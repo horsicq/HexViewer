@@ -20,6 +20,8 @@
 #endif
 #include <cwctype>
 #include <algorithm>
+#include <fstream>
+#include <language.h>
 
 struct OptionsDialogData {
   AppOptions tempOptions;
@@ -36,6 +38,12 @@ struct OptionsDialogData {
   int hoveredWidget;
   int pressedWidget;
 
+  bool dropdownOpen;
+  int dropdownScrollOffset;
+  int hoveredDropdownItem;
+  std::vector<std::string> languages;
+  int selectedLanguage;
+
 #ifdef __linux__
   Display* display;
   Atom wmDeleteWindow;
@@ -46,18 +54,21 @@ struct OptionsDialogData {
     hoveredWidget(-1), pressedWidget(-1),
     renderer(nullptr),
 #ifdef _WIN32
-    window(nullptr),   // HWND is a pointer type
+    window(nullptr),
 #elif defined(__APPLE__)
-    window(nullptr),   // Cocoa id is a pointer type
+    window(nullptr),
 #elif defined(__linux__)
-    window(0),        // X11 Window is an integer type
+    window(0),
 #endif
-    dialogResult(false), running(true), originalOptions(nullptr)
+    dialogResult(false), running(true), originalOptions(nullptr),
+    dropdownOpen(false), hoveredDropdownItem(-1), selectedLanguage(0),
+    dropdownScrollOffset(0)
   {
 #ifdef __linux__
     display = nullptr;
     wmDeleteWindow = 0;
 #endif
+    languages = { "English", "Spanish", "French", "German", "Japanese", "Chinese" };
   }
 };
 
@@ -126,6 +137,74 @@ void DetectNative() {
 #endif
 }
 
+std::filesystem::path GetConfigPath() {
+#ifdef _WIN32
+  wchar_t exePath[MAX_PATH];
+  GetModuleFileNameW(nullptr, exePath, MAX_PATH);
+  std::filesystem::path exeDir(exePath);
+  exeDir = exeDir.parent_path();
+
+  std::wstring exeDirLower = exeDir.wstring();
+  std::transform(exeDirLower.begin(), exeDirLower.end(), exeDirLower.begin(),
+    [](wchar_t c) { return std::towlower(c); });
+  if (exeDirLower.find(L"program files") == std::wstring::npos && !g_isNative) {
+    return exeDir / "hexviewer_config.ini";
+  }
+
+  wchar_t localAppData[MAX_PATH];
+  DWORD len = GetEnvironmentVariableW(L"LOCALAPPDATA", localAppData, MAX_PATH);
+  if (len > 0 && len < MAX_PATH) {
+    return std::filesystem::path(localAppData) / "HexViewer" / "hexviewer_config.ini";
+  }
+
+  return exeDir / "hexviewer_config.ini";
+#else
+  const char* home = getenv("HOME");
+  if (home) {
+    return std::filesystem::path(home) / ".config" / "HexViewer" / "hexviewer_config.ini";
+  }
+  return "hexviewer_config.ini"; // fallback
+#endif
+}
+
+void SaveOptionsToFile(const AppOptions& options) {
+  std::filesystem::path configPath = GetConfigPath();
+
+  std::error_code ec;
+  std::filesystem::create_directories(configPath.parent_path(), ec);
+
+  std::ofstream file(configPath);
+  if (file.is_open()) {
+    file << "darkMode=" << (options.darkMode ? "1" : "0") << "\n";
+    file << "bytesPerLine=" << options.defaultBytesPerLine << "\n";
+    file << "autoReload=" << (options.autoReload ? "1" : "0") << "\n";
+    file << "language=" << options.language << "\n";
+    file.close();
+  }
+}
+
+void LoadOptionsFromFile(AppOptions& options) {
+  std::filesystem::path configPath = GetConfigPath();
+
+  std::ifstream file(configPath);
+  if (file.is_open()) {
+    std::string line;
+    while (std::getline(file, line)) {
+      size_t pos = line.find('=');
+      if (pos != std::string::npos) {
+        std::string key = line.substr(0, pos);
+        std::string value = line.substr(pos + 1);
+
+        if (key == "darkMode") options.darkMode = (value == "1");
+        else if (key == "bytesPerLine") options.defaultBytesPerLine = std::stoi(value);
+        else if (key == "autoReload") options.autoReload = (value == "1");
+        else if (key == "language") options.language = value;
+      }
+    }
+    file.close();
+  }
+}
+
 static OptionsDialogData* g_dialogData = nullptr;
 
 bool IsPointInRect(int x, int y, const Rect& rect) {
@@ -146,7 +225,7 @@ void RenderOptionsDialog(OptionsDialogData* data, int windowWidth, int windowHei
   int controlHeight = 25;
   int spacing = 10;
 
-  data->renderer->drawText("Options", margin, y, theme.headerColor);
+  data->renderer->drawText(Translations::T("Options").c_str(), margin, y, theme.headerColor);
   y += 35;
 
   Rect checkboxRect1(margin, y, 18, 18);
@@ -155,7 +234,7 @@ void RenderOptionsDialog(OptionsDialogData* data, int windowWidth, int windowHei
   checkboxState1.pressed = (data->pressedWidget == 0);
 
   data->renderer->drawModernCheckbox(checkboxState1, theme, data->tempOptions.darkMode);
-  data->renderer->drawText("Dark Mode", margin + 28, y + 2, theme.textColor);
+  data->renderer->drawText(Translations::T("Dark Mode").c_str(), margin + 28, y + 2, theme.textColor);
   y += controlHeight + spacing;
 
   Rect checkboxRect2(margin, y, 18, 18);
@@ -164,21 +243,44 @@ void RenderOptionsDialog(OptionsDialogData* data, int windowWidth, int windowHei
   checkboxState2.pressed = (data->pressedWidget == 1);
 
   data->renderer->drawModernCheckbox(checkboxState2, theme, data->tempOptions.autoReload);
-  data->renderer->drawText("Auto-reload modified file", margin + 28, y + 2, theme.textColor);
+  data->renderer->drawText(Translations::T("Auto-reload modified file").c_str(), margin + 28, y + 2, theme.textColor);
   y += controlHeight + spacing;
 
-  if (!g_isNative) {   // show in portable mode
+  if (!g_isNative) {
     Rect checkboxRect3(margin, y, 18, 18);
     WidgetState checkboxState3(checkboxRect3);
     checkboxState3.hovered = (data->hoveredWidget == 2);
     checkboxState3.pressed = (data->pressedWidget == 2);
 
     data->renderer->drawModernCheckbox(checkboxState3, theme, data->tempOptions.contextMenu);
-    data->renderer->drawText("Add to context menu (right-click files)", margin + 28, y + 2, theme.textColor);
+    data->renderer->drawText(Translations::T("Add to context menu (right-click files)").c_str(), margin + 28, y + 2, theme.textColor);
     y += controlHeight + spacing * 2;
   }
 
-  data->renderer->drawText("Default bytes per line:", margin, y, theme.textColor);
+  data->renderer->drawText(Translations::T("Language:").c_str(), margin, y, theme.textColor);
+  y += controlHeight;
+
+  Rect dropdownRect(margin + 20, y, 200, controlHeight);
+  WidgetState dropdownState(dropdownRect);
+  dropdownState.hovered = (data->hoveredWidget == 7);
+  dropdownState.pressed = (data->pressedWidget == 7);
+
+  data->renderer->drawDropdown(
+    dropdownState,
+    theme,
+    data->languages[data->selectedLanguage],
+    data->dropdownOpen,
+    data->languages,
+    data->selectedLanguage,
+    data->hoveredDropdownItem,
+    data->dropdownScrollOffset
+  );
+
+  y += controlHeight + spacing * 2;
+
+  y += spacing * 8; // Much more space!
+
+  data->renderer->drawText(Translations::T("Default bytes per line:").c_str(), margin, y, theme.textColor);
   y += controlHeight;
 
   Rect radioRect1(margin + 20, y, 16, 16);
@@ -187,7 +289,7 @@ void RenderOptionsDialog(OptionsDialogData* data, int windowWidth, int windowHei
   radioState1.pressed = (data->pressedWidget == 3);
 
   data->renderer->drawModernRadioButton(radioState1, theme, data->tempOptions.defaultBytesPerLine == 8);
-  data->renderer->drawText("8 bytes", margin + 45, y + 1, theme.textColor);
+  data->renderer->drawText(Translations::T("8 bytes").c_str(), margin + 45, y + 1, theme.textColor);
   y += controlHeight;
 
   Rect radioRect2(margin + 20, y, 16, 16);
@@ -196,7 +298,7 @@ void RenderOptionsDialog(OptionsDialogData* data, int windowWidth, int windowHei
   radioState2.pressed = (data->pressedWidget == 4);
 
   data->renderer->drawModernRadioButton(radioState2, theme, data->tempOptions.defaultBytesPerLine == 16);
-  data->renderer->drawText("16 bytes", margin + 45, y + 1, theme.textColor);
+  data->renderer->drawText(Translations::T("16 bytes").c_str(), margin + 45, y + 1, theme.textColor);
   y += controlHeight + spacing * 2;
 
   int buttonWidth = 75;
@@ -209,14 +311,14 @@ void RenderOptionsDialog(OptionsDialogData* data, int windowWidth, int windowHei
   okButtonState.hovered = (data->hoveredWidget == 5);
   okButtonState.pressed = (data->pressedWidget == 5);
 
-  data->renderer->drawModernButton(okButtonState, theme, "OK");
+  data->renderer->drawModernButton(okButtonState, theme, Translations::T("OK").c_str());
 
   Rect cancelButtonRect(windowWidth - margin - buttonWidth, buttonY, buttonWidth, buttonHeight);
   WidgetState cancelButtonState(cancelButtonRect);
   cancelButtonState.hovered = (data->hoveredWidget == 6);
   cancelButtonState.pressed = (data->pressedWidget == 6);
 
-  data->renderer->drawModernButton(cancelButtonState, theme, "Cancel");
+  data->renderer->drawModernButton(cancelButtonState, theme, Translations::T("Cancel").c_str());
 
   data->renderer->endFrame();
 }
@@ -228,6 +330,7 @@ void UpdateHoverState(OptionsDialogData* data, int x, int y, int windowWidth, in
   int spacing = 10;
 
   data->hoveredWidget = -1;
+  data->hoveredDropdownItem = -1;
 
   Rect checkboxRect1(margin, startY, 18, 18);
   if (IsPointInRect(x, y, checkboxRect1)) {
@@ -248,6 +351,37 @@ void UpdateHoverState(OptionsDialogData* data, int x, int y, int windowWidth, in
     if (IsPointInRect(x, y, checkboxRect3)) {
       data->hoveredWidget = 2;
       return;
+    }
+    startY += controlHeight + spacing * 2;
+  }
+
+  startY += controlHeight;
+
+  Rect dropdownRect(margin + 20, startY, 200, controlHeight);
+  if (IsPointInRect(x, y, dropdownRect)) {
+    data->hoveredWidget = 7;
+    if (!data->dropdownOpen) {
+      return;
+    }
+  }
+
+  if (data->dropdownOpen) {
+    int itemHeight = 28;
+    int maxVisibleItems = 3;
+    int dropdownItemY = startY + controlHeight + 2;
+
+    for (size_t i = 0; i < data->languages.size(); i++) {
+      int visualIndex = (int)i - data->dropdownScrollOffset;
+
+      if (visualIndex < 0 || visualIndex >= maxVisibleItems) {
+        continue;
+      }
+
+      Rect itemRect(margin + 20, dropdownItemY + (visualIndex * itemHeight), 200, itemHeight);
+      if (IsPointInRect(x, y, itemRect)) {
+        data->hoveredDropdownItem = i;
+        return;
+      }
     }
   }
 
@@ -285,6 +419,12 @@ void UpdateHoverState(OptionsDialogData* data, int x, int y, int windowWidth, in
 }
 
 void HandleMouseClick(OptionsDialogData* data, int x, int y, int windowWidth, int windowHeight) {
+  if (data->dropdownOpen && data->hoveredDropdownItem >= 0) {
+    data->selectedLanguage = data->hoveredDropdownItem;
+    data->dropdownOpen = false;
+    return;
+  }
+
   if (data->hoveredWidget == -1) return;
 
   switch (data->hoveredWidget) {
@@ -329,7 +469,7 @@ void HandleMouseClick(OptionsDialogData* data, int x, int y, int windowWidth, in
         MessageBoxW(nullptr,
           L"Failed to register context menu.",
           L"Error", MB_OK | MB_ICONERROR);
-        data->tempOptions.contextMenu = false; // Revert
+        data->tempOptions.contextMenu = false;
       }
     }
     else if (!shouldBeRegistered && wasRegistered) {
@@ -337,11 +477,12 @@ void HandleMouseClick(OptionsDialogData* data, int x, int y, int windowWidth, in
         MessageBoxW(nullptr,
           L"Failed to unregister context menu.",
           L"Error", MB_OK | MB_ICONERROR);
-        data->tempOptions.contextMenu = true; // Revert
+        data->tempOptions.contextMenu = true;
       }
     }
 #endif
 
+    data->tempOptions.language = data->languages[data->selectedLanguage];
     * data->originalOptions = data->tempOptions;
     data->dialogResult = true;
     data->running = false;
@@ -352,6 +493,14 @@ void HandleMouseClick(OptionsDialogData* data, int x, int y, int windowWidth, in
     data->dialogResult = false;
     data->running = false;
     break;
+
+  case 7: // Dropdown
+    data->dropdownOpen = !data->dropdownOpen;
+    if (!data->dropdownOpen) {
+      data->dropdownScrollOffset = 0;  // Reset scroll when closing
+    }
+    break;
+
   }
 }
 
@@ -386,6 +535,42 @@ LRESULT CALLBACK OptionsWindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lP
     }
     return 0;
   }
+  case WM_MOUSEWHEEL: {
+    if (data && data->dropdownOpen) {
+      RECT rect;
+      GetClientRect(hwnd, &rect);
+
+      int margin = 20;
+      int startY = margin + 35 + 25 + 10 + 25 + 10; // Calculate dropdown Y position
+      if (!g_isNative) {
+        startY += 25 + 10 * 2;
+      }
+      startY += 25; // Skip "Language:" label
+
+      Rect dropdownRect(margin + 20, startY, 200, 25);
+
+      if (data->mouseX >= dropdownRect.x &&
+        data->mouseX <= dropdownRect.x + dropdownRect.width &&
+        data->mouseY >= dropdownRect.y) {
+
+        int delta = GET_WHEEL_DELTA_WPARAM(wParam);
+        int maxVisibleItems = 3;
+        int maxScroll = std::max(0, (int)data->languages.size() - maxVisibleItems);
+
+        if (delta > 0) {
+          data->dropdownScrollOffset = std::max(0, data->dropdownScrollOffset - 1);
+        }
+        else {
+          data->dropdownScrollOffset = std::min(maxScroll, data->dropdownScrollOffset + 1);
+        }
+
+        UpdateHoverState(data, data->mouseX, data->mouseY, rect.right, rect.bottom);
+        InvalidateRect(hwnd, NULL, FALSE);
+        return 0;
+      }
+    }
+    break;
+  }
 
   case WM_LBUTTONDOWN: {
     if (data) {
@@ -408,7 +593,7 @@ LRESULT CALLBACK OptionsWindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lP
       int y = HIWORD(lParam);
       data->mouseDown = false;
 
-      if (data->pressedWidget == data->hoveredWidget) {
+      if (data->pressedWidget == data->hoveredWidget || data->hoveredDropdownItem >= 0) {
         HandleMouseClick(data, x, y, rect.right, rect.bottom);
       }
 
@@ -473,8 +658,14 @@ bool OptionsDialog::Show(HWND parent, AppOptions& options)
   data.running = true;
   g_dialogData = &data;
 
+  for (size_t i = 0; i < data.languages.size(); i++) {
+    if (data.languages[i] == options.language) {
+      data.selectedLanguage = i;
+      break;
+    }
+  }
   int width = 400;
-  int height = 310;
+  int height = 480; // Increased height for dropdown with full list
 
   RECT parentRect;
   GetWindowRect(parent, &parentRect);
@@ -581,7 +772,7 @@ void ProcessOptionsEvent(OptionsDialogData* data, XEvent* event, int width, int 
     if (event->xbutton.button == Button1) {
       data->mouseDown = false;
 
-      if (data->pressedWidget == data->hoveredWidget) {
+      if (data->pressedWidget == data->hoveredWidget || data->hoveredDropdownItem >= 0) {
         HandleMouseClick(data, event->xbutton.x, event->xbutton.y, width, height);
       }
 
@@ -634,7 +825,7 @@ bool OptionsDialog::Show(NativeWindow parent, AppOptions& options) {
   g_dialogData = &data;
 
   int width = 400;
-  int height = 310;
+  int height = 480;
 
   Window window = XCreateSimpleWindow(
     display, rootWindow,
@@ -644,7 +835,6 @@ bool OptionsDialog::Show(NativeWindow parent, AppOptions& options) {
   );
 
   data.window = window;
-  data.window = (NativeWindow)window;
 
   XStoreName(display, window, "Options");
 

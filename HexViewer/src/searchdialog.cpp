@@ -19,6 +19,7 @@ typedef void* SEL;
 #include <X11/Xutil.h>
 #include <X11/Xatom.h>
 #endif
+#include <language.h>
 
 namespace SearchDialogs {
 
@@ -79,7 +80,7 @@ namespace SearchDialogs {
     int margin = 20;
     int y = margin + 10;
 
-    data->renderer->drawText("Find:", margin, y, theme.textColor);
+    data->renderer->drawText(Translations::T("Find:").c_str(), margin, y, theme.textColor);
     y += 28;
 
     Rect findBox(margin, y, windowWidth - margin * 2, 30);
@@ -93,7 +94,7 @@ namespace SearchDialogs {
 
     y += 48;
 
-    data->renderer->drawText("Replace:", margin, y, theme.textColor);
+    data->renderer->drawText(Translations::T("Replace:").c_str(), margin, y, theme.textColor);
     y += 28;
 
     Rect replaceBox(margin, y, windowWidth - margin * 2, 30);
@@ -117,14 +118,14 @@ namespace SearchDialogs {
     okState.hovered = (data->hoveredWidget == 0);
     okState.pressed = (data->pressedWidget == 0);
     okState.enabled = true;
-    data->renderer->drawModernButton(okState, theme, "Replace");
+    data->renderer->drawModernButton(okState, theme, Translations::T("Replace").c_str());
 
     WidgetState cancelState;
     cancelState.rect = cancelButton;
     cancelState.hovered = (data->hoveredWidget == 1);
     cancelState.pressed = (data->pressedWidget == 1);
     cancelState.enabled = true;
-    data->renderer->drawModernButton(cancelState, theme, "Cancel");
+    data->renderer->drawModernButton(cancelState, theme, Translations::T("Cancel").c_str());
 
     data->renderer->endFrame();
   }
@@ -139,7 +140,7 @@ namespace SearchDialogs {
     int margin = 20;
     int y = margin;
 
-    data->renderer->drawText("Offset:", margin, y + 8, theme.textColor);
+    data->renderer->drawText(Translations::T("Offset:").c_str(), margin, y + 8, theme.textColor);
 
     Rect offsetBox(80, y, windowWidth - 100, 30);
     Color offsetBg = (data->activeTextBox == 0) ? Color(70, 70, 75) : Color(55, 55, 60);
@@ -162,14 +163,14 @@ namespace SearchDialogs {
     okState.hovered = (data->hoveredWidget == 0);
     okState.pressed = (data->pressedWidget == 0);
     okState.enabled = true;
-    data->renderer->drawModernButton(okState, theme, "Go");
+    data->renderer->drawModernButton(okState, theme, Translations::T("Go").c_str());
 
     WidgetState cancelState;
     cancelState.rect = cancelButton;
     cancelState.hovered = (data->hoveredWidget == 1);
     cancelState.pressed = (data->pressedWidget == 1);
     cancelState.enabled = true;
-    data->renderer->drawModernButton(cancelState, theme, "Cancel");
+    data->renderer->drawModernButton(cancelState, theme, Translations::T("Cancel").c_str());
 
     data->renderer->endFrame();
   }

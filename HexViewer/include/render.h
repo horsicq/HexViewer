@@ -176,6 +176,16 @@ public:
   void drawModernCheckbox(const WidgetState& state, const Theme& theme, bool checked);
   void drawModernRadioButton(const WidgetState& state, const Theme& theme, bool selected);
 
+  void drawDropdown(
+    const WidgetState& state,
+    const Theme& theme,
+    const std::string& selectedText,
+    bool isOpen,
+    const std::vector<std::string>& items,
+    int selectedIndex,
+    int hoveredIndex,
+    int scrollOffset);
+
   void renderHexViewer(
     const std::vector<std::string>& hexLines,
     const std::string& headerLine,

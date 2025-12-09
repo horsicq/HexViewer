@@ -10,6 +10,7 @@
 #include "HexData.h"
 #include "searchdialog.h"
 #include "menu.h"
+#include "language.h"
 
 #ifdef _WIN32
 #include <windows.h>
@@ -50,7 +51,7 @@ int editingRow = -1;
 int editingCol = -1;
 
 #ifdef _WIN32
-AppOptions g_options = { true, 16, false };
+AppOptions g_options = { true, 16, false, false, "English" }; 
 HWND g_hWnd = NULL;
 std::wstring currentFilePathW;
 
@@ -94,6 +95,75 @@ std::wstring string_to_wstring(const std::string& str) {
   return result;
 }
 
+void RebuildMenuBar() {
+  if (menuBar) {
+    delete menuBar;
+    menuBar = nullptr;
+  }
+
+  menuBar = new MenuBar();
+
+  Menu fileMenu(Translations::T("File"));
+  MenuItem openItem(Translations::T("Open"), MenuItemType::Normal);
+  openItem.shortcut = "Ctrl+O";
+  openItem.callback = []() { LoadFile(); };
+  fileMenu.items.push_back(openItem);
+
+  MenuItem saveItem(Translations::T("Save"), MenuItemType::Normal);
+  saveItem.shortcut = "Ctrl+S";
+  saveItem.callback = []() { SaveFile(); };
+  fileMenu.items.push_back(saveItem);
+
+  MenuItem exitItem(Translations::T("Exit"), MenuItemType::Normal);
+  exitItem.callback = []() { PostQuitMessage(0); };
+  fileMenu.items.push_back(exitItem);
+
+  Menu searchMenu(Translations::T("Search"));
+  MenuItem findReplaceItem(Translations::T("Find and Replace..."), MenuItemType::Normal);
+  findReplaceItem.shortcut = "Ctrl+F";
+  findReplaceItem.callback = []() {
+    SearchDialogs::ShowFindReplaceDialog(g_hWnd, g_options.darkMode,
+      [](const std::string& find, const std::string& replace) {
+        MessageBoxA(g_hWnd,
+          ("Find: " + find + "\nReplace: " + replace).c_str(),
+          "Find & Replace", MB_OK);
+      });
+    };
+  searchMenu.items.push_back(findReplaceItem);
+
+  MenuItem goToItem(Translations::T("Go To..."), MenuItemType::Normal);
+  goToItem.shortcut = "Ctrl+G";
+  goToItem.callback = []() {
+    SearchDialogs::ShowGoToDialog(g_hWnd, g_options.darkMode,
+      [](int line) {
+        MessageBoxA(g_hWnd,
+          ("Go to line: " + std::to_string(line)).c_str(),
+          "Go To", MB_OK);
+      });
+    };
+  searchMenu.items.push_back(goToItem);
+
+  Menu toolsMenu(Translations::T("Tools"));
+  MenuItem optionsItem(Translations::T("Options..."), MenuItemType::Normal);
+  optionsItem.callback = []() { ShowOptionsDialog(); };
+  toolsMenu.items.push_back(optionsItem);
+
+  Menu helpMenu(Translations::T("Help"));
+  MenuItem aboutItem(Translations::T("About HexViewer"), MenuItemType::Normal);
+  aboutItem.callback = []() {
+    AboutDialog::Show(g_hWnd, g_options.darkMode);
+    };
+  helpMenu.items.push_back(aboutItem);
+
+  menuBar->addMenu(fileMenu);
+  menuBar->addMenu(searchMenu);
+  menuBar->addMenu(toolsMenu);
+  menuBar->addMenu(helpMenu);
+
+  menuBar->setPosition(0, 0);
+  menuBar->setHeight(24);
+}
+
 void ShowOptionsDialog() {
   AppOptions oldOptions = g_options;
 
@@ -105,6 +175,12 @@ void ShowOptionsDialog() {
       needsRedraw = true;
     }
 
+    if (oldOptions.language != g_options.language) {
+      Translations::SetLanguage(g_options.language);
+      RebuildMenuBar();  // Rebuild menu with new translations
+      needsRedraw = true;
+    }
+
     if (oldOptions.defaultBytesPerLine != g_options.defaultBytesPerLine && !hexData->isEmpty()) {
       hexData->regenerateHexLines(g_options.defaultBytesPerLine);
       scrollPos = 0;
@@ -113,6 +189,8 @@ void ShowOptionsDialog() {
       UpdateScrollbar(rc.right - rc.left, rc.bottom - rc.top);
       needsRedraw = true;
     }
+
+    SaveOptionsToFile(g_options);
 
     if (needsRedraw) {
       InvalidateRect(g_hWnd, NULL, FALSE);
@@ -541,6 +619,13 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
   WNDCLASSEXW wcex = {};
 
+  Translations::Initialize();
+
+  DetectNative();
+  LoadOptionsFromFile(g_options);
+
+  Translations::SetLanguage(g_options.language);
+
   wcex.cbSize = sizeof(WNDCLASSEX);
   wcex.style = CS_HREDRAW | CS_VREDRAW | CS_OWNDC | CS_DBLCLKS;
   wcex.lpfnWndProc = WndProc;
@@ -549,8 +634,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
   wcex.hbrBackground = nullptr;
   wcex.lpszClassName = L"HexViewerClass";
   RegisterClassExW(&wcex);
-
-  DetectNative();
 
   HWND hWnd = CreateWindowW(L"HexViewerClass", L"HexViewer", WS_OVERLAPPEDWINDOW,
     CW_USEDEFAULT, 0, 1024, 768, nullptr, nullptr, hInstance, nullptr);
@@ -570,61 +653,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
   renderManager->resize(rc.right - rc.left, rc.bottom - rc.top);
   hexData = new HexData();
 
-  menuBar = new MenuBar();
-
-  Menu fileMenu = MenuHelper::createFileMenu(
-    []() { LoadFile(); },
-    []() { LoadFile(); },
-    []() { SaveFile(); },
-    []() { PostQuitMessage(0); }
-  );
-
-  Menu toolsMenu("Tools");
-  MenuItem optionsItem("Options...", MenuItemType::Normal);
-  optionsItem.callback = []() { ShowOptionsDialog(); };
-  toolsMenu.items.push_back(optionsItem);
-
-  Menu searchMenu("Search");
-
-  MenuItem findReplaceItem("Find and Replace...", MenuItemType::Normal);
-  findReplaceItem.shortcut = "Ctrl+F";
-  findReplaceItem.callback = []() {
-    SearchDialogs::ShowFindReplaceDialog(g_hWnd, g_options.darkMode,
-      [](const std::string& find, const std::string& replace) {
-        MessageBoxA(g_hWnd,
-          ("Find: " + find + "\nReplace: " + replace).c_str(),
-          "Find & Replace", MB_OK);
-      });
-    };
-  searchMenu.items.push_back(findReplaceItem);
-
-  MenuItem goToItem("Go To...", MenuItemType::Normal);
-  goToItem.shortcut = "Ctrl+G";
-  goToItem.callback = []() {
-    SearchDialogs::ShowGoToDialog(g_hWnd, g_options.darkMode,
-      [](int line) {
-        MessageBoxA(g_hWnd,
-          ("Go to line: " + std::to_string(line)).c_str(),
-          "Go To", MB_OK);
-      });
-    };
-  searchMenu.items.push_back(goToItem);
-
-  Menu helpMenu("Help");
-
-  MenuItem aboutItem("About HexViewer", MenuItemType::Normal);
-  aboutItem.callback = []() {
-    AboutDialog::Show(g_hWnd, g_options.darkMode);
-    };
-  helpMenu.items.push_back(aboutItem);
-
-  menuBar->addMenu(fileMenu);
-  menuBar->addMenu(searchMenu);
-  menuBar->addMenu(toolsMenu);
-  menuBar->addMenu(helpMenu);
-
-  menuBar->setPosition(0, 0);
-  menuBar->setHeight(24);
+  RebuildMenuBar();
 
   ShowWindow(hWnd, nCmdShow);
   UpdateWindow(hWnd);
@@ -644,7 +673,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
   return (int)msg.wParam;
 }
-
 #elif __APPLE__
 
 NSWindow* g_nsWindow = nullptr;

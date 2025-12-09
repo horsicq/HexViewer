@@ -15,6 +15,7 @@
 #include <X11/Xutil.h>
 #include <stdlib.h>
 #endif
+#include <language.h>
 
 RenderManager* UpdateDialog::renderer = nullptr;
 UpdateInfo UpdateDialog::currentInfo = {};
@@ -641,19 +642,19 @@ void UpdateDialog::RenderContent(int width, int height) {
   renderer->drawText("i", 35, 32, Color::White());
 
   std::string title = currentInfo.updateAvailable ?
-    "Update Available!" : "You're up to date!";
+    Translations::T("Update Available!") : Translations::T("You're up to date!");
   renderer->drawText(title, 80, 25, theme.textColor);
 
-  std::string versionText = "Current: " + currentInfo.currentVersion;
+  std::string versionText = Translations::T("Current:") + " " + currentInfo.currentVersion;
   if (currentInfo.updateAvailable) {
-    versionText += " ? Latest: " + currentInfo.latestVersion;
+    versionText += " → " + Translations::T("Latest:") + " " + currentInfo.latestVersion;
   }
   renderer->drawText(versionText, 80, 50, theme.disabledText);
 
   renderer->drawLine(0, 80, width, 80, theme.separator);
 
   if (currentInfo.updateAvailable && !currentInfo.releaseNotes.empty()) {
-    renderer->drawText("What's New:", 20, 100, theme.textColor);
+    renderer->drawText(Translations::T("What's New:").c_str(), 20, 100, theme.textColor);
 
     std::istringstream stream(currentInfo.releaseNotes);
     std::string line;
@@ -662,7 +663,7 @@ void UpdateDialog::RenderContent(int width, int height) {
 
     while (std::getline(stream, line) && y < maxY) {
       if (y > 80) {
-        renderer->drawText("� " + line, 30, y, theme.disabledText);
+        renderer->drawText("• " + line, 30, y, theme.disabledText);
       }
       y += 25;
     }
@@ -679,12 +680,11 @@ void UpdateDialog::RenderContent(int width, int height) {
         (scrollOffset / (float)maxScroll));
 
       scrollThumbRect = Rect(scrollbarRect.x, thumbY, scrollbarRect.width, thumbHeight);
-      
     }
   }
   else if (!currentInfo.updateAvailable) {
-    renderer->drawText("You have the latest version installed.", 20, 120, theme.textColor);
-    renderer->drawText("Check back later for updates.", 20, 150, theme.disabledText);
+    renderer->drawText(Translations::T("You have the latest version installed.").c_str(), 20, 120, theme.textColor);
+    renderer->drawText(Translations::T("Check back later for updates.").c_str(), 20, 150, theme.disabledText);
   }
 
   int buttonY = height - 60;
@@ -697,7 +697,7 @@ void UpdateDialog::RenderContent(int width, int height) {
     updateState.enabled = true;
     updateState.hovered = (hoveredButton == 1);
     updateState.pressed = (pressedButton == 1);
-    renderer->drawModernButton(updateState, theme, "Update Now");
+    renderer->drawModernButton(updateState, theme, Translations::T("Update Now").c_str());
 
     skipButtonRect = Rect(width - 150, buttonY, 100, buttonHeight);
     WidgetState skipState;
@@ -705,7 +705,7 @@ void UpdateDialog::RenderContent(int width, int height) {
     skipState.enabled = true;
     skipState.hovered = (hoveredButton == 2);
     skipState.pressed = (pressedButton == 2);
-    renderer->drawModernButton(skipState, theme, "Skip");
+    renderer->drawModernButton(skipState, theme, Translations::T("Skip").c_str());
   }
   else {
     closeButtonRect = Rect((width - 120) / 2, buttonY, 120, buttonHeight);
@@ -714,7 +714,7 @@ void UpdateDialog::RenderContent(int width, int height) {
     closeState.enabled = true;
     closeState.hovered = (hoveredButton == 3);
     closeState.pressed = (pressedButton == 3);
-    renderer->drawModernButton(closeState, theme, "Close");
+    renderer->drawModernButton(closeState, theme, Translations::T("Close").c_str());
   }
 
   renderer->endFrame();

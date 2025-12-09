@@ -514,6 +514,180 @@ void RenderManager::drawModernRadioButton(const WidgetState& state, const Theme&
 #endif
 }
 
+void RenderManager::drawDropdown(
+  const WidgetState& state,
+  const Theme& theme,
+  const std::string& selectedText,
+  bool isOpen,
+  const std::vector<std::string>& items,
+  int selectedIndex,
+  int hoveredIndex,
+  int scrollOffset)
+{
+  float radius = 4.0f;
+
+  Color bgColor = theme.controlBackground;
+  bgColor.a = 255; // Force fully opaque
+
+  drawRect(state.rect, bgColor, true);
+
+  Color borderColor = theme.controlBorder;
+
+  if (state.hovered && !isOpen) {
+    borderColor = Color(
+      std::min(255, borderColor.r + 30),
+      std::min(255, borderColor.g + 30),
+      std::min(255, borderColor.b + 30)
+    );
+  }
+
+  drawRect(state.rect, bgColor, true);
+  drawRoundedRect(state.rect, radius, bgColor, true);
+  drawRoundedRect(state.rect, radius, borderColor, false);
+
+  int textX = state.rect.x + 10;
+  int textY = state.rect.y + (state.rect.height / 2) - 6;
+  drawText(selectedText, textX, textY, theme.textColor);
+
+  int arrowX = state.rect.x + state.rect.width - 18;
+  int arrowY = state.rect.y + (state.rect.height / 2);
+
+  Color arrowColor = theme.textColor;
+
+  if (isOpen) {
+    drawLine(arrowX + 4, arrowY - 3, arrowX, arrowY + 2, arrowColor);
+    drawLine(arrowX + 4, arrowY - 3, arrowX + 8, arrowY + 2, arrowColor);
+    drawLine(arrowX, arrowY + 2, arrowX + 8, arrowY + 2, arrowColor);
+  }
+  else {
+    drawLine(arrowX, arrowY - 2, arrowX + 8, arrowY - 2, arrowColor);
+    drawLine(arrowX, arrowY - 2, arrowX + 4, arrowY + 3, arrowColor);
+    drawLine(arrowX + 8, arrowY - 2, arrowX + 4, arrowY + 3, arrowColor);
+  }
+
+  if (isOpen && !items.empty()) {
+    int itemHeight = 28; // Slightly taller for better readability
+    int maxVisibleItems = 3; // Show max 3 items, then scroll
+
+    int maxScroll = std::max(0, (int)items.size() - maxVisibleItems);
+    scrollOffset = std::max(0, std::min(scrollOffset, maxScroll));
+
+    int visibleItems = std::min((int)items.size() - scrollOffset, maxVisibleItems);
+    int listHeight = itemHeight * visibleItems;
+    int listY = state.rect.y + state.rect.height + 2;
+
+    Rect clearRect(state.rect.x - 5, listY - 5, state.rect.width + 10, listHeight + 10);
+    Color windowBg = theme.windowBackground;
+    windowBg.a = 255;
+    drawRect(clearRect, windowBg, true);
+
+    Rect shadowRect(state.rect.x + 3, listY + 3, state.rect.width, listHeight);
+    Color shadowColor(0, 0, 0, 80);
+    drawRect(shadowRect, shadowColor, true);
+
+    Rect listRect(state.rect.x, listY, state.rect.width, listHeight);
+
+    Color listBg = theme.menuBackground;
+    listBg.a = 255; // Make sure it's fully opaque
+
+    drawRect(listRect, listBg, true);
+
+    drawRoundedRect(listRect, radius, listBg, true);
+
+    Color listBorder = theme.menuBorder;
+    drawRoundedRect(listRect, radius, listBorder, false);
+
+    for (int visualIndex = 0; visualIndex < visibleItems; visualIndex++) {
+      size_t actualIndex = scrollOffset + visualIndex;
+
+      Rect itemRect(
+        state.rect.x + 1,
+        listY + (visualIndex * itemHeight) + 1,
+        state.rect.width - 2,
+        itemHeight - 1
+      );
+
+      bool isSelected = ((int)actualIndex == selectedIndex);
+      bool isHovered = ((int)actualIndex == hoveredIndex);
+
+      Color itemBg;
+
+      if (isHovered) {
+        itemBg = theme.menuHover;
+      }
+      else if (isSelected) {
+        itemBg = Color(
+          (theme.controlCheck.r + theme.menuBackground.r) / 2,
+          (theme.controlCheck.g + theme.menuBackground.g) / 2,
+          (theme.controlCheck.b + theme.menuBackground.b) / 2
+        );
+      }
+      else {
+        itemBg = listBg;
+      }
+
+      itemBg.a = 255; // FORCE fully opaque
+
+      drawRect(itemRect, itemBg, true);
+
+      int itemTextX = itemRect.x + 10;
+      int itemTextY = itemRect.y + (itemRect.height / 2) - 6;
+
+      Color textColor = theme.textColor;
+      if (isSelected) {
+        textColor = Color(
+          std::min(255, textColor.r + 20),
+          std::min(255, textColor.g + 20),
+          std::min(255, textColor.b + 20)
+        );
+      }
+
+      drawText(items[actualIndex], itemTextX, itemTextY, textColor);
+
+      if (isSelected) {
+        int checkX = itemRect.x + itemRect.width - 20;
+        int checkY = itemRect.y + itemRect.height / 2;
+        Color checkColor = theme.controlCheck;
+
+        drawLine(checkX, checkY, checkX + 2, checkY + 3, checkColor);
+        drawLine(checkX + 2, checkY + 3, checkX + 6, checkY - 2, checkColor);
+        drawLine(checkX + 1, checkY, checkX + 3, checkY + 3, checkColor);
+        drawLine(checkX + 3, checkY + 3, checkX + 7, checkY - 2, checkColor);
+      }
+
+      if (visualIndex < visibleItems - 1) {
+        Color separatorColor = Color(
+          theme.separator.r,
+          theme.separator.g,
+          theme.separator.b,
+          100
+        );
+        drawLine(
+          itemRect.x + 8,
+          itemRect.y + itemRect.height,
+          itemRect.x + itemRect.width - 8,
+          itemRect.y + itemRect.height,
+          separatorColor
+        );
+      }
+    }
+
+    if (scrollOffset > 0) {
+      int arrowTopX = state.rect.x + state.rect.width / 2 - 4;
+      int arrowTopY = listY + 8;
+      Color scrollHint = theme.textColor;
+      drawText("^", arrowTopX, arrowTopY - 4, scrollHint);
+    }
+
+    if (scrollOffset < maxScroll) {
+      int arrowBottomX = state.rect.x + state.rect.width / 2 - 4;
+      int arrowBottomY = listY + listHeight - 12;
+      Color scrollHint = theme.textColor;
+      drawText("v", arrowBottomX, arrowBottomY, scrollHint);
+    }
+  }
+}
+
 void RenderManager::renderHexViewer(
   const std::vector<std::string>& hexLines,
   const std::string& headerLine,
