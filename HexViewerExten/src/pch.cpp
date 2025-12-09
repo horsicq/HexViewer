@@ -1,6 +1,4 @@
-
 #include "pch.h"
-
 
 void LogMessage(const std::wstring& message) {
 #ifdef _DEBUG
@@ -13,11 +11,11 @@ void LogMessage(const std::wstring& message) {
             logFile.close();
         }
         else {
-            std::cerr << "Failed to open log file." << std::endl;
+            fprint(stderr, "Failed to open log file.");
         }
     }
     else {
-        std::cerr << "Failed to get desktop directory." << std::endl;
+        fprintf(stderr, "Failed to get desktop directory.");
     }
 #endif
 }

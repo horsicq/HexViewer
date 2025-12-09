@@ -63,7 +63,7 @@ set(SOURCES
     HexViewer/src/HexData.cpp
     HexViewer/src/menu.cpp
     HexViewer/src/update.cpp
-    HexViewer/src/Options.cpp
+    HexViewer/src/options.cpp
     HexViewer/src/searchdialog.cpp
     HexViewer/src/about.cpp
     HexViewer/src/contextmenu.cpp
@@ -211,7 +211,7 @@ elseif(APPLE)
     set(CPACK_GENERATOR "DragNDrop")
 else()
     set(CPACK_GENERATOR "TGZ;DEB")
-    set(CPACK_DEBIAN_PACKAGE_MAINTAINER "Your Name")
+    set(CPACK_DEBIAN_PACKAGE_MAINTAINER "DevX-Cipher")
     set(CPACK_DEBIAN_PACKAGE_DEPENDS "libx11-6")
 endif()
 include(CPack)

@@ -662,7 +662,7 @@ void UpdateDialog::RenderContent(int width, int height) {
 
     while (std::getline(stream, line) && y < maxY) {
       if (y > 80) {
-        renderer->drawText("• " + line, 30, y, theme.disabledText);
+        renderer->drawText("ï¿½ " + line, 30, y, theme.disabledText);
       }
       y += 25;
     }

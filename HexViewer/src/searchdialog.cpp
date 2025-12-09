@@ -414,7 +414,7 @@ namespace SearchDialogs {
       }
       return 0;
     }
-    }
+  }
 
     return DefWindowProc(hwnd, msg, wParam, lParam);
   }
@@ -500,7 +500,7 @@ namespace SearchDialogs {
       }
       return 0;
     }
-    }
+  }
 
     return DefWindowProc(hwnd, msg, wParam, lParam);
   }

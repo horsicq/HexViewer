@@ -397,7 +397,7 @@ bool AboutDialog::OnMouseUp(HWND hWnd, int x, int y) {
       "Fixed scrollbar flickering on Linux\n"
       "Fixed memory leak in hex editor\n"
       "Improved file loading speed";
-    info.downloadUrl = "https://github.com/yourproject/hexviewer/releases/latest";
+      info.downloadUrl = "https://github.com/horsicq/HexViewer/releases/latest";
 
     ShowWindow(hWnd, SW_HIDE);
     UpdateDialog::Show(parentWindow, info);
@@ -454,7 +454,7 @@ bool AboutDialog::OnMouseUp(int x, int y) {
       "Fixed scrollbar flickering on Linux\n"
       "Fixed memory leak in hex editor\n"
       "Improved file loading speed";
-    info.downloadUrl = "https://github.com/yourproject/hexviewer/releases/latest";
+    info.downloadUrl = "https://github.com/horsicq/HexViewer/releases/latest";
 
     UpdateDialog::Show(parentWindow, info);
     return true;
@@ -512,7 +512,7 @@ bool AboutDialog::OnMouseUp(int x, int y) {
       "Fixed scrollbar flickering on Linux\n"
       "Fixed memory leak in hex editor\n"
       "Improved file loading speed";
-    info.downloadUrl = "https://github.com/yourproject/hexviewer/releases/latest";
+    info.downloadUrl = "https://github.com/horsicq/HexViewer/releases/latest";
 
     UpdateDialog::Show(parentWindow, info);
     return true;
@@ -543,9 +543,9 @@ void AboutDialog::RenderContent(int width, int height) {
 
   int featuresY = 100;
   renderer->drawText("Features:", 40, featuresY, theme.textColor);
-  renderer->drawText("• Cross-platform support", 50, featuresY + 30, theme.disabledText);
-  renderer->drawText("• Real-time hex editing", 50, featuresY + 55, theme.disabledText);
-  renderer->drawText("• Dark mode support", 50, featuresY + 80, theme.disabledText);
+  renderer->drawText("- Cross-platform support", 50, featuresY + 30, theme.disabledText);
+  renderer->drawText("- Real-time hex editing", 50, featuresY + 55, theme.disabledText);
+  renderer->drawText("- Dark mode support", 50, featuresY + 80, theme.disabledText);
 
   renderer->drawLine(0, height - 90, width, height - 90, theme.separator);
 
@@ -562,7 +562,7 @@ void AboutDialog::RenderContent(int width, int height) {
   updateState.pressed = (pressedButton == 1);
   renderer->drawModernButton(updateState, theme, "Check for Updates");
 
-  std::string copyright = "© 2025 HexViewer Project";
+  std::string copyright = "2025 Hors";
   int copyrightX = (width - (copyright.length() * 8)) / 2;
   renderer->drawText(copyright, copyrightX, height - 15, theme.disabledText);
 

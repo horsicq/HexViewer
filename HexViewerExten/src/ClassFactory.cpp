@@ -5,9 +5,7 @@
 
 #include "ShellEx.h"
 
-
 extern long g_cDllRef;
-
 
 ClassFactory::ClassFactory() : m_cRef(1)
 {
@@ -18,8 +16,6 @@ ClassFactory::~ClassFactory()
 {
     InterlockedDecrement(&g_cDllRef);
 }
-
-
 
 IFACEMETHODIMP ClassFactory::QueryInterface(REFIID riid, void **ppv)
 {
@@ -45,8 +41,6 @@ IFACEMETHODIMP_(ULONG) ClassFactory::Release()
     }
     return cRef;
 }
-
-
 
 IFACEMETHODIMP ClassFactory::CreateInstance(IUnknown* pUnkOuter, REFIID riid, void** ppv)
 {

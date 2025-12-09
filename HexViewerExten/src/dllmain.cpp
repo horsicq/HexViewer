@@ -1,15 +1,13 @@
 #include "pch.h"
 #include "ClassFactory.h"
 
-
 HINSTANCE g_hInst = NULL;
-long        g_cDllRef = 0;
+long      g_cDllRef = 0;
 
 #pragma comment(linker, "/export:DllCanUnloadNow=DllCanUnloadNow")
 #pragma comment(linker, "/export:DllGetClassObject=DllGetClassObject")
 #pragma comment(linker, "/export:DllRegisterServer=DllRegisterServer")
 #pragma comment(linker, "/export:DllUnregisterServer=DllUnregisterServer")
-
 
 BOOL APIENTRY DllMain(HMODULE hModule, DWORD dwReason, LPVOID lpReserved)
 {
@@ -100,4 +98,3 @@ extern "C" STDAPI DllUnregisterServer(void)
 
 	return hr;
 }
-
