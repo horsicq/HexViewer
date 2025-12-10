@@ -19,7 +19,9 @@ if(MSVC)
 endif()
 
 set(CAPSTONE_DIR "")
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/Capstone")
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/Capstone/src")
+    set(CAPSTONE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/Capstone/src")
+elseif(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/Capstone")
     set(CAPSTONE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/Capstone")
 elseif(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/capstone")
     set(CAPSTONE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/capstone")
@@ -35,9 +37,11 @@ if(CAPSTONE_DIR)
     set(CAPSTONE_BUILD_TESTS OFF CACHE BOOL "Build tests")
     set(CAPSTONE_BUILD_CSTOOL OFF CACHE BOOL "Build cstool")
     set(CAPSTONE_ARCHITECTURE_DEFAULT ON CACHE BOOL "Enable all architectures")
+
     add_subdirectory(${CAPSTONE_DIR} ${CMAKE_BINARY_DIR}/capstone)
+
     set(CAPSTONE_FOUND TRUE)
-    set(CAPSTONE_INCLUDE_DIRS "${CAPSTONE_DIR}/src")
+    set(CAPSTONE_INCLUDE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}/XCapstone/3rdparty/Capstone/src/include")
     set(CAPSTONE_LIBRARIES capstone)
 else()
     find_package(PkgConfig)
@@ -54,7 +58,7 @@ else()
         endif()
     endif()
     if(NOT CAPSTONE_FOUND)
-        message(FATAL_ERROR "Capstone library not found! Place source in ${CMAKE_CURRENT_SOURCE_DIR}/Capstone or install libcapstone-dev")
+        message(FATAL_ERROR "Capstone library not found! Place source in ${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/Capstone/src or install libcapstone-dev")
     endif()
 endif()
 
@@ -80,7 +84,6 @@ set(HEADERS
     HexViewer/include/searchdialog.h
     HexViewer/include/about.h
     HexViewer/include/contextmenu.h
-	HexViewer/include/language.h
 )
 
 add_executable(HexViewer ${SOURCES} ${HEADERS})
