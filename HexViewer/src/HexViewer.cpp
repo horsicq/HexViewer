@@ -61,7 +61,7 @@ AppOptions g_options = { true, 16, false };
 NSWindow* g_nsWindow = nullptr;
 
 #else  // Linux
-AppOptions g_options = { true, 16, false };
+AppOptions g_options = { true, 16, false, false, "English"};
 Display* g_display = nullptr;
 Window g_window = 0;
 Atom wmDeleteMessage;

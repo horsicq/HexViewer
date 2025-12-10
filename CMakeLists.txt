@@ -80,6 +80,7 @@ set(HEADERS
     HexViewer/include/searchdialog.h
     HexViewer/include/about.h
     HexViewer/include/contextmenu.h
+	HexViewer/include/language.h
 )
 
 add_executable(HexViewer ${SOURCES} ${HEADERS})
