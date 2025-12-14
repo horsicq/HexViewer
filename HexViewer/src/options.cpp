@@ -68,7 +68,7 @@ struct OptionsDialogData {
     display = nullptr;
     wmDeleteWindow = 0;
 #endif
-    languages = { "English", "Spanish", "French", "German", "Japanese", "Chinese" }; // TODO: add more lang!!!
+    languages = { "English", "Spanish", "French", "German", "Japanese", "Chinese", "Russian" }; // TODO: add more lang!!!
   }
 };
 

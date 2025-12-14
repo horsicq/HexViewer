@@ -258,6 +258,56 @@ public:
     translations["Japanese"]["Dark mode support"] = "????????";
     translations["Japanese"]["Check for Updates"] = "?????????";
 
+    translations["Russian"]["Options"] = "??";
+    translations["Russian"]["Dark Mode"] = "????";
+    translations["Russian"]["Auto-reload modified file"] = "???????????";
+    translations["Russian"]["Add to context menu (right-click files)"] = "????????(??????)";
+    translations["Russian"]["Language:"] = "??:";
+    translations["Russian"]["Default bytes per line:"] = "???????:";
+    translations["Russian"]["8 bytes"] = "8??";
+    translations["Russian"]["16 bytes"] = "16??";
+    translations["Russian"]["OK"] = "??";
+    translations["Russian"]["Cancel"] = "??";
+
+    translations["Russian"]["File"] = "??";
+    translations["Russian"]["Open"] = "??";
+    translations["Russian"]["Save"] = "??";
+    translations["Russian"]["Exit"] = "??";
+    translations["Russian"]["View"] = "??";
+    translations["Russian"]["Disassembly"] = "???";
+    translations["Russian"]["Search"] = "??";
+    translations["Russian"]["Find and Replace..."] = "?????...";
+    translations["Russian"]["Go To..."] = "??...";
+    translations["Russian"]["Tools"] = "??";
+    translations["Russian"]["Options..."] = "??...";
+    translations["Russian"]["Help"] = "??";
+    translations["Russian"]["About HexViewer"] = "??HexViewer";
+
+    translations["Russian"]["Find:"] = "??:";
+    translations["Russian"]["Replace:"] = "??:";
+    translations["Russian"]["Replace"] = "??";
+    translations["Russian"]["Go"] = "??";
+    translations["Russian"]["Offset:"] = "???:";
+
+    translations["Russian"]["Update Available!"] = "?????!";
+    translations["Russian"]["You're up to date!"] = "???????!";
+    translations["Russian"]["Current:"] = "??:";
+    translations["Russian"]["Latest:"] = "??:";
+    translations["Russian"]["What's New:"] = "???:";
+    translations["Russian"]["You have the latest version installed."] = "?????????";
+    translations["Russian"]["Check back later for updates."] = "????????";
+    translations["Russian"]["Update Now"] = "????";
+    translations["Russian"]["Skip"] = "??";
+    translations["Russian"]["Close"] = "??";
+
+    translations["Russian"]["Version"] = "??";
+    translations["Russian"]["A modern cross-platform hex editor"] = "????????????";
+    translations["Russian"]["Features:"] = "??:";
+    translations["Russian"]["Cross-platform support"] = "?????";
+    translations["Russian"]["Real-time hex editing"] = "????????";
+    translations["Russian"]["Dark mode support"] = "??????";
+    translations["Russian"]["Check for Updates"] = "????";
+
     translations["Chinese"]["Options"] = "??";
     translations["Chinese"]["Dark Mode"] = "????";
     translations["Chinese"]["Auto-reload modified file"] = "???????????";
