@@ -532,7 +532,7 @@ bool UpdateDialog::OnMouseUp(int x, int y) {
   if (pressedButton == hoveredButton && pressedButton > 0) {
     if (pressedButton == 1) {
       std::string cmd = "xdg-open \"" + currentInfo.downloadUrl + "\"";
-      (int)system(cmd.c_str());
+      system(cmd.c_str());
       return true;
     }
     else if (pressedButton == 2 || pressedButton == 3) {

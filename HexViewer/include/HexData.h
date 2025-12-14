@@ -33,7 +33,6 @@ private:
   std::string disassembleInstruction(size_t offset, int& instructionLength);
   bool initializeCapstone();
   void cleanupCapstone();
-  void debugLog(const char* message);
 
   std::vector<uint8_t> fileData;
   std::vector<std::string> hexLines;

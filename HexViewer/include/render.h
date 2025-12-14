@@ -170,7 +170,9 @@ struct WidgetState {
 
   WidgetState() : hovered(false), pressed(false), enabled(true) {}
   WidgetState(const Rect& r) : rect(r), hovered(false), pressed(false), enabled(true) {}
+  WidgetState(const Rect& r, bool h, bool p, bool e) : rect(r), hovered(h), pressed(p), enabled(e) {}
 };
+
 
 #ifdef _WIN32
 typedef HWND NativeWindow;
@@ -209,6 +211,15 @@ public:
   void UpdateCaret();
   void DrawCaret();
   long long ScreenToByteIndex(int mouseX, int mouseY);
+
+#ifdef _WIN32
+  void drawBitmap(void* hBitmap, int width, int height, int x, int y);
+#elif __APPLE__
+  void drawImage(void* nsImage, int width, int height, int x, int y);
+#else
+  void drawX11Pixmap(Pixmap pixmap, int width, int height, int x, int y);
+#endif
+
 
   void drawDropdown(
     const WidgetState& state,

@@ -1,7 +1,8 @@
-#include "render.h"
 #include <functional>
 #include <string>
 #include "darkmode.h"
+#include "render.h"
+#include "searchdialog.h"
 
 #ifdef _WIN32
 #include <windows.h>
@@ -23,44 +24,6 @@ typedef void* SEL;
 
 namespace SearchDialogs {
 
-  struct PlatformWindow {
-#ifdef _WIN32
-    HWND hwnd;
-#elif defined(__APPLE__)
-    id window;
-    id view;
-#elif defined(__linux__)
-    Display* display;
-    Window window;
-    Atom wmDeleteWindow;
-#endif
-  };
-
-  struct FindReplaceDialogData {
-    std::string findText;
-    std::string replaceText;
-    int activeTextBox = 0;
-    int hoveredWidget = -1;
-    int pressedWidget = -1;
-    bool dialogResult = false;
-    bool running = true;
-    RenderManager* renderer = nullptr;
-    PlatformWindow platformWindow = {};
-    std::function<void(const std::string&, const std::string&)> callback;
-  };
-
-  struct GoToDialogData {
-    std::string lineNumberText;
-    int activeTextBox = 0;
-    int hoveredWidget = -1;
-    int pressedWidget = -1;
-    bool dialogResult = false;
-    bool running = true;
-    RenderManager* renderer = nullptr;
-    PlatformWindow platformWindow = {};
-    std::function<void(int)> callback;
-  };
-
   static FindReplaceDialogData* g_findReplaceData = nullptr;
   static GoToDialogData* g_goToData = nullptr;
 
@@ -69,6 +32,8 @@ namespace SearchDialogs {
       y >= rect.y && y <= rect.y + rect.height;
   }
 
+
+  void CleanupDialogs() {};
 
   void RenderFindReplaceDialog(FindReplaceDialogData* data, int windowWidth, int windowHeight) {
     if (!data || !data->renderer) return;

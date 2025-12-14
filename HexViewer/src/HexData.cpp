@@ -20,19 +20,6 @@ HexData::~HexData() {
   cleanupCapstone();
 }
 
-void HexData::debugLog(const char* message) {
-#ifdef _WIN32
-  int wideSize = MultiByteToWideChar(CP_UTF8, 0, message, -1, nullptr, 0);
-  if (wideSize > 0) {
-    std::wstring wideMsg(wideSize - 1, L'\0');
-    MultiByteToWideChar(CP_UTF8, 0, message, -1, &wideMsg[0], wideSize);
-    OutputDebugStringW(wideMsg.c_str());
-  }
-#else
-  std::cerr << message;
-#endif
-}
-
 bool HexData::initializeCapstone() {
   if (capstoneInitialized) {
     cleanupCapstone();
@@ -40,7 +27,6 @@ bool HexData::initializeCapstone() {
 
   cs_err err = cs_open(currentArch, currentMode, &csHandle);
   if (err != CS_ERR_OK) {
-    debugLog("ERROR: Failed to initialize Capstone\n");
     capstoneInitialized = false;
     return false;
   }
@@ -49,7 +35,6 @@ bool HexData::initializeCapstone() {
   cs_option(csHandle, CS_OPT_SYNTAX, CS_OPT_SYNTAX_INTEL);
 
   capstoneInitialized = true;
-  debugLog("Capstone initialized successfully\n");
   return true;
 }
 
@@ -73,39 +58,28 @@ void HexData::setArchitecture(cs_arch arch, cs_mode mode) {
 bool HexData::loadFile(const char* filepath) {
   std::ifstream file(filepath, std::ios::binary | std::ios::ate);
   if (!file.is_open()) {
-    debugLog("ERROR: Failed to open file\n");
     hexLines.clear();
     hexLines.push_back("Error: Failed to open file");
     return false;
   }
 
-  debugLog("File opened successfully\n");
   std::streamsize fileSize = file.tellg();
   file.seekg(0, std::ios::beg);
-
-  char debugMsg[100];
-  snprintf(debugMsg, sizeof(debugMsg), "File size: %lld bytes\n", (long long)fileSize);
-  debugLog(debugMsg);
 
   fileData.clear();
   fileData.resize(fileSize);
 
   if (!file.read(reinterpret_cast<char*>(fileData.data()), fileSize)) {
-    debugLog("ERROR: Failed to read file\n");
     hexLines.clear();
     hexLines.push_back("Error: Failed to read file");
     file.close();
     return false;
   }
 
-  debugLog("File read successfully\n");
   file.close();
 
   convertDataToHex(16);
   modified = false;
-
-  snprintf(debugMsg, sizeof(debugMsg), "Generated %zu hex lines\n", hexLines.size());
-  debugLog(debugMsg);
 
   return true;
 }
@@ -113,20 +87,17 @@ bool HexData::loadFile(const char* filepath) {
 bool HexData::saveFile(const char* filepath) {
   std::ofstream file(filepath, std::ios::binary);
   if (!file.is_open()) {
-    debugLog("ERROR: Failed to open file for writing\n");
     return false;
   }
 
   file.write(reinterpret_cast<const char*>(fileData.data()), fileData.size());
   if (!file.good()) {
-    debugLog("ERROR: Failed to write file\n");
     file.close();
     return false;
   }
 
   file.close();
   modified = false;
-  debugLog("File saved successfully\n");
   return true;
 }
 
@@ -252,10 +223,6 @@ void HexData::convertDataToHex(int bytesPerLine) {
 
   bytesPerLine = std::clamp(bytesPerLine, 8, 48);
   currentBytesPerLine = bytesPerLine;
-
-  char debugMsg[100];
-  snprintf(debugMsg, sizeof(debugMsg), "Converting to hex with %d bytes per line\n", bytesPerLine);
-  debugLog(debugMsg);
 
   generateHeader(bytesPerLine);
   generateDisassembly(bytesPerLine);

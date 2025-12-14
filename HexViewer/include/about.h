@@ -17,11 +17,11 @@ typedef Window NativeWindow;
 #include <render.h>
 #include <update.h>
 #include <darkmode.h>
+#include <imageloader.h>
 
 class AboutDialog {
 public:
   static void Show(NativeWindow parent, bool isDarkMode);
-
 private:
   static RenderManager* renderer;
   static bool darkMode;

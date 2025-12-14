@@ -768,6 +768,35 @@ long long RenderManager::ScreenToByteIndex(int mouseX, int mouseY) {
   return info.Index;
 }
 
+#ifdef _WIN32
+void RenderManager::drawBitmap(void* hBitmap, int width, int height, int x, int y) {
+  if (!memDC || !hBitmap) return;
+  HDC tempDC = CreateCompatibleDC(memDC);
+  HBITMAP oldBmp = (HBITMAP)SelectObject(tempDC, (HBITMAP)hBitmap);
+  BitBlt(memDC, x, y, width, height, tempDC, 0, 0, SRCCOPY);
+  SelectObject(tempDC, oldBmp);
+  DeleteDC(tempDC);
+}
+#endif
+#ifdef __APPLE__
+void RenderManager::drawImage(NSImage* image, int width, int height, int x, int y) {
+  if (!backBuffer || !image) return;
+  [image drawInRect : NSMakeRect(x, y, width, height)
+    fromRect : NSZeroRect
+    operation : NSCompositingOperationSourceOver
+    fraction : 1.0] ;
+}
+#endif
+#ifdef __linux__
+void RenderManager::drawX11Pixmap(Pixmap pixmap, int width, int height, int x, int y) {
+  if (!display || !backBuffer || !pixmap) return;
+  GC tempGC = XCreateGC(display, backBuffer, 0, nullptr);
+  XCopyArea(display, pixmap, backBuffer, tempGC, 0, 0, width, height, x, y);
+  XFreeGC(display, tempGC);
+}
+#endif
+
+
 void RenderManager::renderHexViewer(
   const std::vector<std::string>& hexLines,
   const std::string& headerLine,
