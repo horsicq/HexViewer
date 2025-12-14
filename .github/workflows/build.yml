@@ -24,7 +24,7 @@ jobs:
 
       - name: Clone DiE's submodules
         run: |
-          git clone https://github.com/horsicq/XHexViewer.git --recursive
+          git clone https://github.com/horsicq/HexViewer.git --recursive
 
       - name: Build DiE
         run: |
