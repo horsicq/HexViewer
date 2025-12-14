@@ -4,7 +4,7 @@
 
 class Translations {
 private:
-  static inline std::string currentLanguage = "English";
+  static inline std::string defaultLanguage = "English";
   static inline std::map<std::string, std::map<std::string, std::string>> translations;
 public:
   static void Initialize() {
@@ -60,10 +60,10 @@ public:
 
     translations["Spanish"]["Options"] = "Opciones";
     translations["Spanish"]["Dark Mode"] = "Modo Oscuro";
-    translations["Spanish"]["Auto-reload modified file"] = "Recargar archivo modificado automáticamente";
-    translations["Spanish"]["Add to context menu (right-click files)"] = "Agregar al menú contextual (clic derecho en archivos)";
+    translations["Spanish"]["Auto-reload modified file"] = "Recargar archivo modificado automï¿½ticamente";
+    translations["Spanish"]["Add to context menu (right-click files)"] = "Agregar al menï¿½ contextual (clic derecho en archivos)";
     translations["Spanish"]["Language:"] = "Idioma:";
-    translations["Spanish"]["Default bytes per line:"] = "Bytes predeterminados por línea:";
+    translations["Spanish"]["Default bytes per line:"] = "Bytes predeterminados por lï¿½nea:";
     translations["Spanish"]["8 bytes"] = "8 bytes";
     translations["Spanish"]["16 bytes"] = "16 bytes";
     translations["Spanish"]["OK"] = "Aceptar";
@@ -89,31 +89,31 @@ public:
     translations["Spanish"]["Go"] = "Ir";
     translations["Spanish"]["Offset:"] = "Desplazamiento:";
 
-    translations["Spanish"]["Update Available!"] = "¡Actualización Disponible!";
-    translations["Spanish"]["You're up to date!"] = "¡Estás actualizado!";
+    translations["Spanish"]["Update Available!"] = "ï¿½Actualizaciï¿½n Disponible!";
+    translations["Spanish"]["You're up to date!"] = "ï¿½Estï¿½s actualizado!";
     translations["Spanish"]["Current:"] = "Actual:";
-    translations["Spanish"]["Latest:"] = "Última:";
+    translations["Spanish"]["Latest:"] = "ï¿½ltima:";
     translations["Spanish"]["What's New:"] = "Novedades:";
-    translations["Spanish"]["You have the latest version installed."] = "Tienes la última versión instalada.";
-    translations["Spanish"]["Check back later for updates."] = "Vuelve más tarde para buscar actualizaciones.";
+    translations["Spanish"]["You have the latest version installed."] = "Tienes la ï¿½ltima versiï¿½n instalada.";
+    translations["Spanish"]["Check back later for updates."] = "Vuelve mï¿½s tarde para buscar actualizaciones.";
     translations["Spanish"]["Update Now"] = "Actualizar Ahora";
     translations["Spanish"]["Skip"] = "Omitir";
     translations["Spanish"]["Close"] = "Cerrar";
 
-    translations["Spanish"]["Version"] = "Versión";
+    translations["Spanish"]["Version"] = "Versiï¿½n";
     translations["Spanish"]["A modern cross-platform hex editor"] = "Un editor hexadecimal multiplataforma moderno";
-    translations["Spanish"]["Features:"] = "Características:";
+    translations["Spanish"]["Features:"] = "Caracterï¿½sticas:";
     translations["Spanish"]["Cross-platform support"] = "Soporte multiplataforma";
-    translations["Spanish"]["Real-time hex editing"] = "Edición hexadecimal en tiempo real";
+    translations["Spanish"]["Real-time hex editing"] = "Ediciï¿½n hexadecimal en tiempo real";
     translations["Spanish"]["Dark mode support"] = "Soporte de modo oscuro";
     translations["Spanish"]["Check for Updates"] = "Buscar Actualizaciones";
 
     translations["French"]["Options"] = "Options";
     translations["French"]["Dark Mode"] = "Mode Sombre";
-    translations["French"]["Auto-reload modified file"] = "Recharger automatiquement le fichier modifié";
+    translations["French"]["Auto-reload modified file"] = "Recharger automatiquement le fichier modifiï¿½";
     translations["French"]["Add to context menu (right-click files)"] = "Ajouter au menu contextuel (clic droit sur les fichiers)";
     translations["French"]["Language:"] = "Langue:";
-    translations["French"]["Default bytes per line:"] = "Octets par ligne par défaut:";
+    translations["French"]["Default bytes per line:"] = "Octets par ligne par dï¿½faut:";
     translations["French"]["8 bytes"] = "8 octets";
     translations["French"]["16 bytes"] = "16 octets";
     translations["French"]["OK"] = "OK";
@@ -124,44 +124,44 @@ public:
     translations["French"]["Save"] = "Enregistrer";
     translations["French"]["Exit"] = "Quitter";
     translations["French"]["View"] = "Affichage";
-    translations["French"]["Disassembly"] = "Désassemblage";
+    translations["French"]["Disassembly"] = "Dï¿½sassemblage";
     translations["French"]["Search"] = "Recherche";
     translations["French"]["Find and Replace..."] = "Rechercher et Remplacer...";
-    translations["French"]["Go To..."] = "Aller à...";
+    translations["French"]["Go To..."] = "Aller ï¿½...";
     translations["French"]["Tools"] = "Outils";
     translations["French"]["Options..."] = "Options...";
     translations["French"]["Help"] = "Aide";
-    translations["French"]["About HexViewer"] = "À propos de HexViewer";
+    translations["French"]["About HexViewer"] = "ï¿½ propos de HexViewer";
 
     translations["French"]["Find:"] = "Rechercher:";
     translations["French"]["Replace:"] = "Remplacer:";
     translations["French"]["Replace"] = "Remplacer";
     translations["French"]["Go"] = "Aller";
-    translations["French"]["Offset:"] = "Décalage:";
+    translations["French"]["Offset:"] = "Dï¿½calage:";
 
-    translations["French"]["Update Available!"] = "Mise à jour disponible!";
-    translations["French"]["You're up to date!"] = "Vous êtes à jour!";
+    translations["French"]["Update Available!"] = "Mise ï¿½ jour disponible!";
+    translations["French"]["You're up to date!"] = "Vous ï¿½tes ï¿½ jour!";
     translations["French"]["Current:"] = "Actuelle:";
-    translations["French"]["Latest:"] = "Dernière:";
-    translations["French"]["What's New:"] = "Nouveautés:";
-    translations["French"]["You have the latest version installed."] = "Vous avez la dernière version installée.";
-    translations["French"]["Check back later for updates."] = "Revenez plus tard pour les mises à jour.";
-    translations["French"]["Update Now"] = "Mettre à jour maintenant";
+    translations["French"]["Latest:"] = "Derniï¿½re:";
+    translations["French"]["What's New:"] = "Nouveautï¿½s:";
+    translations["French"]["You have the latest version installed."] = "Vous avez la derniï¿½re version installï¿½e.";
+    translations["French"]["Check back later for updates."] = "Revenez plus tard pour les mises ï¿½ jour.";
+    translations["French"]["Update Now"] = "Mettre ï¿½ jour maintenant";
     translations["French"]["Skip"] = "Ignorer";
     translations["French"]["Close"] = "Fermer";
 
     translations["French"]["Version"] = "Version";
-    translations["French"]["A modern cross-platform hex editor"] = "Un éditeur hexadécimal multiplateforme moderne";
-    translations["French"]["Features:"] = "Fonctionnalités:";
+    translations["French"]["A modern cross-platform hex editor"] = "Un ï¿½diteur hexadï¿½cimal multiplateforme moderne";
+    translations["French"]["Features:"] = "Fonctionnalitï¿½s:";
     translations["French"]["Cross-platform support"] = "Support multiplateforme";
-    translations["French"]["Real-time hex editing"] = "Édition hexadécimale en temps réel";
+    translations["French"]["Real-time hex editing"] = "ï¿½dition hexadï¿½cimale en temps rï¿½el";
     translations["French"]["Dark mode support"] = "Support du mode sombre";
-    translations["French"]["Check for Updates"] = "Vérifier les mises à jour";
+    translations["French"]["Check for Updates"] = "Vï¿½rifier les mises ï¿½ jour";
 
     translations["German"]["Options"] = "Optionen";
     translations["German"]["Dark Mode"] = "Dunkler Modus";
-    translations["German"]["Auto-reload modified file"] = "Geänderte Datei automatisch neu laden";
-    translations["German"]["Add to context menu (right-click files)"] = "Zum Kontextmenü hinzufügen (Rechtsklick auf Dateien)";
+    translations["German"]["Auto-reload modified file"] = "Geï¿½nderte Datei automatisch neu laden";
+    translations["German"]["Add to context menu (right-click files)"] = "Zum Kontextmenï¿½ hinzufï¿½gen (Rechtsklick auf Dateien)";
     translations["German"]["Language:"] = "Sprache:";
     translations["German"]["Default bytes per line:"] = "Standard-Bytes pro Zeile:";
     translations["German"]["8 bytes"] = "8 Bytes";
@@ -170,7 +170,7 @@ public:
     translations["German"]["Cancel"] = "Abbrechen";
 
     translations["German"]["File"] = "Datei";
-    translations["German"]["Open"] = "Öffnen";
+    translations["German"]["Open"] = "ï¿½ffnen";
     translations["German"]["Save"] = "Speichern";
     translations["German"]["Exit"] = "Beenden";
     translations["German"]["View"] = "Ansicht";
@@ -181,7 +181,7 @@ public:
     translations["German"]["Tools"] = "Werkzeuge";
     translations["German"]["Options..."] = "Optionen...";
     translations["German"]["Help"] = "Hilfe";
-    translations["German"]["About HexViewer"] = "Über HexViewer";
+    translations["German"]["About HexViewer"] = "ï¿½ber HexViewer";
 
     translations["German"]["Find:"] = "Suchen:";
     translations["German"]["Replace:"] = "Ersetzen:";
@@ -189,23 +189,23 @@ public:
     translations["German"]["Go"] = "Gehe";
     translations["German"]["Offset:"] = "Offset:";
 
-    translations["German"]["Update Available!"] = "Update verfügbar!";
+    translations["German"]["Update Available!"] = "Update verfï¿½gbar!";
     translations["German"]["You're up to date!"] = "Sie sind auf dem neuesten Stand!";
     translations["German"]["Current:"] = "Aktuell:";
     translations["German"]["Latest:"] = "Neueste:";
     translations["German"]["What's New:"] = "Was ist neu:";
     translations["German"]["You have the latest version installed."] = "Sie haben die neueste Version installiert.";
-    translations["German"]["Check back later for updates."] = "Schauen Sie später nach Updates.";
+    translations["German"]["Check back later for updates."] = "Schauen Sie spï¿½ter nach Updates.";
     translations["German"]["Update Now"] = "Jetzt aktualisieren";
-    translations["German"]["Skip"] = "Überspringen";
-    translations["German"]["Close"] = "Schließen";
+    translations["German"]["Skip"] = "ï¿½berspringen";
+    translations["German"]["Close"] = "Schlieï¿½en";
 
     translations["German"]["Version"] = "Version";
-    translations["German"]["A modern cross-platform hex editor"] = "Ein moderner plattformübergreifender Hex-Editor";
+    translations["German"]["A modern cross-platform hex editor"] = "Ein moderner plattformï¿½bergreifender Hex-Editor";
     translations["German"]["Features:"] = "Funktionen:";
-    translations["German"]["Cross-platform support"] = "Plattformübergreifende Unterstützung";
+    translations["German"]["Cross-platform support"] = "Plattformï¿½bergreifende Unterstï¿½tzung";
     translations["German"]["Real-time hex editing"] = "Echtzeit-Hex-Bearbeitung";
-    translations["German"]["Dark mode support"] = "Dunkler Modus Unterstützung";
+    translations["German"]["Dark mode support"] = "Dunkler Modus Unterstï¿½tzung";
     translations["German"]["Check for Updates"] = "Nach Updates suchen";
 
     translations["Japanese"]["Options"] = "?????";
@@ -308,17 +308,17 @@ public:
     translations["Chinese"]["Dark mode support"] = "??????";
     translations["Chinese"]["Check for Updates"] = "????";
 
-    currentLanguage = "English";
+    defaultLanguage = "English";
   }
 
   static void SetLanguage(const std::string& language) {
     if (translations.find(language) != translations.end()) {
-      currentLanguage = language;
+      defaultLanguage = language;
     }
   }
 
   static std::string Get(const std::string& key) {
-    auto langIt = translations.find(currentLanguage);
+    auto langIt = translations.find(defaultLanguage);
     if (langIt != translations.end()) {
       auto textIt = langIt->second.find(key);
       if (textIt != langIt->second.end()) {
