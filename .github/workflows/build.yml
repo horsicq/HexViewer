@@ -40,4 +40,4 @@ jobs:
           draft: false
           prerelease: true
           files: |
-            /github/home/HexViewer/build/bin/HexViewer
+            /home/runner/work/HexViewer/HexViewer/build/bin/HexViewer
