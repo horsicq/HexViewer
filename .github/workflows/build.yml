@@ -22,14 +22,8 @@ jobs:
           sudo apt-get update
           sudo apt-get install git build-essential cmake libcapstone-dev -y
 
-     # - name: Clone DiE's submodules
-      #  run: |
-       #   git clone https://github.com/horsicq/HexViewer.git --recursive
-
-      - name: Build DiE
+      - name: Build HexViewer
         run: |
-          # rsync -av --exclude 'XHexViewer' ./ DIE-engine/
-          #cd XHexViewer
           chmod a+x build_linux.sh
           ./build_linux.sh
 
