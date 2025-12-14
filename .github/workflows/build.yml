@@ -28,7 +28,7 @@ jobs:
 
       - name: Build DiE
         run: |
-        #  rsync -av --exclude 'XHexViewer' ./ DIE-engine/
+          # rsync -av --exclude 'XHexViewer' ./ DIE-engine/
           cd XHexViewer
           chmod a+x build_linux.sh
           ./build_linux.sh
