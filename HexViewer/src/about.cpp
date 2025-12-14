@@ -385,7 +385,6 @@ void AboutDialog::Show(NativeWindow parent, bool isDarkMode) {
 #endif
 }
 
-
 void AboutDialog::RenderContent(int width, int height) {
   if (!renderer) return;
 
@@ -420,11 +419,10 @@ void AboutDialog::RenderContent(int width, int height) {
   renderer->drawText(desc, contentX, contentY + 50, theme.disabledText);
 
   int featuresY = logoPadding + logoSize + 30;
-  renderer->drawText(Translations::T("Features:"), logoPadding, featuresY, theme.textColor);
-  renderer->drawText(std::string("  � ") + Translations::T("Cross-platform support (Windows, macOS, Linux)"), logoPadding + 10, featuresY + 30, theme.disabledText);
-  renderer->drawText(std::string("  � ") + Translations::T("Real-time hex editing with undo/redo"), logoPadding + 10, featuresY + 55, theme.disabledText);
-  renderer->drawText(std::string("  � ") + Translations::T("Dark and light mode themes"), logoPadding + 10, featuresY + 80, theme.disabledText);
-  renderer->drawText(std::string("  � ") + Translations::T("Advanced search and replace"), logoPadding + 10, featuresY + 105, theme.disabledText);
+  renderer->drawText(Translations::T("Features:"), 40, featuresY, theme.textColor);
+  renderer->drawText(std::string("- ") + Translations::T("Cross-platform support"), 50, featuresY + 30, theme.disabledText);
+  renderer->drawText(std::string("- ") + Translations::T("Real-time hex editing"), 50, featuresY + 55, theme.disabledText);
+  renderer->drawText(std::string("- ") + Translations::T("Dark mode support"), 50, featuresY + 80, theme.disabledText);
 
   renderer->drawLine(0, height - 90, width, height - 90, theme.separator);
 
@@ -441,16 +439,14 @@ void AboutDialog::RenderContent(int width, int height) {
   updateState.pressed = (pressedButton == 1);
   renderer->drawModernButton(updateState, theme, Translations::T("Check for Updates"));
 
-  std::string copyright = "� 2025 DiE team!";
+  std::string copyright =  "\u00A9 2025 DiE team!";
   int copyrightX = (width - (copyright.length() * 8)) / 2;
   renderer->drawText(copyright, copyrightX, height - 20, theme.disabledText);
 
   renderer->endFrame();
 }
 
-
 #ifdef _WIN32
-
 void AboutDialog::OnPaint(HWND hWnd) {
   PAINTSTRUCT ps;
   HDC hdc = BeginPaint(hWnd, &ps);
@@ -497,16 +493,14 @@ bool AboutDialog::OnMouseUp(HWND hWnd, int x, int y) {
     info.updateAvailable = true;
     info.releaseNotes =
       "New Features:\n"
-      "� Added cross-platform menu bar support\n"
-      "� Improved rendering performance\n"
-      "� Added dark mode for all dialogs\n"
-      "� Enhanced file parsing capabilities\n"
+      "Added cross-platform menu bar support\n"
+      "Improved rendering performance\n"
+      "Added dark mode for all dialogs\n"
       "\n"
       "Bug Fixes:\n"
-      "� Fixed scrollbar flickering on Linux\n"
-      "� Fixed memory leak in hex editor\n"
-      "� Improved file loading speed\n"
-      "� Better Unicode support";
+      "Fixed scrollbar flickering on Linux\n"
+      "Fixed memory leak in hex editor\n"
+      "Improved file loading speed";
     info.downloadUrl = "https://github.com/horsicq/HexViewer/releases/latest";
 
     ShowWindow(hWnd, SW_HIDE);
@@ -603,16 +597,14 @@ bool AboutDialog::OnMouseUp(int x, int y) {
     info.updateAvailable = true;
     info.releaseNotes =
       "New Features:\n"
-      "� Added cross-platform menu bar support\n"
-      "� Improved rendering performance\n"
-      "� Added dark mode for all dialogs\n"
-      "� Enhanced file parsing capabilities\n"
+      "Added cross-platform menu bar support\n"
+      "Improved rendering performance\n"
+      "Added dark mode for all dialogs\n"
       "\n"
       "Bug Fixes:\n"
-      "� Fixed scrollbar flickering on Linux\n"
-      "� Fixed memory leak in hex editor\n"
-      "� Improved file loading speed\n"
-      "� Better Unicode support";
+      "Fixed scrollbar flickering on Linux\n"
+      "Fixed memory leak in hex editor\n"
+      "Improved file loading speed";
     info.downloadUrl = "https://github.com/horsicq/HexViewer/releases/latest";
 
     UpdateDialog::Show(parentWindow, info);
@@ -669,16 +661,14 @@ bool AboutDialog::OnMouseUp(int x, int y) {
     info.updateAvailable = true;
     info.releaseNotes =
       "New Features:\n"
-      "� Added cross-platform menu bar support\n"
-      "� Improved rendering performance\n"
-      "� Added dark mode for all dialogs\n"
-      "� Enhanced file parsing capabilities\n"
+      "Added cross-platform menu bar support\n"
+      "Improved rendering performance\n"
+      "Added dark mode for all dialogs\n"
       "\n"
       "Bug Fixes:\n"
-      "� Fixed scrollbar flickering on Linux\n"
-      "� Fixed memory leak in hex editor\n"
-      "� Improved file loading speed\n"
-      "� Better Unicode support";
+      "Fixed scrollbar flickering on Linux\n"
+      "Fixed memory leak in hex editor\n"
+      "Improved file loading speed";
     info.downloadUrl = "https://github.com/horsicq/HexViewer/releases/latest";
 
     UpdateDialog::Show(parentWindow, info);
@@ -692,46 +682,3 @@ bool AboutDialog::OnMouseUp(int x, int y) {
 
 #endif
 
-void AboutDialog::RenderContent(int width, int height) {
-  if (!renderer) return;
-
-  Theme theme = darkMode ? Theme::Dark() : Theme::Light();
-
-  renderer->beginFrame();
-  renderer->clear(theme.windowBackground);
-
-  std::string version = std::string(Translations::T("Version")) + " 1.2.0";
-  int versionX = (width - (version.length() * 8)) / 2;
-  renderer->drawText(version, versionX, 30, theme.textColor);
-
-  std::string desc = Translations::T("A modern cross-platform hex editor");
-  int descX = (desc.length() * 8) / 2;
-  renderer->drawText(desc, width / 2 - descX, 60, theme.disabledText);
-
-  int featuresY = 100;
-  renderer->drawText(Translations::T("Features:"), 40, featuresY, theme.textColor);
-  renderer->drawText(std::string("- ") + Translations::T("Cross-platform support"), 50, featuresY + 30, theme.disabledText);
-  renderer->drawText(std::string("- ") + Translations::T("Real-time hex editing"), 50, featuresY + 55, theme.disabledText);
-  renderer->drawText(std::string("- ") + Translations::T("Dark mode support"), 50, featuresY + 80, theme.disabledText);
-
-  renderer->drawLine(0, height - 90, width, height - 90, theme.separator);
-
-  int buttonY = height - 65;
-  int buttonHeight = 40;
-  int buttonWidth = 180;
-  int buttonX = (width - buttonWidth) / 2;
-
-  updateButtonRect = Rect(buttonX, buttonY, buttonWidth, buttonHeight);
-  WidgetState updateState;
-  updateState.rect = updateButtonRect;
-  updateState.enabled = true;
-  updateState.hovered = (hoveredButton == 1);
-  updateState.pressed = (pressedButton == 1);
-  renderer->drawModernButton(updateState, theme, Translations::T("Check for Updates"));
-
-  std::string copyright = "2025 Hors";  // This can stay hardcoded
-  int copyrightX = (width - (copyright.length() * 8)) / 2;
-  renderer->drawText(copyright, copyrightX, height - 15, theme.disabledText);
-
-  renderer->endFrame();
-}
