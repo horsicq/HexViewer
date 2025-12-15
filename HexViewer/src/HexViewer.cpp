@@ -16,12 +16,11 @@
 #include <ApplicationServices/ApplicationServices.h>
 #import <Cocoa/Cocoa.h>
 #import <OpenGL/gl.h>
-#else
+#elif defined(__linux__)
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
 #include <X11/keysym.h>
 #endif
-
 #include <about.h>
 #include <darkmode.h>
 #include <render.h>
@@ -30,6 +29,7 @@
 #include <searchdialog.h>
 #include <menu.h>
 #include <language.h>
+#include <resource.h>
 
 
 RenderManager* renderManager = nullptr;
@@ -114,7 +114,7 @@ void RebuildMenuBar() {
   fileMenu.items.push_back(exitItem);
 
   Menu searchMenu(Translations::T("Search"));
-  MenuItem findReplaceItem(Translations::T("Find and Replace..."), MenuItemType::Normal);
+  MenuItem findReplaceItem(Translations::T("Find..."), MenuItemType::Normal);
   findReplaceItem.shortcut = "Ctrl+F";
   findReplaceItem.callback = []() {
 #ifdef _WIN32
@@ -129,7 +129,7 @@ void RebuildMenuBar() {
       [](const std::string& find, const std::string& replace) {
         fprintf(stderr, "Find: %s, Replace: %s\n", find.c_str(), replace.c_str());
       });
-#else // Linux
+#else __linux__
     SearchDialogs::ShowFindReplaceDialog((void*)g_display, darkMode,
       [](const std::string& find, const std::string& replace) {
         fprintf(stderr, "Find: %s, Replace: %s\n", find.c_str(), replace.c_str());
@@ -148,12 +148,7 @@ void RebuildMenuBar() {
           ("Go to line: " + std::to_string(line)).c_str(),
           "Go To", MB_OK);
       });
-#elif __APPLE__
-    SearchDialogs::ShowGoToDialog((void*)g_display, darkMode,
-      [](int offset) {
-        fprintf(stderr, "Go to offset: 0x%x\n", offset);
-      });
-#else // Linux
+#elif defined(__APPLE__) || defined(__linux__)
     SearchDialogs::ShowGoToDialog((void*)g_display, darkMode,
       [](int offset) {
         fprintf(stderr, "Go to offset: 0x%x\n", offset);
@@ -223,7 +218,7 @@ void RebuildMenuBar() {
       if (needsRedraw) {
       }
     }
-#else // Linux
+#elif defined(__linux__)
     if (OptionsDialog::Show((NativeWindow)g_window, g_options)) {
       bool needsRedraw = false;
 
@@ -270,7 +265,7 @@ void RebuildMenuBar() {
     AboutDialog::Show(g_hWnd, g_options.darkMode);
 #elif __APPLE__
     AboutDialog::Show(g_nsWindow, darkMode);
-#else // Linux
+#elif defined(__linux__)
     AboutDialog::Show(g_window, g_options.darkMode);
 #endif
     };
@@ -837,57 +832,54 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) 
   return 0;
 }
 
-int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
+int WINAPI WinMain(
+  HINSTANCE hInstance,
+  HINSTANCE,
+  LPSTR,
+  int nCmdShow)
+{
   WNDCLASSEXW wcex = {};
-
-  Translations::Initialize();
-
-  DetectNative();
-  LoadOptionsFromFile(g_options);
-
-  Translations::SetLanguage(g_options.language);
-
-  wcex.cbSize = sizeof(WNDCLASSEX);
+  wcex.cbSize = sizeof(WNDCLASSEXW);
   wcex.style = CS_HREDRAW | CS_VREDRAW | CS_OWNDC | CS_DBLCLKS;
   wcex.lpfnWndProc = WndProc;
   wcex.hInstance = hInstance;
   wcex.hCursor = LoadCursor(nullptr, IDC_ARROW);
+
+
   wcex.hbrBackground = nullptr;
   wcex.lpszClassName = L"HexViewerClass";
+
   RegisterClassExW(&wcex);
 
-  HWND hWnd = CreateWindowW(L"HexViewerClass", L"HexViewer", WS_OVERLAPPEDWINDOW,
-    CW_USEDEFAULT, 0, 1024, 768, nullptr, nullptr, hInstance, nullptr);
+  HWND hWnd = CreateWindowW(
+    L"HexViewerClass",
+    L"HexViewer",
+    WS_OVERLAPPEDWINDOW,
+    CW_USEDEFAULT, 0, 1024, 768,
+    nullptr, nullptr,
+    hInstance,
+    nullptr
+  );
 
   if (!hWnd) return FALSE;
-
   ApplyDarkTitleBar(hWnd, g_options.darkMode);
 
   renderManager = new RenderManager();
   if (!renderManager->initialize(hWnd)) {
-    MessageBoxW(hWnd, L"Failed to initialize render manager!", L"Error", MB_OK | MB_ICONERROR);
+    MessageBoxW(hWnd, L"Failed to initialize render manager!", L"Error",
+      MB_OK | MB_ICONERROR);
     return FALSE;
   }
 
   RECT rc;
   GetClientRect(hWnd, &rc);
   renderManager->resize(rc.right - rc.left, rc.bottom - rc.top);
-  hexData = new HexData();
 
+  hexData = new HexData();
   RebuildMenuBar();
 
   ShowWindow(hWnd, nCmdShow);
   UpdateWindow(hWnd);
-
-  int argc = 0;
-  LPWSTR* argv = CommandLineToArgvW(GetCommandLineW(), &argc);
-  if (argv && argc > 1) {
-    std::wstring_convert<std::codecvt_utf8<wchar_t>> conv;
-    std::string path = conv.to_bytes(argv[1]);
-
-    LoadFileFromPath(path.c_str());
-  }
-  LocalFree(argv);
 
   MSG msg;
   while (GetMessage(&msg, nullptr, 0, 0)) {
@@ -897,6 +889,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
   return (int)msg.wParam;
 }
+
 #elif __APPLE__
 
 NSWindow* g_nsWindow = nullptr;
@@ -1110,8 +1103,12 @@ int main(int argc, char** argv) {
   @autoreleasepool {
     [NSApplication sharedApplication] ;
 
+    Translations::Initialize();
+
     DetectNative();
     LoadOptionsFromFile(g_options);
+
+    Translations::SetLanguage(g_options.language);
 
     AppDelegate* delegate = [[AppDelegate alloc]init];
     bool running = true;
@@ -1170,49 +1167,7 @@ int main(int argc, char** argv) {
     renderManager->resize(1024, 768);
     hexData = new HexData();
 
-    menuBar = new MenuBar();
-
-    Menu fileMenu = MenuHelper::createFileMenu(
-      []() { LoadFile(); },
-      []() { LoadFile(); },
-      []() { SaveFile(); },
-      []() { [NSApp terminate:nil] ; }
-      );
-
-    Menu searchMenu("Search");
-    MenuItem findReplaceItem("Find and Replace...", MenuItemType::Normal);
-    findReplaceItem.shortcut = "Ctrl+F";
-    findReplaceItem.callback = []() {
-      SearchDialogs::ShowFindReplaceDialog((void*)g_display, darkMode,
-        [](const std::string& find, const std::string& replace) {
-          fprintf(stderr, "Find: %s, Replace: %s\n", find.c_str(), replace.c_str());
-        });
-      };
-    searchMenu.items.push_back(findReplaceItem);
-
-    MenuItem goToItem("Go To...", MenuItemType::Normal);
-    goToItem.shortcut = "Ctrl+G";
-    goToItem.callback = []() {
-      SearchDialogs::ShowGoToDialog((void*)g_display, darkMode,
-        [](int offset) {
-          fprintf(stderr, "Go to offset: 0x%x\n", offset);
-        });
-      };
-    searchMenu.items.push_back(goToItem);
-
-    Menu helpMenu("Help");
-    MenuItem aboutItem("About HexViewer", MenuItemType::Normal);
-    aboutItem.callback = []() {
-      AboutDialog::Show(g_nsWindow, darkMode);  // Change this!
-      };
-    helpMenu.items.push_back(aboutItem);
-
-    menuBar->addMenu(fileMenu);
-    menuBar->addMenu(searchMenu);
-    menuBar->addMenu(helpMenu);
-
-    menuBar->setPosition(0, 0);
-    menuBar->setHeight(24);
+    RebuildMenuBar();
 
     if (argc > 1) {
       LoadFileFromPath(argv[1]);
@@ -1231,7 +1186,7 @@ int main(int argc, char** argv) {
   }
 }
 
-#else
+#elif defined(__linux__)
 void LoadFile() {
   FILE* fp = popen("zenity --file-selection", "r");
   if (fp) {
@@ -1555,15 +1510,13 @@ size_t GetByteOffsetFromClick(int x, int y, int* outRow, int* outCol, int window
     ReleaseDC(g_hWnd, hdc);
   }
   else {
-    layout.charWidth = 9.6f;  // Fallback
+    layout.charWidth = 9.6f;
     layout.lineHeight = 20.0f;
   }
-#elif __APPLE__
-  layout.charWidth = 9.6f;
-  layout.lineHeight = 20.0f;
-#else
-  layout.charWidth = 9.6f;
-  layout.lineHeight = 20.0f;
+#if defined(__APPLE__) || defined(__linux__)
+    layout.charWidth  = 9.6f;
+    layout.lineHeight = 20.0f;
+#endif
 #endif
 
   int menuBarHeight = menuBar ? menuBar->getHeight() : 0;

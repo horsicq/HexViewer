@@ -206,6 +206,7 @@ public:
   PointF GetBytePointF(long long byteIndex);
   PointF GetBytePointF(Point gridPoint);
   BytePositionInfo GetHexBytePositionInfo(Point screenPoint);
+  void drawProgressBar(const Rect& rect, float progress, const Theme& theme);
   void UpdateCaret();
   void DrawCaret();
   long long ScreenToByteIndex(int mouseX, int mouseY);

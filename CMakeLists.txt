@@ -64,32 +64,34 @@ endif()
 
 set(SOURCES
     HexViewer/src/HexViewer.cpp
-    HexViewer/src/render.cpp
-    HexViewer/src/HexData.cpp
-    HexViewer/src/menu.cpp
-    HexViewer/src/update.cpp
-    HexViewer/src/options.cpp
-    HexViewer/src/searchdialog.cpp
-    HexViewer/src/about.cpp
-    HexViewer/src/contextmenu.cpp
+    HexViewer/src/core/render.cpp
+    HexViewer/src/core/HexData.cpp
+    HexViewer/src/ui/menu.cpp
+    HexViewer/src/ui/options.cpp
+    HexViewer/src/ui/searchdialog.cpp
+    HexViewer/src/ui/about.cpp
+    HexViewer/src/ui/contextmenu.cpp
+    HexViewer/src/system/update.cpp
 )
 
 set(HEADERS
-    HexViewer/include/HexData.h
-    HexViewer/include/darkmode.h
-    HexViewer/include/render.h
-    HexViewer/include/menu.h
-    HexViewer/include/update.h
-    HexViewer/include/options.h
-    HexViewer/include/searchdialog.h
-    HexViewer/include/about.h
-    HexViewer/include/contextmenu.h
-    HexViewer/include/imageloader.h
-    HexViewer/include/Resource.h
+    HexViewer/include/core/HexData.h
+    HexViewer/include/core/render.h
+    HexViewer/include/core/imageloader.h
+    HexViewer/include/ui/menu.h
+    HexViewer/include/ui/options.h
+    HexViewer/include/ui/searchdialog.h
+    HexViewer/include/ui/about.h
+    HexViewer/include/ui/contextmenu.h
+    HexViewer/include/ui/darkmode.h
+    HexViewer/include/system/update.h
+    HexViewer/include/system/language.h
+    HexViewer/include/system/resource.h
 )
 
+
 if(WIN32)
-    set(RESOURCE_FILES HexViewer/resources/HexViewer.rc)
+    set(RESOURCE_FILES HexViewer/resources/ui/HexViewer.rc)
     add_executable(HexViewer ${SOURCES} ${HEADERS} ${RESOURCE_FILES})
 
 elseif(APPLE)
@@ -98,17 +100,17 @@ elseif(APPLE)
 else()
     find_program(CMAKE_OBJCOPY objcopy REQUIRED)
 
-    set(RESOURCE_INPUT ${CMAKE_CURRENT_SOURCE_DIR}/HexViewer/resources/about.png)
+    set(RESOURCE_INPUT ${CMAKE_CURRENT_SOURCE_DIR}/HexViewer/resources/images/about.png)
     set(RESOURCE_OUTPUT ${CMAKE_BINARY_DIR}/about.o)
 
     add_custom_command(
         OUTPUT ${RESOURCE_OUTPUT}
-        COMMAND cd ${CMAKE_CURRENT_SOURCE_DIR}/HexViewer/resources && 
-                ${CMAKE_OBJCOPY} -I binary -O elf64-x86-64 -B i386
-                --redefine-sym _binary_about_png_start=_binary_about_png_start
-                --redefine-sym _binary_about_png_end=_binary_about_png_end
-                --redefine-sym _binary_about_png_size=_binary_about_png_size
-                about.png ${RESOURCE_OUTPUT}
+        COMMAND cd ${CMAKE_CURRENT_SOURCE_DIR}/HexViewer/resources/images && 
+			${CMAKE_OBJCOPY} -I binary -O elf64-x86-64 -B i386
+			--redefine-sym _binary_about_png_start=_binary_about_png_start
+			--redefine-sym _binary_about_png_end=_binary_about_png_end
+			--redefine-sym _binary_about_png_size=_binary_about_png_size
+			about.png ${RESOURCE_OUTPUT}
         DEPENDS ${RESOURCE_INPUT}
         COMMENT "Embedding about.png into object file"
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/HexViewer/resources
@@ -172,8 +174,13 @@ endif()
 
 target_include_directories(HexViewer PRIVATE
     ${CAPSTONE_INCLUDE_DIRS}
-    ${CMAKE_CURRENT_SOURCE_DIR}/HexViewer/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/HexViewer/src
+    ${CMAKE_CURRENT_SOURCE_DIR}/HexViewer/include/core
+    ${CMAKE_CURRENT_SOURCE_DIR}/HexViewer/include/ui
+    ${CMAKE_CURRENT_SOURCE_DIR}/HexViewer/include/system
+	${CMAKE_CURRENT_SOURCE_DIR}/HexViewer/resources/images
+    ${CMAKE_CURRENT_SOURCE_DIR}/HexViewer/src/core
+    ${CMAKE_CURRENT_SOURCE_DIR}/HexViewer/src/ui
+    ${CMAKE_CURRENT_SOURCE_DIR}/HexViewer/src/system
 )
 
 if(MSVC)

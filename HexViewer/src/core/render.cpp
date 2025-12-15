@@ -797,6 +797,46 @@ void RenderManager::drawX11Pixmap(Pixmap pixmap, int width, int height, int x, i
 #endif
 
 
+void RenderManager::drawProgressBar(const Rect& rect, float progress, const Theme& theme) {
+  progress = std::clamp(progress, 0.0f, 1.0f);
+
+  float radius = 4.0f;
+
+  Color bgColor(50, 50, 50);
+  if (theme.windowBackground.r > 128) { // Light theme
+    bgColor = Color(220, 220, 220);
+  }
+  drawRoundedRect(rect, radius, bgColor, true);
+
+  int fillWidth = (int)(rect.width * progress);
+  if (fillWidth > 2) { // Only draw if there's visible progress
+    Rect fillRect(rect.x, rect.y, fillWidth, rect.height);
+
+    Color fillColor(100, 150, 255); // Blue progress color
+
+    drawRoundedRect(fillRect, radius, fillColor, true);
+
+    if (rect.height > 10) {
+      Rect highlightRect(rect.x + 2, rect.y + 2, fillWidth - 4, rect.height / 3);
+      Color highlightColor(
+        std::clamp(fillColor.r + 40, 0, 255),
+        std::clamp(fillColor.g + 40, 0, 255),
+        std::clamp(fillColor.b + 40, 0, 255),
+        150
+      );
+      if (highlightRect.width > 0) {
+        drawRect(highlightRect, highlightColor, true);
+      }
+    }
+  }
+
+  Color borderColor(80, 80, 80);
+  if (theme.windowBackground.r > 128) { // Light theme
+    borderColor = Color(180, 180, 180);
+  }
+  drawRoundedRect(rect, radius, borderColor, false);
+}
+
 void RenderManager::renderHexViewer(
   const std::vector<std::string>& hexLines,
   const std::string& headerLine,

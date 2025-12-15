@@ -1,8 +1,8 @@
-#ifndef UPDATE_H
-#define UPDATE_H
+#ifndef ABOUT_H
+#define ABOUT_H
 
-#include <string>
-#include "render.h"
+#include <chrono>
+#include <thread>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -14,49 +14,22 @@ typedef void* NativeWindow;
 typedef Window NativeWindow;
 #endif
 
-extern bool g_isNative;
+#include <render.h>
+#include <update.h>
+#include <darkmode.h>
+#include <imageloader.h>
 
-struct UpdateInfo {
-  bool updateAvailable;
-  std::string currentVersion;
-  std::string latestVersion;
-  std::string releaseNotes;
-  std::string downloadUrl;
-  std::string releaseApiUrl;
-};
-
-enum class DownloadState {
-  Idle,
-  Connecting,
-  Downloading,
-  Installing,
-  Complete,
-  Error
-};
-
-std::string ExtractJsonValue(const std::string& json, const std::string& key);
-std::string HttpGet(const std::string& url);
-
-class UpdateDialog {
+class AboutDialog {
 public:
-  static bool Show(NativeWindow parent, const UpdateInfo& info);
-  static UpdateInfo currentInfo;
-
+  static void Show(NativeWindow parent, bool isDarkMode);
 private:
   static RenderManager* renderer;
   static bool darkMode;
+  static NativeWindow parentWindow;
   static int hoveredButton;
   static int pressedButton;
-  static int scrollOffset;
-  static bool scrollbarHovered;
-  static bool scrollbarPressed;
-  static int scrollDragStart;
-  static int scrollOffsetStart;
   static Rect updateButtonRect;
-  static Rect skipButtonRect;
   static Rect closeButtonRect;
-  static Rect scrollbarRect;
-  static Rect scrollThumbRect;
 
   static void RenderContent(int width, int height);
 
@@ -79,4 +52,4 @@ private:
 #endif
 };
 
-#endif // UPDATE_H
+#endif // ABOUT_H
