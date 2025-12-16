@@ -71,6 +71,7 @@ set(SOURCES
     HexViewer/src/ui/searchdialog.cpp
     HexViewer/src/ui/about.cpp
     HexViewer/src/ui/contextmenu.cpp
+    HexViewer/src/ui/notification.cpp
     HexViewer/src/system/update.cpp
 )
 
@@ -126,19 +127,19 @@ if(WIN32 AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/HexViewerShell")
     add_library(HexViewerShell SHARED ${HEXVIEWERSHELL_SOURCE})
 
     target_compile_definitions(HexViewerShell PRIVATE UNICODE _UNICODE)
+    
+    target_link_libraries(HexViewerShell PRIVATE
+        shlwapi
+        windowsapp
+        ole32
+        shell32
+    )
 
     if(MSVC)
         set_target_properties(HexViewerShell PROPERTIES
             LINK_FLAGS "/MACHINE:X64"
         )
     endif()
-
-    target_link_libraries(HexViewerShell
-        user32
-        shell32
-        shlwapi
-        runtimeobject
-    )
 
     set_target_properties(HexViewerShell PROPERTIES
         RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
@@ -157,7 +158,7 @@ endif()
 
 if(WIN32)
     target_compile_definitions(HexViewer PRIVATE UNICODE _UNICODE WIN32_LEAN_AND_MEAN)
-    target_link_libraries(HexViewer PRIVATE ${CAPSTONE_LIBRARIES} gdi32 user32 shell32 comdlg32)
+    target_link_libraries(HexViewer PRIVATE ${CAPSTONE_LIBRARIES} gdi32 user32 shell32 comdlg32 ole32 runtimeobject dwmapi wininet)
 elseif(APPLE)
     target_compile_definitions(HexViewer PRIVATE __APPLE__)
     find_library(COCOA_FRAMEWORK Cocoa)

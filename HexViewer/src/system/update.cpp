@@ -10,8 +10,6 @@
 #include <wininet.h>
 #include <shlobj.h>
 #include <appmodel.h>
-#pragma comment(lib, "wininet.lib")
-#pragma comment(lib, "shell32.lib")
 #elif __APPLE__
 #import <Cocoa/Cocoa.h>
 #import <QuartzCore/QuartzCore.h>

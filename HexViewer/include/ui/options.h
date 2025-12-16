@@ -2,7 +2,6 @@
 #include <string>  
 #ifdef _WIN32
 #include <windows.h>
-#pragma comment(lib, "dwmapi.lib")
 typedef HWND NativeWindow;
 #elif __APPLE__
 typedef void* NativeWindow;

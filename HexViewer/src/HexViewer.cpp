@@ -30,6 +30,7 @@
 #include <menu.h>
 #include <language.h>
 #include <resource.h>
+#include <notification.h>
 
 
 RenderManager* renderManager = nullptr;
@@ -880,6 +881,50 @@ int WINAPI WinMain(
 
   ShowWindow(hWnd, nCmdShow);
   UpdateWindow(hWnd);
+
+  std::thread([]() {
+    std::this_thread::sleep_for(std::chrono::seconds(2));
+
+    UpdateInfo info;
+    info.currentVersion = "1.0.0";
+    info.releaseApiUrl = "https://api.github.com/repos/horsicq/HexViewer/releases/latest";
+
+    std::string response = HttpGet(info.releaseApiUrl);
+
+    if (!response.empty()) {
+      std::string releaseName = ExtractJsonValue(response, "name");
+
+      size_t vPos = releaseName.find("v");
+      if (vPos != std::string::npos) {
+        size_t spacePos = releaseName.find(" ", vPos);
+        if (spacePos != std::string::npos) {
+          info.latestVersion = releaseName.substr(vPos + 1, spacePos - vPos - 1);
+        }
+        else {
+          info.latestVersion = releaseName.substr(vPos + 1);
+        }
+      }
+      else {
+        info.latestVersion = ExtractJsonValue(response, "tag_name");
+        if (!info.latestVersion.empty() && info.latestVersion[0] == 'v') {
+          info.latestVersion = info.latestVersion.substr(1);
+        }
+      }
+
+      info.updateAvailable = (info.latestVersion != info.currentVersion &&
+        !info.latestVersion.empty());
+
+      if (info.updateAvailable) {
+        AppNotification::Show(
+          "Update Available!",
+          "HexViewer " + info.latestVersion + " is now available.",
+          "HexViewer",
+          AppNotification::NotificationIcon::Info,
+          10000  // Show for 10 seconds
+        );
+      }
+    }
+    }).detach();
 
   MSG msg;
   while (GetMessage(&msg, nullptr, 0, 0)) {
