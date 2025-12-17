@@ -22,6 +22,9 @@ int AboutDialog::hoveredButton = 0;
 int AboutDialog::pressedButton = 0;
 Rect AboutDialog::updateButtonRect = {};
 Rect AboutDialog::closeButtonRect = {};
+bool AboutDialog::betaEnabled = false;
+Rect AboutDialog::betaToggleRect = {};
+bool AboutDialog::betaToggleHovered = false;
 
 unsigned char* logoPixels = nullptr;
 int logoPixelsWidth = 0;
@@ -48,6 +51,7 @@ void AboutDialog::Show(NativeWindow parent, bool isDarkMode) {
   parentWindow = parent;
   hoveredButton = 0;
   pressedButton = 0;
+  betaToggleHovered = false;
 
   int width = 550;
   int height = 480;
@@ -423,7 +427,23 @@ void AboutDialog::RenderContent(int width, int height) {
   renderer->drawText(std::string("- ") + Translations::T("Real-time hex editing"), 50, featuresY + 55, theme.disabledText);
   renderer->drawText(std::string("- ") + Translations::T("Dark mode support"), 50, featuresY + 80, theme.disabledText);
 
-  renderer->drawLine(0, height - 90, width, height - 90, theme.separator);
+  renderer->drawLine(0, height - 120, width, height - 120, theme.separator);
+
+  int toggleY = height - 100;
+  betaToggleRect = Rect(40, toggleY, 200, 25);
+
+  Rect checkboxRect(betaToggleRect.x, betaToggleRect.y, 18, 18);
+  Color checkboxBorder = betaToggleHovered ? Color(100, 150, 255) : theme.disabledText;
+  renderer->drawRect(checkboxRect, theme.windowBackground, true);
+  renderer->drawRect(checkboxRect, checkboxBorder, false);
+
+  if (betaEnabled) {
+    renderer->drawRect(Rect(checkboxRect.x + 3, checkboxRect.y + 3, 12, 12),
+      Color(100, 150, 255), true);
+  }
+
+  renderer->drawText(Translations::T("Include Beta Versions"),
+    betaToggleRect.x + 23, betaToggleRect.y + 2, theme.disabledText);
 
   int buttonY = height - 60;
   int buttonHeight = 35;
@@ -438,7 +458,7 @@ void AboutDialog::RenderContent(int width, int height) {
   updateState.pressed = (pressedButton == 1);
   renderer->drawModernButton(updateState, theme, Translations::T("Check for Updates"));
 
-  std::string copyright =  "\u00A9 2025 DiE team!";
+  std::string copyright = "\u00A9 2025 DiE team!";
   int copyrightX = (width - (copyright.length() * 8)) / 2;
   renderer->drawText(copyright, copyrightX, height - 20, theme.disabledText);
 
@@ -467,19 +487,32 @@ void AboutDialog::OnPaint(HWND hWnd) {
 
 void AboutDialog::OnMouseMove(HWND hWnd, int x, int y) {
   int oldHovered = hoveredButton;
+  bool oldBetaHovered = betaToggleHovered;
   hoveredButton = 0;
+  betaToggleHovered = false;
+
+  if (x >= betaToggleRect.x && x <= betaToggleRect.x + betaToggleRect.width &&
+    y >= betaToggleRect.y && y <= betaToggleRect.y + betaToggleRect.height) {
+    betaToggleHovered = true;
+  }
 
   if (x >= updateButtonRect.x && x <= updateButtonRect.x + updateButtonRect.width &&
     y >= updateButtonRect.y && y <= updateButtonRect.y + updateButtonRect.height) {
     hoveredButton = 1;
   }
 
-  if (oldHovered != hoveredButton) {
+  if (oldHovered != hoveredButton || oldBetaHovered != betaToggleHovered) {
     InvalidateRect(hWnd, nullptr, FALSE);
   }
 }
 
 void AboutDialog::OnMouseDown(HWND hWnd, int x, int y) {
+  if (betaToggleHovered) {
+    betaEnabled = !betaEnabled;
+    InvalidateRect(hWnd, nullptr, FALSE);
+    return;
+  }
+
   pressedButton = hoveredButton;
   InvalidateRect(hWnd, nullptr, FALSE);
 }
@@ -491,17 +524,40 @@ bool AboutDialog::OnMouseUp(HWND hWnd, int x, int y) {
     info.updateAvailable = false;
     info.latestVersion = "Checking...";
     info.releaseNotes = "Please wait while we check for updates...";
-    info.releaseApiUrl = "https://api.github.com/repos/horsicq/HexViewer/releases/latest";
+
+    if (betaEnabled) {
+      info.releaseApiUrl = "https://api.github.com/repos/horsicq/HexViewer/releases";
+    }
+    else {
+      info.releaseApiUrl = "https://api.github.com/repos/horsicq/HexViewer/releases/latest";
+    }
 
     ShowWindow(hWnd, SW_HIDE);
 
     HWND parentWnd = parentWindow;
+    bool checkBeta = betaEnabled;
 
-    std::thread([parentWnd, info]() mutable {
+    std::thread([parentWnd, info, checkBeta]() mutable {
       std::string response = HttpGet(info.releaseApiUrl);
 
       if (!response.empty()) {
-        std::string releaseName = ExtractJsonValue(response, "name");
+        std::string releaseName;
+
+        if (checkBeta) {
+          size_t releaseStart = response.find("{\"url\"");
+          if (releaseStart != std::string::npos) {
+            std::string firstRelease = response.substr(releaseStart);
+            size_t releaseEnd = firstRelease.find("},");
+            if (releaseEnd == std::string::npos) {
+              releaseEnd = firstRelease.find("}]");
+            }
+            if (releaseEnd != std::string::npos) {
+              response = firstRelease.substr(0, releaseEnd + 1);
+            }
+          }
+        }
+
+        releaseName = ExtractJsonValue(response, "name");
 
         size_t vPos = releaseName.find("v");
         if (vPos != std::string::npos) {
@@ -529,6 +585,10 @@ bool AboutDialog::OnMouseUp(HWND hWnd, int x, int y) {
 
         info.updateAvailable = (info.latestVersion != info.currentVersion &&
           !info.latestVersion.empty());
+
+        if (checkBeta) {
+          info.releaseApiUrl = "https://api.github.com/repos/horsicq/HexViewer/releases";
+        }
       }
       else {
         info.updateAvailable = false;
@@ -592,14 +652,21 @@ void AboutDialog::OnPaint() {
 
 void AboutDialog::OnMouseMove(int x, int y) {
   int oldHovered = hoveredButton;
+  bool oldBetaHovered = betaToggleHovered;
   hoveredButton = 0;
+  betaToggleHovered = false;
+
+  if (x >= betaToggleRect.x && x <= betaToggleRect.x + betaToggleRect.width &&
+    y >= betaToggleRect.y && y <= betaToggleRect.y + betaToggleRect.height) {
+    betaToggleHovered = true;
+  }
 
   if (x >= updateButtonRect.x && x <= updateButtonRect.x + updateButtonRect.width &&
     y >= updateButtonRect.y && y <= updateButtonRect.y + updateButtonRect.height) {
     hoveredButton = 1;
   }
 
-  if (oldHovered != hoveredButton) {
+  if (oldHovered != hoveredButton || oldBetaHovered != betaToggleHovered) {
     XClearWindow(display, window);
     XEvent exposeEvent;
     memset(&exposeEvent, 0, sizeof(exposeEvent));
@@ -612,6 +679,19 @@ void AboutDialog::OnMouseMove(int x, int y) {
 }
 
 void AboutDialog::OnMouseDown(int x, int y) {
+  if (betaToggleHovered) {
+    betaEnabled = !betaEnabled;
+    XClearWindow(display, window);
+    XEvent exposeEvent;
+    memset(&exposeEvent, 0, sizeof(exposeEvent));
+    exposeEvent.type = Expose;
+    exposeEvent.xexpose.window = window;
+    exposeEvent.xexpose.count = 0;
+    XSendEvent(display, window, False, ExposureMask, &exposeEvent);
+    XFlush(display);
+    return;
+  }
+
   pressedButton = hoveredButton;
   XClearWindow(display, window);
   XEvent exposeEvent;
@@ -628,12 +708,35 @@ bool AboutDialog::OnMouseUp(int x, int y) {
     UpdateInfo info;
     info.currentVersion = "1.0.0";
 
-    info.releaseApiUrl = "https://api.github.com/repos/horsicq/HexViewer/releases/latest";
+    if (betaEnabled) {
+      info.releaseApiUrl = "https://api.github.com/repos/horsicq/HexViewer/releases";
+    }
+    else {
+      info.releaseApiUrl = "https://api.github.com/repos/horsicq/HexViewer/releases/latest";
+    }
 
     std::string response = HttpGet(info.releaseApiUrl);
 
     if (!response.empty()) {
+      if (betaEnabled) {
+        size_t releaseStart = response.find("{\"url\"");
+        if (releaseStart != std::string::npos) {
+          std::string firstRelease = response.substr(releaseStart);
+          size_t releaseEnd = firstRelease.find("},");
+          if (releaseEnd == std::string::npos) {
+            releaseEnd = firstRelease.find("}]");
+          }
+          if (releaseEnd != std::string::npos) {
+            response = firstRelease.substr(0, releaseEnd + 1);
+          }
+        }
+      }
+
       info.latestVersion = ExtractJsonValue(response, "tag_name");
+      if (!info.latestVersion.empty() && info.latestVersion[0] == 'v') {
+        info.latestVersion = info.latestVersion.substr(1);
+      }
+
       info.releaseNotes = ExtractJsonValue(response, "body");
       info.updateAvailable = (info.latestVersion != info.currentVersion && !info.latestVersion.empty());
     }
@@ -672,19 +775,32 @@ void AboutDialog::OnPaint() {
 
 void AboutDialog::OnMouseMove(int x, int y) {
   int oldHovered = hoveredButton;
+  bool oldBetaHovered = betaToggleHovered;
   hoveredButton = 0;
+  betaToggleHovered = false;
+
+  if (x >= betaToggleRect.x && x <= betaToggleRect.x + betaToggleRect.width &&
+    y >= betaToggleRect.y && y <= betaToggleRect.y + betaToggleRect.height) {
+    betaToggleHovered = true;
+  }
 
   if (x >= updateButtonRect.x && x <= updateButtonRect.x + updateButtonRect.width &&
     y >= updateButtonRect.y && y <= updateButtonRect.y + updateButtonRect.height) {
     hoveredButton = 1;
   }
 
-  if (oldHovered != hoveredButton) {
+  if (oldHovered != hoveredButton || oldBetaHovered != betaToggleHovered) {
     OnPaint();
   }
 }
 
 void AboutDialog::OnMouseDown(int x, int y) {
+  if (betaToggleHovered) {
+    betaEnabled = !betaEnabled;
+    OnPaint();
+    return;
+  }
+
   pressedButton = hoveredButton;
   OnPaint();
 }
@@ -694,12 +810,35 @@ bool AboutDialog::OnMouseUp(int x, int y) {
     UpdateInfo info;
     info.currentVersion = "1.0.0";
 
-    info.releaseApiUrl = "https://api.github.com/repos/horsicq/HexViewer/releases/latest";
+    if (betaEnabled) {
+      info.releaseApiUrl = "https://api.github.com/repos/horsicq/HexViewer/releases";
+    }
+    else {
+      info.releaseApiUrl = "https://api.github.com/repos/horsicq/HexViewer/releases/latest";
+    }
 
     std::string response = HttpGet(info.releaseApiUrl);
 
     if (!response.empty()) {
+      if (betaEnabled) {
+        size_t releaseStart = response.find("{\"url\"");
+        if (releaseStart != std::string::npos) {
+          std::string firstRelease = response.substr(releaseStart);
+          size_t releaseEnd = firstRelease.find("},");
+          if (releaseEnd == std::string::npos) {
+            releaseEnd = firstRelease.find("}]");
+          }
+          if (releaseEnd != std::string::npos) {
+            response = firstRelease.substr(0, releaseEnd + 1);
+          }
+        }
+      }
+
       info.latestVersion = ExtractJsonValue(response, "tag_name");
+      if (!info.latestVersion.empty() && info.latestVersion[0] == 'v') {
+        info.latestVersion = info.latestVersion.substr(1);
+      }
+
       info.releaseNotes = ExtractJsonValue(response, "body");
       info.updateAvailable = (info.latestVersion != info.currentVersion && !info.latestVersion.empty());
     }
@@ -719,4 +858,3 @@ bool AboutDialog::OnMouseUp(int x, int y) {
 }
 
 #endif
-

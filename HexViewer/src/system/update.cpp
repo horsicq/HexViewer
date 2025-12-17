@@ -53,6 +53,9 @@ static std::string downloadStatus = "";
 static std::string downloadedFilePath = "";
 static Rect progressBarRect = {};
 static std::thread* downloadThread = nullptr;
+static bool betaEnabled = false;
+static Rect betaToggleRect = {};
+static bool betaToggleHovered = false;
 
 #ifdef __linux__
 static Display* display = nullptr;
@@ -101,6 +104,27 @@ std::string ExtractJsonValue(const std::string& json, const std::string& key) {
   if (endPos == std::string::npos) return "";
 
   return json.substr(pos + 1, endPos - pos - 1);
+}
+
+bool ExtractJsonBool(const std::string& json, const std::string& key) {
+  std::string searchKey = "\"" + key + "\"";
+  size_t pos = json.find(searchKey);
+  if (pos == std::string::npos) return false;
+
+  pos = json.find(":", pos);
+  if (pos == std::string::npos) return false;
+
+  size_t truePos = json.find("true", pos);
+  size_t falsePos = json.find("false", pos);
+  size_t commaPos = json.find(",", pos);
+  size_t bracePos = json.find("}", pos);
+
+  size_t endPos = std::clamp(commaPos, size_t{ 0 }, bracePos);
+
+  if (truePos != std::string::npos && truePos < endPos) {
+    return true;
+  }
+  return false;
 }
 
 std::string HttpGet(const std::string& url) {
@@ -200,14 +224,22 @@ bool DownloadFile(const std::string& url, const std::string& outputPath,
 #endif
 }
 
-std::string GetAssetDownloadUrl(const std::string& releaseApiUrl) {
+std::string GetAssetDownloadUrl(const std::string& releaseApiUrl, bool includeBeta) {
   bool isMsix = IsMsixPackage();
 
   if (isMsix) {
     return "";
   }
 
-  std::string response = HttpGet(releaseApiUrl);
+  std::string modifiedUrl = releaseApiUrl;
+  if (includeBeta) {
+    size_t pos = modifiedUrl.find("/releases/latest");
+    if (pos != std::string::npos) {
+      modifiedUrl = modifiedUrl.substr(0, pos) + "/releases";
+    }
+  }
+
+  std::string response = HttpGet(modifiedUrl);
   if (response.empty()) return "";
 
   bool isNative = g_isNative;
@@ -222,6 +254,20 @@ std::string GetAssetDownloadUrl(const std::string& releaseApiUrl) {
 #else
   targetExtension = ".zip"; // Fallback
 #endif
+
+  if (includeBeta) {
+    size_t releaseStart = response.find("{\"url\"");
+    if (releaseStart != std::string::npos) {
+      std::string firstRelease = response.substr(releaseStart);
+      size_t releaseEnd = firstRelease.find("},");
+      if (releaseEnd == std::string::npos) {
+        releaseEnd = firstRelease.find("}]");
+      }
+      if (releaseEnd != std::string::npos) {
+        response = firstRelease.substr(0, releaseEnd + 1);
+      }
+    }
+  }
 
   size_t assetsPos = response.find("\"assets\"");
   if (assetsPos == std::string::npos) return "";
@@ -257,7 +303,7 @@ void DownloadFromGitHub() {
   downloadStatus = "Connecting to GitHub...";
   downloadProgress = 0.0f;
 
-  std::string assetUrl = GetAssetDownloadUrl(UpdateDialog::currentInfo.releaseApiUrl);
+  std::string assetUrl = GetAssetDownloadUrl(UpdateDialog::currentInfo.releaseApiUrl, betaEnabled);
   if (assetUrl.empty()) {
     downloadState = DownloadState::Error;
     downloadStatus = "Failed to find download asset";
@@ -265,7 +311,7 @@ void DownloadFromGitHub() {
   }
 
   downloadState = DownloadState::Downloading;
-  downloadStatus = "Downloading update...";
+  downloadStatus = betaEnabled ? "Downloading beta update..." : "Downloading update...";
 
   bool isNative = g_isNative;
   std::string extension = isNative ? ".msi" : ".zip";
@@ -350,6 +396,8 @@ bool UpdateDialog::Show(NativeWindow parent, const UpdateInfo& info) {
   downloadState = DownloadState::Idle;
   downloadProgress = 0.0f;
   downloadStatus = "";
+  betaEnabled = info.betaPreference;
+  betaToggleHovered = false;
 
   int width = 600;
   int height = 500;
@@ -737,8 +785,17 @@ void UpdateDialog::OnPaint(HWND hWnd) {
 
 void UpdateDialog::OnMouseMove(HWND hWnd, int x, int y) {
   int oldHovered = hoveredButton;
+  bool oldBetaHovered = betaToggleHovered;
   hoveredButton = 0;
+  betaToggleHovered = false;
   bool isMsix = IsMsixPackage();
+
+  if (downloadState == DownloadState::Idle && currentInfo.updateAvailable && !isMsix) {
+    if (x >= betaToggleRect.x && x <= betaToggleRect.x + betaToggleRect.width &&
+      y >= betaToggleRect.y && y <= betaToggleRect.y + betaToggleRect.height) {
+      betaToggleHovered = true;
+    }
+  }
 
   if (downloadState == DownloadState::Idle && currentInfo.updateAvailable && !isMsix) {
     if (x >= updateButtonRect.x && x <= updateButtonRect.x + updateButtonRect.width &&
@@ -764,13 +821,19 @@ void UpdateDialog::OnMouseMove(HWND hWnd, int x, int y) {
   scrollbarHovered = (x >= scrollThumbRect.x && x <= scrollThumbRect.x + scrollThumbRect.width &&
     y >= scrollThumbRect.y && y <= scrollThumbRect.y + scrollThumbRect.height);
 
-  if (oldHovered != hoveredButton || wasScrollbarHovered != scrollbarHovered) {
+  if (oldHovered != hoveredButton || wasScrollbarHovered != scrollbarHovered || oldBetaHovered != betaToggleHovered) {
     InvalidateRect(hWnd, nullptr, FALSE);
   }
 }
 
 void UpdateDialog::OnMouseDown(HWND hWnd, int x, int y) {
   pressedButton = hoveredButton;
+
+  if (betaToggleHovered) {
+    betaEnabled = !betaEnabled;
+    InvalidateRect(hWnd, nullptr, FALSE);
+    return;
+  }
 
   if (x >= scrollThumbRect.x && x <= scrollThumbRect.x + scrollThumbRect.width &&
     y >= scrollThumbRect.y && y <= scrollThumbRect.y + scrollThumbRect.height) {
@@ -817,7 +880,16 @@ void UpdateDialog::OnPaint() {
 
 void UpdateDialog::OnMouseMove(int x, int y) {
   int oldHovered = hoveredButton;
+  bool oldBetaHovered = betaToggleHovered;
   hoveredButton = 0;
+  betaToggleHovered = false;
+
+  if (downloadState == DownloadState::Idle && currentInfo.updateAvailable) {
+    if (x >= betaToggleRect.x && x <= betaToggleRect.x + betaToggleRect.width &&
+      y >= betaToggleRect.y && y <= betaToggleRect.y + betaToggleRect.height) {
+      betaToggleHovered = true;
+    }
+  }
 
   if (downloadState == DownloadState::Idle && currentInfo.updateAvailable) {
     if (x >= updateButtonRect.x && x <= updateButtonRect.x + updateButtonRect.width &&
@@ -843,13 +915,19 @@ void UpdateDialog::OnMouseMove(int x, int y) {
   scrollbarHovered = (x >= scrollThumbRect.x && x <= scrollThumbRect.x + scrollThumbRect.width &&
     y >= scrollThumbRect.y && y <= scrollThumbRect.y + scrollThumbRect.height);
 
-  if (oldHovered != hoveredButton || wasScrollbarHovered != scrollbarHovered) {
+  if (oldHovered != hoveredButton || wasScrollbarHovered != scrollbarHovered || oldBetaHovered != betaToggleHovered) {
     OnPaint();
   }
 }
 
 void UpdateDialog::OnMouseDown(int x, int y) {
   pressedButton = hoveredButton;
+
+  if (betaToggleHovered) {
+    betaEnabled = !betaEnabled;
+    OnPaint();
+    return;
+  }
 
   if (x >= scrollThumbRect.x && x <= scrollThumbRect.x + scrollThumbRect.width &&
     y >= scrollThumbRect.y && y <= scrollThumbRect.y + scrollThumbRect.height) {
@@ -897,7 +975,16 @@ void UpdateDialog::OnPaint() {
 
 void UpdateDialog::OnMouseMove(int x, int y) {
   int oldHovered = hoveredButton;
+  bool oldBetaHovered = betaToggleHovered;
   hoveredButton = 0;
+  betaToggleHovered = false;
+
+  if (downloadState == DownloadState::Idle && currentInfo.updateAvailable) {
+    if (x >= betaToggleRect.x && x <= betaToggleRect.x + betaToggleRect.width &&
+      y >= betaToggleRect.y && y <= betaToggleRect.y + betaToggleRect.height) {
+      betaToggleHovered = true;
+    }
+  }
 
   if (downloadState == DownloadState::Idle && currentInfo.updateAvailable) {
     if (x >= updateButtonRect.x && x <= updateButtonRect.x + updateButtonRect.width &&
@@ -926,13 +1013,19 @@ void UpdateDialog::OnMouseMove(int x, int y) {
   scrollbarHovered = (x >= scrollThumbRect.x && x <= scrollThumbRect.x + scrollThumbRect.width &&
     y >= scrollThumbRect.y && y <= scrollThumbRect.y + scrollThumbRect.height);
 
-  if (oldHovered != hoveredButton || wasScrollbarHovered != scrollbarHovered) {
+  if (oldHovered != hoveredButton || wasScrollbarHovered != scrollbarHovered || oldBetaHovered != betaToggleHovered) {
     OnPaint();
   }
 }
 
 void UpdateDialog::OnMouseDown(int x, int y) {
   pressedButton = hoveredButton;
+
+  if (betaToggleHovered) {
+    betaEnabled = !betaEnabled;
+    OnPaint();
+    return;
+  }
 
   if (x >= scrollThumbRect.x && x <= scrollThumbRect.x + scrollThumbRect.width &&
     y >= scrollThumbRect.y && y <= scrollThumbRect.y + scrollThumbRect.height) {
@@ -995,8 +1088,25 @@ void UpdateDialog::RenderContent(int width, int height) {
 
   renderer->drawLine(0, 80, width, 80, theme.separator);
 
+  if (downloadState == DownloadState::Idle && currentInfo.updateAvailable && !isMsix) {
+    betaToggleRect = Rect(width - 180, 90, 160, 30);
+
+    Rect checkboxRect(betaToggleRect.x, betaToggleRect.y + 5, 20, 20);
+    Color checkboxBorder = betaToggleHovered ? Color(100, 150, 255) : theme.disabledText;
+    renderer->drawRect(checkboxRect, theme.windowBackground, true);
+    renderer->drawRect(checkboxRect, checkboxBorder, false);
+
+    if (betaEnabled) {
+      renderer->drawRect(Rect(checkboxRect.x + 4, checkboxRect.y + 4, 12, 12),
+        Color(100, 150, 255), true);
+    }
+
+    renderer->drawText(Translations::T("Include Beta Versions"),
+      betaToggleRect.x + 25, betaToggleRect.y + 5, theme.textColor);
+  }
+
   if (downloadState != DownloadState::Idle) {
-    int progressY = 100;
+    int progressY = 130;
 
     Color statusColor = theme.textColor;
     if (downloadState == DownloadState::Error) {
@@ -1015,17 +1125,17 @@ void UpdateDialog::RenderContent(int width, int height) {
     renderer->drawText(pctStream.str(), width / 2 - 15, progressY + 38, theme.textColor);
   }
   else if (currentInfo.updateAvailable && isMsix) {
-    renderer->drawText(Translations::T("Microsoft Store Package Detected").c_str(), 20, 100, theme.textColor);
-    renderer->drawText(Translations::T("This application is installed via the Microsoft Store.").c_str(), 20, 130, theme.disabledText);
-    renderer->drawText(Translations::T("Updates are managed automatically through the Store.").c_str(), 20, 155, theme.disabledText);
-    renderer->drawText(Translations::T("Please check the Microsoft Store for updates.").c_str(), 20, 180, theme.disabledText);
+    renderer->drawText(Translations::T("Microsoft Store Package Detected").c_str(), 20, 130, theme.textColor);
+    renderer->drawText(Translations::T("This application is installed via the Microsoft Store.").c_str(), 20, 160, theme.disabledText);
+    renderer->drawText(Translations::T("Updates are managed automatically through the Store.").c_str(), 20, 185, theme.disabledText);
+    renderer->drawText(Translations::T("Please check the Microsoft Store for updates.").c_str(), 20, 210, theme.disabledText);
   }
   else if (currentInfo.updateAvailable && !currentInfo.releaseNotes.empty()) {
-    renderer->drawText(Translations::T("What's New:").c_str(), 20, 100, theme.textColor);
+    renderer->drawText(Translations::T("What's New:").c_str(), 20, 130, theme.textColor);
 
     std::istringstream stream(currentInfo.releaseNotes);
     std::string line;
-    int y = 130 - scrollOffset;
+    int y = 160 - scrollOffset;
     int maxY = height - 100;
 
     while (std::getline(stream, line) && y < maxY) {
@@ -1035,12 +1145,12 @@ void UpdateDialog::RenderContent(int width, int height) {
       y += 25;
     }
 
-    int contentHeight = y + scrollOffset - 130;
-    if (contentHeight > (maxY - 130)) {
-      scrollbarRect = Rect(width - 15, 100, 10, maxY - 100);
+    int contentHeight = y + scrollOffset - 160;
+    if (contentHeight > (maxY - 160)) {
+      scrollbarRect = Rect(width - 15, 130, 10, maxY - 130);
       renderer->drawRect(scrollbarRect, theme.scrollbarBg, true);
 
-      int viewHeight = maxY - 130;
+      int viewHeight = maxY - 160;
       float visibleRatio = 0.0f;
       if (contentHeight > 0) {
         visibleRatio = (float)viewHeight / (float)contentHeight;
@@ -1068,8 +1178,8 @@ void UpdateDialog::RenderContent(int width, int height) {
     }
   }
   else if (!currentInfo.updateAvailable) {
-    renderer->drawText(Translations::T("You have the latest version installed.").c_str(), 20, 120, theme.textColor);
-    renderer->drawText(Translations::T("Check back later for updates.").c_str(), 20, 150, theme.disabledText);
+    renderer->drawText(Translations::T("You have the latest version installed.").c_str(), 20, 150, theme.textColor);
+    renderer->drawText(Translations::T("Check back later for updates.").c_str(), 20, 180, theme.disabledText);
   }
 
   int buttonY = height - 60;
@@ -1082,7 +1192,9 @@ void UpdateDialog::RenderContent(int width, int height) {
     updateState.enabled = true;
     updateState.hovered = (hoveredButton == 1);
     updateState.pressed = (pressedButton == 1);
-    renderer->drawModernButton(updateState, theme, Translations::T("Download").c_str());
+    std::string downloadText = betaEnabled ?
+      Translations::T("Download Beta") : Translations::T("Download");
+    renderer->drawModernButton(updateState, theme, downloadText.c_str());
 
     skipButtonRect = Rect(width - 150, buttonY, 100, buttonHeight);
     WidgetState skipState;

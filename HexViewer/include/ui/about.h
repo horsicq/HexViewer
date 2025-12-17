@@ -30,7 +30,9 @@ private:
   static int pressedButton;
   static Rect updateButtonRect;
   static Rect closeButtonRect;
-
+  static bool betaEnabled;
+  static Rect betaToggleRect;
+  static bool betaToggleHovered;
   static void RenderContent(int width, int height);
 
 #ifdef _WIN32

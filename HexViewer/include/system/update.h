@@ -23,6 +23,7 @@ struct UpdateInfo {
   std::string releaseNotes;
   std::string downloadUrl;
   std::string releaseApiUrl;
+  bool betaPreference = false;
 };
 
 enum class DownloadState {
