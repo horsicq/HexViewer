@@ -1064,9 +1064,11 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
             return 0;
         }
 
-        if (g_MainScrollbar.visible && g_Renderer.isPointInScrollbarTrack(x, y, g_MainScrollbar))
+        if (g_MainScrollbar.visible &&
+            g_Renderer.isPointInScrollbarTrack(x, y, g_MainScrollbar))
         {
-            float newPos = g_Renderer.getScrollbarPositionFromMouse(y, g_MainScrollbar, true);
+            float newPos = g_Renderer.getScrollbarPositionFromMouse(
+                y, g_MainScrollbar, true);
 
             int maxScroll = g_TotalLines - g_LinesPerPage;
             if (maxScroll < 0)
@@ -1084,6 +1086,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
             InvalidateRect(hwnd, NULL, FALSE);
             return 0;
         }
+
         if (g_MenuBar.handleMouseDown(x, y))
         {
             InvalidateRect(hwnd, NULL, FALSE);
@@ -1249,14 +1252,23 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
             return 0;
         }
 
+        if (HandleLeftPanelContentClick(x, y, windowWidth, windowHeight))
+        {
+            InvalidateRect(hwnd, NULL, FALSE);
+            return 0;
+        }
+
         g_Renderer.UpdateHexMetrics(leftPanelWidth, g_MenuBar.getHeight());
 
-        if (g_Renderer.IsPointInHexArea(x, y, leftPanelWidth, g_MenuBar.getHeight(),
+        if (g_Renderer.IsPointInHexArea(x, y,
+                                        leftPanelWidth,
+                                        g_MenuBar.getHeight(),
                                         windowWidth, windowHeight))
         {
             g_PatternSearch.hasFocus = false;
 
-            BytePositionInfo clickInfo = g_Renderer.GetHexBytePositionInfo(Point(x, y));
+            BytePositionInfo clickInfo =
+                g_Renderer.GetHexBytePositionInfo(Point(x, y));
 
             if (clickInfo.Index >= 0 &&
                 clickInfo.Index < (long long)g_HexData.getFileSize())

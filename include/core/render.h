@@ -65,7 +65,7 @@ struct Theme
   Color buttonPressed;
   Color buttonText;
   Color buttonDisabled;
-
+  Color buttonColor;
   Color controlBorder;
   Color controlBackground;
   Color controlCheck;

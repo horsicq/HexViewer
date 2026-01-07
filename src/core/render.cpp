@@ -1,8 +1,10 @@
 #include "render.h"
-#include "panellayout.h"
 #include "panelcontent.h"
 #include "hexdata.h"
+#include "platfrom_die.h"
+
 extern HexData g_HexData;
+char g_DIEExecutablePath[260];
 
 #ifdef _WIN32
 #define NATIVE_WINDOW_NULL nullptr
@@ -1012,9 +1014,9 @@ void RenderManager::drawX11Pixmap(Pixmap pixmap, int width, int height, int x, i
 }
 #endif
 
-int MeasureTextHeight(const char* text)
+int MeasureTextHeight(const char *text)
 {
-    return 16;
+  return 16;
 }
 
 void RenderManager::drawProgressBar(const Rect &rect, float progress, const Theme &theme)
@@ -1066,301 +1068,313 @@ void RenderManager::drawLeftPanel(
     int windowHeight,
     const Rect &panelBounds)
 {
-    if (!state.visible)
-        return;
+  if (!state.visible)
+    return;
 
-    Color panelBg(
-        theme.windowBackground.r - 10,
-        theme.windowBackground.g - 10,
-        theme.windowBackground.b - 10);
+  Color panelBg(
+      theme.windowBackground.r - 10,
+      theme.windowBackground.g - 10,
+      theme.windowBackground.b - 10);
 
-    if (theme.windowBackground.r < 50)
-        panelBg = Color(35, 35, 40);
+  if (theme.windowBackground.r < 50)
+    panelBg = Color(35, 35, 40);
 
-    drawRect(panelBounds, panelBg, true);
+  drawRect(panelBounds, panelBg, true);
 
-    Rect titleBar(panelBounds.x, panelBounds.y, panelBounds.width, PANEL_TITLE_HEIGHT);
-    Color titleBg = state.dragging ? theme.controlCheck
-                                   : Color(panelBg.r + 15, panelBg.g + 15, panelBg.b + 15);
-    drawRect(titleBar, titleBg, true);
+  Rect titleBar(panelBounds.x, panelBounds.y, panelBounds.width, PANEL_TITLE_HEIGHT);
+  Color titleBg = state.dragging ? theme.controlCheck
+                                 : Color(panelBg.r + 15, panelBg.g + 15, panelBg.b + 15);
+  drawRect(titleBar, titleBg, true);
 
-    const char *dockText = "";
-    switch (state.dockPosition)
+  const char *dockText = "";
+  switch (state.dockPosition)
+  {
+  case PanelDockPosition::Left:
+    dockText = " [Left]";
+    break;
+  case PanelDockPosition::Right:
+    dockText = " [Right]";
+    break;
+  case PanelDockPosition::Top:
+    dockText = " [Top]";
+    break;
+  case PanelDockPosition::Bottom:
+    dockText = " [Bottom]";
+    break;
+  case PanelDockPosition::Floating:
+    dockText = " [Float]";
+    break;
+  }
+
+  char titleText[64];
+  StrCopy(titleText, "File Explorer");
+  StrCat(titleText, dockText);
+  drawText(titleText, panelBounds.x + 10, panelBounds.y + 7, theme.textColor);
+
+  drawRect(panelBounds, theme.separator, false);
+
+  int contentX = panelBounds.x + 15;
+  int currentY = panelBounds.y + PANEL_TITLE_HEIGHT + 10;
+  int contentWidth = panelBounds.width - 30;
+
+  int rowHeight = 16;
+  int headerHeight = 18;
+  int itemSpacing = 4;
+  int sectionSpacing = 10;
+
+  char buf[256];
+  extern HexData g_HexData;
+  extern long long cursorBytePos;
+  extern BookmarksState g_Bookmarks;
+  extern ByteStatistics g_ByteStats;
+  extern DetectItEasyState g_DIEState;
+
+  long long fileSize = (long long)g_HexData.getFileSize();
+
+  Color faded(
+      theme.textColor.r - 40,
+      theme.textColor.g - 40,
+      theme.textColor.b - 40);
+
+  Color halfText(
+      theme.textColor.r / 2,
+      theme.textColor.g / 2,
+      theme.textColor.b / 2);
+
+  Color thirdText(
+      theme.textColor.r / 3,
+      theme.textColor.g / 3,
+      theme.textColor.b / 3);
+
+  drawText("File Information", contentX, currentY, theme.headerColor);
+  currentY += headerHeight + sectionSpacing;
+
+  if (fileSize < 1024)
+  {
+    ItoaDec(fileSize, buf, 256);
+    StrCat(buf, " bytes");
+  }
+  else if (fileSize < 1024 * 1024)
+  {
+    ItoaDec(fileSize / 1024, buf, 256);
+    StrCat(buf, " KB");
+  }
+  else
+  {
+    ItoaDec(fileSize / (1024 * 1024), buf, 256);
+    StrCat(buf, " MB");
+  }
+  drawText("Size:", contentX, currentY, faded);
+  drawText(buf, contentX + 85, currentY, theme.textColor);
+  currentY += rowHeight + itemSpacing;
+
+  const char *typeStr = "Unknown";
+  if (fileSize >= 4)
+  {
+    uint8_t b0 = g_HexData.getByte(0);
+    uint8_t b1 = g_HexData.getByte(1);
+    uint8_t b2 = g_HexData.getByte(2);
+    uint8_t b3 = g_HexData.getByte(3);
+
+    typeStr = "Binary Data";
+    if (b0 == 0x4D && b1 == 0x5A)
+      typeStr = "PE Executable";
+    else if (b0 == 0x7F && b1 == 'E' && b2 == 'L' && b3 == 'F')
+      typeStr = "ELF Executable";
+    else if (b0 == 0x89 && b1 == 'P' && b2 == 'N' && b3 == 'G')
+      typeStr = "PNG Image";
+    else if (b0 == 0xFF && b1 == 0xD8 && b2 == 0xFF)
+      typeStr = "JPEG Image";
+  }
+  drawText("Type:", contentX, currentY, faded);
+  drawText(typeStr, contentX + 85, currentY, Color(100, 200, 150));
+  currentY += rowHeight + itemSpacing;
+
+  currentY += 8;
+
+  drawText("Data Inspector", contentX, currentY, theme.headerColor);
+  currentY += headerHeight + sectionSpacing;
+
+  if (cursorBytePos >= 0 && cursorBytePos < fileSize)
+  {
+    uint8_t byteVal = g_HexData.getByte((size_t)cursorBytePos);
+
+    StrCopy(buf, "0x");
+    ItoaHex(cursorBytePos, buf + 2, 254);
+    drawText("Offset:", contentX, currentY, faded);
+    drawText(buf, contentX + 85, currentY, Color(100, 150, 255));
+    currentY += rowHeight + itemSpacing;
+
+    ItoaDec(byteVal, buf, 256);
+    drawText("Uint8:", contentX, currentY, faded);
+    drawText(buf, contentX + 85, currentY, theme.textColor);
+    currentY += rowHeight + itemSpacing;
+
+    ItoaDec((int8_t)byteVal, buf, 256);
+    drawText("Int8:", contentX, currentY, faded);
+    drawText(buf, contentX + 85, currentY, theme.textColor);
+    currentY += rowHeight + itemSpacing;
+
+    StrCopy(buf, "0x");
+    ByteToHex(byteVal, buf + 2);
+    buf[4] = 0;
+    drawText("Hex:", contentX, currentY, faded);
+    drawText(buf, contentX + 85, currentY, theme.textColor);
+    currentY += rowHeight + itemSpacing;
+
+    if (byteVal >= 32 && byteVal < 127)
     {
-    case PanelDockPosition::Left:    dockText = " [Left]";  break;
-    case PanelDockPosition::Right:   dockText = " [Right]"; break;
-    case PanelDockPosition::Top:     dockText = " [Top]";   break;
-    case PanelDockPosition::Bottom:  dockText = " [Bottom]";break;
-    case PanelDockPosition::Floating:dockText = " [Float]"; break;
-    }
-
-    char titleText[64];
-    StrCopy(titleText, "File Explorer");
-    StrCat(titleText, dockText);
-    drawText(titleText, panelBounds.x + 10, panelBounds.y + 7, theme.textColor);
-
-    drawRect(panelBounds, theme.separator, false);
-
-    int contentX = panelBounds.x + 15;
-    int startY   = panelBounds.y + PANEL_TITLE_HEIGHT + 10;
-    int contentWidth = panelBounds.width - 30;
-
-    int rowHeight      = 16;
-    int headerHeight   = 18;
-    int itemSpacing    = 4;
-    int sectionSpacing = 10;
-
-    PanelLayoutBuilder layout(
-        contentX,
-        startY,
-        contentWidth,
-        rowHeight,
-        headerHeight,
-        itemSpacing,
-        sectionSpacing,
-        &MeasureTextHeight);
-
-    char buf[256];
-    extern HexData g_HexData;
-    extern long long cursorBytePos;
-    extern BookmarksState g_Bookmarks;
-    extern ByteStatistics g_ByteStats;
-    extern DetectItEasyState g_DIEState;
-
-    long long fileSize = (long long)g_HexData.getFileSize();
-
-    Color faded(
-        theme.textColor.r - 40,
-        theme.textColor.g - 40,
-        theme.textColor.b - 40);
-
-    Color halfText(
-        theme.textColor.r / 2,
-        theme.textColor.g / 2,
-        theme.textColor.b / 2);
-
-    Color thirdText(
-        theme.textColor.r / 3,
-        theme.textColor.g / 3,
-        theme.textColor.b / 3);
-
-    layout.addSectionHeader("File Information", theme.headerColor);
-
-    if (fileSize < 1024)
-    {
-        ItoaDec(fileSize, buf, 256);
-        StrCat(buf, " bytes");
-    }
-    else if (fileSize < 1024 * 1024)
-    {
-        ItoaDec(fileSize / 1024, buf, 256);
-        StrCat(buf, " KB");
-    }
-    else
-    {
-        ItoaDec(fileSize / (1024 * 1024), buf, 256);
-        StrCat(buf, " MB");
-    }
-    layout.addLabelValue("Size:", buf, faded, theme.textColor);
-
-    const char *typeStr = "Unknown";
-    if (fileSize >= 4)
-    {
-        uint8_t b0 = g_HexData.getByte(0);
-        uint8_t b1 = g_HexData.getByte(1);
-        uint8_t b2 = g_HexData.getByte(2);
-        uint8_t b3 = g_HexData.getByte(3);
-
-        typeStr = "Binary Data";
-        if (b0 == 0x4D && b1 == 0x5A)                        typeStr = "PE Executable";
-        else if (b0 == 0x7F && b1 == 'E' && b2 == 'L' && b3 == 'F') typeStr = "ELF Executable";
-        else if (b0 == 0x89 && b1 == 'P' && b2 == 'N' && b3 == 'G') typeStr = "PNG Image";
-        else if (b0 == 0xFF && b1 == 0xD8 && b2 == 0xFF)           typeStr = "JPEG Image";
-    }
-    layout.addLabelValue("Type:", typeStr, faded, Color(100, 200, 150));
-
-    layout.addSpacer(8);
-
-    layout.addSectionHeader("Data Inspector", theme.headerColor);
-
-    if (cursorBytePos >= 0 && cursorBytePos < fileSize)
-    {
-        uint8_t byteVal = g_HexData.getByte((size_t)cursorBytePos);
-
-        StrCopy(buf, "0x");
-        ItoaHex(cursorBytePos, buf + 2, 254);
-        layout.addLabelValue("Offset:", buf, faded, Color(100, 150, 255));
-
-        ItoaDec(byteVal, buf, 256);
-        layout.addLabelValue("Uint8:", buf, faded, theme.textColor);
-
-        ItoaDec((int8_t)byteVal, buf, 256);
-        layout.addLabelValue("Int8:", buf, faded, theme.textColor);
-
-        StrCopy(buf, "0x");
-        ByteToHex(byteVal, buf + 2);
-        buf[4] = 0;
-        layout.addLabelValue("Hex:", buf, faded, theme.textColor);
-
-        if (byteVal >= 32 && byteVal < 127)
-        {
-            buf[0] = '\'';
-            buf[1] = (char)byteVal;
-            buf[2] = '\'';
-            buf[3] = 0;
-        }
-        else
-        {
-            StrCopy(buf, ".");
-        }
-        layout.addLabelValue("ASCII:", buf, faded, theme.textColor);
-
-        layout.addSpacer(8);
-    }
-    else
-    {
-        layout.addText("Move cursor to view data", halfText, false);
-    }
-
-    layout.addSectionHeader("Bookmarks", theme.headerColor);
-
-    if (g_Bookmarks.bookmarks.empty())
-    {
-        layout.addText("No bookmarks", halfText, false);
-        layout.addText("Ctrl+B to add", thirdText, false);
+      buf[0] = '\'';
+      buf[1] = (char)byteVal;
+      buf[2] = '\'';
+      buf[3] = 0;
     }
     else
     {
-        for (size_t i = 0; i < g_Bookmarks.bookmarks.size() && i < 5; i++)
-        {
-            const Bookmark &bm = g_Bookmarks.bookmarks[i];
-            bool selected = (g_Bookmarks.selectedIndex == (int)i);
-            layout.addBookmark(bm, (int)i, selected);
-        }
+      StrCopy(buf, ".");
     }
+    drawText("ASCII:", contentX, currentY, faded);
+    drawText(buf, contentX + 85, currentY, theme.textColor);
+    currentY += rowHeight + itemSpacing;
 
-    layout.addSpacer(8);
+    currentY += 8;
+  }
+  else
+  {
+    drawText("Move cursor to view data", contentX, currentY, halfText);
+    currentY += rowHeight + itemSpacing;
+  }
 
-    layout.addSectionHeader("Byte Statistics", theme.headerColor);
+  drawText("Bookmarks", contentX, currentY, theme.headerColor);
+  currentY += headerHeight + sectionSpacing;
 
-    if (!g_ByteStats.computed)
+  if (g_Bookmarks.bookmarks.empty())
+  {
+    drawText("No bookmarks", contentX, currentY, halfText);
+    currentY += rowHeight + itemSpacing;
+    drawText("Ctrl+B to add", contentX, currentY, thirdText);
+    currentY += rowHeight + itemSpacing;
+  }
+  else
+  {
+    for (size_t i = 0; i < g_Bookmarks.bookmarks.size() && i < 5; i++)
     {
-        layout.addText("Click to compute", halfText, true);
+      const Bookmark &bm = g_Bookmarks.bookmarks[i];
+      bool selected = (g_Bookmarks.selectedIndex == (int)i);
+
+      Rect colorBox(contentX, currentY + 3, 10, 10);
+      drawRect(colorBox, bm.color, true);
+
+      if (selected)
+      {
+        Color selBg = theme.controlCheck;
+        selBg.a = 40;
+        Rect selRect(contentX, currentY, contentWidth, rowHeight);
+        drawRect(selRect, selBg, true);
+      }
+
+      int textX = contentX + 15;
+      drawText(bm.name, textX, currentY, theme.textColor);
+      currentY += rowHeight + itemSpacing;
     }
-    else
-    {
-        StrCopy(buf, "0x");
-        ByteToHex(g_ByteStats.mostCommonByte, buf + 2);
-        buf[4] = 0;
-        layout.addLabelValue("Most Common:", buf, faded, theme.textColor);
-    }
+  }
 
-    layout.addSpacer(8);
+  currentY += 8;
 
-    layout.addSectionHeader("Detect it Easy", theme.headerColor);
+  drawText("Byte Statistics", contentX, currentY, theme.headerColor);
+  currentY += headerHeight + sectionSpacing;
 
-    layout.addLabelValue(
-        "File Type:",
-        g_DIEState.fileType[0] ? g_DIEState.fileType : "Coming Soon",
-        faded,
-        Color(100, 200, 150));
+  if (!g_ByteStats.computed)
+  {
+    drawText("Click to compute", contentX, currentY, halfText);
+    currentY += rowHeight + itemSpacing;
+  }
+  else
+  {
+    StrCopy(buf, "0x");
+    ByteToHex(g_ByteStats.mostCommonByte, buf + 2);
+    buf[4] = 0;
+    drawText("Most Common:", contentX, currentY, faded);
+    drawText(buf, contentX + 85, currentY, theme.textColor);
+    currentY += rowHeight + itemSpacing;
+  }
 
-    layout.addLabelValue(
-        "Compiler:",
-        g_DIEState.compiler[0] ? g_DIEState.compiler : "Coming Soon",
-        faded,
-        Color(100, 200, 150));
+  currentY += 8;
 
-    layout.addLabelValue(
-        "Arch:",
-        g_DIEState.architecture[0] ? g_DIEState.architecture : "Coming Soon",
-        faded,
-        Color(100, 200, 150));
+  drawText("Detect it Easy", contentX, currentY, theme.headerColor);
+  currentY += headerHeight + sectionSpacing;
 
-    const Vector<UIItem> &items = layout.getItems();
+  drawText("File Type:", contentX, currentY, faded);
+  drawText(g_DIEState.fileType[0] ? g_DIEState.fileType : "Coming Soon",
+           contentX + 85, currentY, Color(100, 200, 150));
+  currentY += rowHeight + itemSpacing;
 
-    for (size_t i = 0; i < items.size(); ++i)
-    {
-        const UIItem &it = items[i];
+  drawText("Compiler:", contentX, currentY, faded);
+  drawText(g_DIEState.compiler[0] ? g_DIEState.compiler : "Coming Soon",
+           contentX + 85, currentY, Color(100, 200, 150));
+  currentY += rowHeight + itemSpacing;
 
-        switch (it.type)
-        {
-        case UIItemType::SectionHeader:
-            drawText(it.label, it.bounds.x, it.bounds.y, it.labelColor);
-            break;
+  drawText("Arch:", contentX, currentY, faded);
+  drawText(g_DIEState.architecture[0] ? g_DIEState.architecture : "Coming Soon",
+           contentX + 85, currentY, Color(100, 200, 150));
+  currentY += rowHeight + itemSpacing;
 
-        case UIItemType::LabelValue:
-        {
-            drawText(it.label, it.bounds.x, it.bounds.y, it.labelColor);
-            int valueX = it.bounds.x + 85;
-            drawText(it.value ? it.value : "", valueX, it.bounds.y, it.valueColor);
-        } break;
+  char diePath[260];
+  bool dieFound = FindDIEPath(diePath, sizeof(diePath));
 
-        case UIItemType::Text:
-            drawText(it.label, it.bounds.x, it.bounds.y, it.labelColor);
-            break;
+  if (dieFound)
+  {
+    StrCopy(g_DIEExecutablePath, diePath);
 
-        case UIItemType::Bookmark:
-        {
-            Rect colorBox(it.bounds.x, it.bounds.y + 3, 10, 10);
-            drawRect(colorBox, it.color, true);
+    currentY += 4;
+    
+    Rect separatorRect(contentX, currentY, contentWidth, 1);
+    drawRect(separatorRect, theme.separator, true);
+    currentY += itemSpacing;
 
-            if (it.selected)
-            {
-                Color selBg = theme.controlCheck;
-                selBg.a = 40;
-                drawRect(it.bounds, selBg, true);
-            }
+    Rect buttonRect(contentX, currentY, contentWidth, rowHeight + 10);
+    WidgetState ws;
+    ws.rect = buttonRect;
+    ws.enabled = true;
+    ws.hovered = false;
+    ws.pressed = false;
+    drawModernButton(ws, theme, "Open in DIE");
+    currentY += rowHeight + 10 + itemSpacing;
+  }
 
-            int textX = it.bounds.x + 15;
-            drawText(it.label, textX, it.bounds.y, theme.textColor);
-        } break;
-
-        case UIItemType::Separator:
-        {
-            Rect line(it.bounds.x, it.bounds.y, it.bounds.width, 1);
-            drawRect(line, it.color, true);
-        } break;
-
-        case UIItemType::Spacer:
-            break;
-        }
-    }
-
-    if (state.dockPosition == PanelDockPosition::Floating)
-    {
-        Rect resizeHandle(
-            panelBounds.x + panelBounds.width - 10,
-            panelBounds.y + panelBounds.height - 10,
-            10, 10);
-        Color handleColor = theme.controlCheck;
-        handleColor.a = state.resizing ? 150 : 30;
-        drawRect(resizeHandle, handleColor, true);
-    }
-    else if (state.dockPosition == PanelDockPosition::Left)
-    {
-        Rect resizeHandle(
-            panelBounds.x + panelBounds.width - 3,
-            panelBounds.y + PANEL_TITLE_HEIGHT,
-            6,
-            panelBounds.height - PANEL_TITLE_HEIGHT);
-        Color handleColor = theme.controlCheck;
-        handleColor.a = state.resizing ? 150 : 30;
-        drawRect(resizeHandle, handleColor, true);
-    }
-    else if (state.dockPosition == PanelDockPosition::Right)
-    {
-        Rect resizeHandle(
-            panelBounds.x,
-            panelBounds.y + PANEL_TITLE_HEIGHT,
-            6,
-            panelBounds.height - PANEL_TITLE_HEIGHT);
-        Color handleColor = theme.controlCheck;
-        handleColor.a = state.resizing ? 150 : 30;
-        drawRect(resizeHandle, handleColor, true);
-    }
+  if (state.dockPosition == PanelDockPosition::Floating)
+  {
+    Rect resizeHandle(
+        panelBounds.x + panelBounds.width - 10,
+        panelBounds.y + panelBounds.height - 10,
+        10, 10);
+    Color handleColor = theme.controlCheck;
+    handleColor.a = state.resizing ? 150 : 30;
+    drawRect(resizeHandle, handleColor, true);
+  }
+  else if (state.dockPosition == PanelDockPosition::Left)
+  {
+    Rect resizeHandle(
+        panelBounds.x + panelBounds.width - 3,
+        panelBounds.y + PANEL_TITLE_HEIGHT,
+        6,
+        panelBounds.height - PANEL_TITLE_HEIGHT);
+    Color handleColor = theme.controlCheck;
+    handleColor.a = state.resizing ? 150 : 30;
+    drawRect(resizeHandle, handleColor, true);
+  }
+  else if (state.dockPosition == PanelDockPosition::Right)
+  {
+    Rect resizeHandle(
+        panelBounds.x,
+        panelBounds.y + PANEL_TITLE_HEIGHT,
+        6,
+        panelBounds.height - PANEL_TITLE_HEIGHT);
+    Color handleColor = theme.controlCheck;
+    handleColor.a = state.resizing ? 150 : 30;
+    drawRect(resizeHandle, handleColor, true);
+  }
 }
-
 
 void RenderManager::drawBottomPanel(
     const BottomPanelState &state,

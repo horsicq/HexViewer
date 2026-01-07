@@ -498,6 +498,26 @@ inline wchar_t* AllocWideString(const wchar_t* str)
     return result;
 }
 
+static double fast_log2(double x)
+{
+    union { double d; uint64_t i; } u = { x };
+
+    int exp = (int)((u.i >> 52) & 0x7FF) - 1023;
+
+    u.i &= ~(uint64_t)0x7FF << 52;
+    u.i |= (uint64_t)1023 << 52;
+
+    double m = u.d - 1.0;
+
+    double m2 = m * m;
+    double m3 = m2 * m;
+
+    double approx = m - 0.5 * m2 + (1.0 / 3.0) * m3;
+
+    return (double)exp + approx;
+}
+
+
 inline void StrCat(char* dest, const char* src)
 {
     if (!dest || !src)

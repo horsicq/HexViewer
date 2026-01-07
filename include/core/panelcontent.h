@@ -124,6 +124,7 @@ void Compare_OpenFileDialog();
 void Compare_Run();
 
 bool HandleBottomPanelContentClick(int x, int y, int windowWidth, int windowHeight);
+bool HandleLeftPanelContentClick(int x, int y, int windowWidth, int windowHeight);
 
 void Bookmarks_Add(long long byteOffset, const char* name, Color color);
 void Bookmarks_Remove(int index);
