@@ -1,30 +1,28 @@
 #if defined(_WIN32)
-    #include <windows.h>
-    #include <wininet.h>
+#include <windows.h>
+#include <wininet.h>
 
 #elif defined(__APPLE__)
-    #import <Cocoa/Cocoa.h>
-    #import <QuartzCore/QuartzCore.h>
+#import <Cocoa/Cocoa.h>
+#import <QuartzCore/QuartzCore.h>
 
 #elif defined(__linux__)
-    #include <X11/Xlib.h>
-    #include <X11/Xatom.h>
-    #include <X11/Xutil.h>
-    #include <unistd.h>
-    #include <fstream>
-    #include <string>
-    #include <vector>
-    #include <thread>
+#include <X11/Xlib.h>
+#include <X11/Xatom.h>
+#include <X11/Xutil.h>
+#include <unistd.h>
+#include <fstream>
+#include <string>
+#include <vector>
+#include <thread>
 
 #endif
-
 
 #include <global.h>
 #include <language.h>
 #include <about.h>
 #include "imageloader.h"
 #include "resource.h"
-
 
 RenderManager *AboutDialog::renderer = nullptr;
 bool AboutDialog::darkMode = true;
@@ -352,86 +350,86 @@ static Window window = 0;
 static Atom wmDeleteWindow;
 #endif
 
-  void AboutDialog::Show(NativeWindow parent, bool isDarkMode)
-  {
-    darkMode = isDarkMode;
-    parentWindow = parent;
-    hoveredButton = 0;
-    pressedButton = 0;
-    betaToggleHovered = false;
+void AboutDialog::Show(NativeWindow parent, bool isDarkMode)
+{
+  darkMode = isDarkMode;
+  parentWindow = parent;
+  hoveredButton = 0;
+  pressedButton = 0;
+  betaToggleHovered = false;
 
-    int width = 550;
-    int height = 480;
+  int width = 550;
+  int height = 480;
 
 #ifdef _WIN32
-    WNDCLASSEXW wcex = {};
-    wcex.cbSize = sizeof(WNDCLASSEX);
-    wcex.style = CS_HREDRAW | CS_VREDRAW | CS_OWNDC;
-    wcex.lpfnWndProc = DialogProc;
-    wcex.hInstance = GetModuleHandle(nullptr);
-    wcex.hCursor = LoadCursor(nullptr, IDC_ARROW);
-    wcex.hbrBackground = nullptr;
-    wcex.lpszClassName = L"AboutDialogClass";
+  WNDCLASSEXW wcex = {};
+  wcex.cbSize = sizeof(WNDCLASSEX);
+  wcex.style = CS_HREDRAW | CS_VREDRAW | CS_OWNDC;
+  wcex.lpfnWndProc = DialogProc;
+  wcex.hInstance = GetModuleHandle(nullptr);
+  wcex.hCursor = LoadCursor(nullptr, IDC_ARROW);
+  wcex.hbrBackground = nullptr;
+  wcex.lpszClassName = L"AboutDialogClass";
 
-    RegisterClassExW(&wcex);
+  RegisterClassExW(&wcex);
 
-    HWND hWnd = CreateWindowExW(
-        WS_EX_DLGMODALFRAME | WS_EX_TOPMOST,
-        L"AboutDialogClass",
-        L"About",
-        WS_POPUP | WS_CAPTION | WS_SYSMENU,
-        CW_USEDEFAULT, CW_USEDEFAULT,
-        width, height,
-        (HWND)parentWindow,
-        nullptr,
-        GetModuleHandleW(nullptr),
-        nullptr);
-    if (!hWnd)
-      return;
+  HWND hWnd = CreateWindowExW(
+      WS_EX_DLGMODALFRAME | WS_EX_TOPMOST,
+      L"AboutDialogClass",
+      L"About",
+      WS_POPUP | WS_CAPTION | WS_SYSMENU,
+      CW_USEDEFAULT, CW_USEDEFAULT,
+      width, height,
+      (HWND)parentWindow,
+      nullptr,
+      GetModuleHandleW(nullptr),
+      nullptr);
+  if (!hWnd)
+    return;
 
-    ApplyDarkTitleBar(hWnd, isDarkMode);
+  ApplyDarkTitleBar(hWnd, isDarkMode);
 
-    RECT parentRect;
-    GetWindowRect((HWND)parentWindow, &parentRect);
-    int x = parentRect.left + (parentRect.right - parentRect.left - width) / 2;
-    int y = parentRect.top + (parentRect.bottom - parentRect.top - height) / 2;
-    SetWindowPos(hWnd, nullptr, x, y, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
+  RECT parentRect;
+  GetWindowRect((HWND)parentWindow, &parentRect);
+  int x = parentRect.left + (parentRect.right - parentRect.left - width) / 2;
+  int y = parentRect.top + (parentRect.bottom - parentRect.top - height) / 2;
+  SetWindowPos(hWnd, nullptr, x, y, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
 
-    renderer = new RenderManager();
-    if (!renderer->initialize(hWnd))
-    {
-      DestroyWindow(hWnd);
-      delete renderer;
-      return;
-    }
-    RECT rc;
-    GetClientRect(hWnd, &rc);
-    renderer->resize(rc.right - rc.left, rc.bottom - rc.top);
-
-    logoBitmap = ImageLoader::LoadPNGDecoded(
-        reinterpret_cast<const char *>(MAKEINTRESOURCE(IDB_LOGO)),
-        &logoWidth,
-        &logoHeight);
-
-    ShowWindow(hWnd, SW_SHOW);
-    UpdateWindow(hWnd);
-    MSG msg;
-    while (GetMessage(&msg, nullptr, 0, 0))
-    {
-      if (msg.message == WM_QUIT || !IsWindow(hWnd))
-        break;
-      TranslateMessage(&msg);
-      DispatchMessage(&msg);
-    }
-
-    if (logoBitmap)
-    {
-      DeleteObject(logoBitmap);
-      logoBitmap = nullptr;
-    }
+  renderer = new RenderManager();
+  if (!renderer->initialize(hWnd))
+  {
+    DestroyWindow(hWnd);
     delete renderer;
-    renderer = nullptr;
-    UnregisterClassW(L"AboutDialogClass", GetModuleHandle(nullptr));
+    return;
+  }
+  RECT rc;
+  GetClientRect(hWnd, &rc);
+  renderer->resize(rc.right - rc.left, rc.bottom - rc.top);
+
+  logoBitmap = ImageLoader::LoadPNGDecoded(
+      reinterpret_cast<const char *>(MAKEINTRESOURCE(IDB_LOGO)),
+      &logoWidth,
+      &logoHeight);
+
+  ShowWindow(hWnd, SW_SHOW);
+  UpdateWindow(hWnd);
+  MSG msg;
+  while (GetMessage(&msg, nullptr, 0, 0))
+  {
+    if (msg.message == WM_QUIT || !IsWindow(hWnd))
+      break;
+    TranslateMessage(&msg);
+    DispatchMessage(&msg);
+  }
+
+  if (logoBitmap)
+  {
+    DeleteObject(logoBitmap);
+    logoBitmap = nullptr;
+  }
+  delete renderer;
+  renderer = nullptr;
+  UnregisterClassW(L"AboutDialogClass", GetModuleHandle(nullptr));
 
 #elif __APPLE__
   @autoreleasepool
@@ -660,18 +658,18 @@ static Atom wmDeleteWindow;
   XCloseDisplay(display);
 
 #endif
-  }
+}
 
-  void AboutDialog::RenderContent(int width, int height)
-  {
-    if (!renderer)
-      return;
+void AboutDialog::RenderContent(int width, int height)
+{
+  if (!renderer)
+    return;
 
-    Theme theme = darkMode ? Theme::Dark() : Theme::Light();
-    renderer->clear(theme.windowBackground);
+  Theme theme = darkMode ? Theme::Dark() : Theme::Light();
+  renderer->clear(theme.windowBackground);
 
-    int logoPadding = 20;
-    int logoSize = 100;
+  int logoPadding = 20;
+  int logoSize = 100;
 
 #ifdef _WIN32
 #elif __APPLE__
@@ -686,226 +684,225 @@ static Atom wmDeleteWindow;
   }
 #endif
 
-    int contentX = logoPadding + logoSize + 30;
-    int contentY = logoPadding;
+  int contentX = logoPadding + logoSize + 30;
+  int contentY = logoPadding;
 
-    char appName[] = "HexViewer";
-    renderer->drawText(appName, contentX, contentY, theme.textColor);
+  char appName[] = "HexViewer";
+  renderer->drawText(appName, contentX, contentY, theme.textColor);
 
-    char version[64];
-    StringCopy(version, Translations::T("Version"), sizeof(version));
-    StrCat(version, " 1.0.0");
-    renderer->drawText(version, contentX, contentY + 25, theme.disabledText);
+  char version[64];
+  StringCopy(version, Translations::T("Version"), sizeof(version));
+  StrCat(version, " 1.0.0");
+  renderer->drawText(version, contentX, contentY + 25, theme.disabledText);
 
-    renderer->drawText(Translations::T("A modern cross-platform hex editor"), contentX, contentY + 50, theme.disabledText);
+  renderer->drawText(Translations::T("A modern cross-platform hex editor"), contentX, contentY + 50, theme.disabledText);
 
-    int featuresY = logoPadding + logoSize + 30;
-    renderer->drawText(Translations::T("Features:"), 40, featuresY, theme.textColor);
+  int featuresY = logoPadding + logoSize + 30;
+  renderer->drawText(Translations::T("Features:"), 40, featuresY, theme.textColor);
 
-    char feature1[128];
-    StringCopy(feature1, "- ", sizeof(feature1));
-    StrCat(feature1, Translations::T("Cross-platform support"));
-    renderer->drawText(feature1, 50, featuresY + 30, theme.disabledText);
+  char feature1[128];
+  StringCopy(feature1, "- ", sizeof(feature1));
+  StrCat(feature1, Translations::T("Cross-platform support"));
+  renderer->drawText(feature1, 50, featuresY + 30, theme.disabledText);
 
-    char feature2[128];
-    StringCopy(feature2, "- ", sizeof(feature2));
-    StrCat(feature2, Translations::T("Real-time hex editing"));
-    renderer->drawText(feature2, 50, featuresY + 55, theme.disabledText);
+  char feature2[128];
+  StringCopy(feature2, "- ", sizeof(feature2));
+  StrCat(feature2, Translations::T("Real-time hex editing"));
+  renderer->drawText(feature2, 50, featuresY + 55, theme.disabledText);
 
-    char feature3[128];
-    StringCopy(feature3, "- ", sizeof(feature3));
-    StrCat(feature3, Translations::T("Dark mode support"));
-    renderer->drawText(feature3, 50, featuresY + 80, theme.disabledText);
+  char feature3[128];
+  StringCopy(feature3, "- ", sizeof(feature3));
+  StrCat(feature3, Translations::T("Dark mode support"));
+  renderer->drawText(feature3, 50, featuresY + 80, theme.disabledText);
 
-    renderer->drawLine(0, height - 120, width, height - 120, theme.separator);
+  renderer->drawLine(0, height - 120, width, height - 120, theme.separator);
 
-    int toggleY = height - 100;
-    betaToggleRect = Rect(40, toggleY, 200, 25);
+  int toggleY = height - 100;
+  betaToggleRect = Rect(40, toggleY, 200, 25);
 
-    Rect checkboxRect(betaToggleRect.x, betaToggleRect.y, 18, 18);
-    Color checkboxBorder = betaToggleHovered ? Color(100, 150, 255) : theme.disabledText;
-    renderer->drawRect(checkboxRect, theme.windowBackground, true);
-    renderer->drawRect(checkboxRect, checkboxBorder, false);
+  Rect checkboxRect(betaToggleRect.x, betaToggleRect.y, 18, 18);
+  Color checkboxBorder = betaToggleHovered ? Color(100, 150, 255) : theme.disabledText;
+  renderer->drawRect(checkboxRect, theme.windowBackground, true);
+  renderer->drawRect(checkboxRect, checkboxBorder, false);
 
-    if (betaEnabled)
-    {
-      renderer->drawRect(Rect(checkboxRect.x + 3, checkboxRect.y + 3, 12, 12),
-                         Color(100, 150, 255), true);
-    }
-
-    renderer->drawText(Translations::T("Include Beta Versions"),
-                       betaToggleRect.x + 23, betaToggleRect.y + 2, theme.disabledText);
-
-    int buttonY = height - 60;
-    int buttonHeight = 35;
-    int buttonWidth = 160;
-    int buttonX = (width - buttonWidth) / 2;
-
-    updateButtonRect = Rect(buttonX, buttonY, buttonWidth, buttonHeight);
-    WidgetState updateState;
-    updateState.rect = updateButtonRect;
-    updateState.enabled = true;
-    updateState.hovered = (hoveredButton == 1);
-    updateState.pressed = (pressedButton == 1);
-    renderer->drawModernButton(updateState, theme, Translations::T("Check for Updates"));
-
-    char copyright[] = "(c) 2025 DiE team!";
-    int copyrightX = (width - (StringLength(copyright) * 8)) / 2;
-    renderer->drawText(copyright, copyrightX, height - 20, theme.disabledText);
+  if (betaEnabled)
+  {
+    renderer->drawRect(Rect(checkboxRect.x + 3, checkboxRect.y + 3, 12, 12),
+                       Color(100, 150, 255), true);
   }
+
+  renderer->drawText(Translations::T("Include Beta Versions"),
+                     betaToggleRect.x + 23, betaToggleRect.y + 2, theme.disabledText);
+
+  int buttonY = height - 60;
+  int buttonHeight = 35;
+  int buttonWidth = 160;
+  int buttonX = (width - buttonWidth) / 2;
+
+  updateButtonRect = Rect(buttonX, buttonY, buttonWidth, buttonHeight);
+  WidgetState updateState;
+  updateState.rect = updateButtonRect;
+  updateState.enabled = true;
+  updateState.hovered = (hoveredButton == 1);
+  updateState.pressed = (pressedButton == 1);
+  renderer->drawModernButton(updateState, theme, Translations::T("Check for Updates"));
+
+  char copyright[] = "(c) 2025 DiE team!";
+  int copyrightX = (width - (StringLength(copyright) * 8)) / 2;
+  renderer->drawText(copyright, copyrightX, height - 20, theme.disabledText);
+}
 
 #ifdef _WIN32
-  void AboutDialog::OnPaint(HWND hWnd)
+void AboutDialog::OnPaint(HWND hWnd)
+{
+  PAINTSTRUCT ps;
+  HDC hdc = BeginPaint(hWnd, &ps);
+
+  if (renderer)
   {
-    PAINTSTRUCT ps;
-    HDC hdc = BeginPaint(hWnd, &ps);
+    RECT rc;
+    GetClientRect(hWnd, &rc);
 
-    if (renderer)
+    renderer->beginFrame();
+    RenderContent(rc.right - rc.left, rc.bottom - rc.top);
+    renderer->endFrame(hdc);
+
+    if (logoBitmap)
     {
-      RECT rc;
-      GetClientRect(hWnd, &rc);
+      int logoPadding = 20;
+      int targetSize = 100;
 
-      renderer->beginFrame();
-      RenderContent(rc.right - rc.left, rc.bottom - rc.top);
-      renderer->endFrame(hdc);
+      int scaledWidth = targetSize;
+      int scaledHeight = targetSize;
 
-      if (logoBitmap)
+      if (logoWidth > logoHeight)
+        scaledHeight = (targetSize * logoHeight) / logoWidth;
+      else if (logoHeight > logoWidth)
+        scaledWidth = (targetSize * logoWidth) / logoHeight;
+
+      ImageLoader::DrawTransparentBitmap(hdc, logoBitmap,
+                                         logoPadding, logoPadding,
+                                         scaledWidth, scaledHeight);
+    }
+  }
+
+  EndPaint(hWnd, &ps);
+}
+
+void AboutDialog::OnMouseMove(HWND hWnd, int x, int y)
+{
+  int oldHovered = hoveredButton;
+  bool oldBetaHovered = betaToggleHovered;
+  hoveredButton = 0;
+  betaToggleHovered = false;
+
+  if (x >= betaToggleRect.x && x <= betaToggleRect.x + betaToggleRect.width &&
+      y >= betaToggleRect.y && y <= betaToggleRect.y + betaToggleRect.height)
+  {
+    betaToggleHovered = true;
+  }
+
+  if (x >= updateButtonRect.x && x <= updateButtonRect.x + updateButtonRect.width &&
+      y >= updateButtonRect.y && y <= updateButtonRect.y + updateButtonRect.height)
+  {
+    hoveredButton = 1;
+  }
+
+  if (oldHovered != hoveredButton || oldBetaHovered != betaToggleHovered)
+  {
+    InvalidateRect(hWnd, nullptr, FALSE);
+  }
+}
+
+void AboutDialog::OnMouseDown(HWND hWnd, int x, int y)
+{
+  if (betaToggleHovered)
+  {
+    betaEnabled = !betaEnabled;
+    InvalidateRect(hWnd, nullptr, FALSE);
+    return;
+  }
+
+  pressedButton = hoveredButton;
+  InvalidateRect(hWnd, nullptr, FALSE);
+}
+
+bool AboutDialog::OnMouseUp(HWND hWnd, int x, int y)
+{
+  if (pressedButton == hoveredButton && pressedButton == 1)
+  {
+    ShowWindow(hWnd, SW_HIDE);
+
+    UpdateCheckParams *params = (UpdateCheckParams *)PlatformAlloc(sizeof(UpdateCheckParams));
+    if (params)
+    {
+      params->parentWnd = parentWindow;
+      params->checkBeta = betaEnabled;
+      StringCopy(params->currentVersion, "1.0.0", sizeof(params->currentVersion));
+
+      if (betaEnabled)
       {
-        int logoPadding = 20;
-        int targetSize = 100;
+        StringCopy(params->releaseApiUrl, "https://api.github.com/repos/horsicq/HexViewer/releases", sizeof(params->releaseApiUrl));
+      }
+      else
+      {
+        StringCopy(params->releaseApiUrl, "https://api.github.com/repos/horsicq/HexViewer/releases/latest", sizeof(params->releaseApiUrl));
+      }
 
-        int scaledWidth = targetSize;
-        int scaledHeight = targetSize;
-
-        if (logoWidth > logoHeight)
-          scaledHeight = (targetSize * logoHeight) / logoWidth;
-        else if (logoHeight > logoWidth)
-          scaledWidth = (targetSize * logoWidth) / logoHeight;
-
-        ImageLoader::DrawTransparentBitmap(hdc, logoBitmap,
-                                           logoPadding, logoPadding,
-                                           scaledWidth, scaledHeight);
+      HANDLE hThread = CreateThread(nullptr, 0, UpdateCheckThread, params, 0, nullptr);
+      if (hThread)
+      {
+        CloseHandle(hThread);
+      }
+      else
+      {
+        PlatformFree(params);
       }
     }
 
-    EndPaint(hWnd, &ps);
+    DestroyWindow(hWnd);
+    return true;
   }
 
-  void AboutDialog::OnMouseMove(HWND hWnd, int x, int y)
+  pressedButton = 0;
+  InvalidateRect(hWnd, nullptr, FALSE);
+  return false;
+}
+
+LRESULT CALLBACK AboutDialog::DialogProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
+{
+  switch (message)
   {
-    int oldHovered = hoveredButton;
-    bool oldBetaHovered = betaToggleHovered;
-    hoveredButton = 0;
-    betaToggleHovered = false;
+  case WM_ERASEBKGND:
+    return 1;
 
-    if (x >= betaToggleRect.x && x <= betaToggleRect.x + betaToggleRect.width &&
-        y >= betaToggleRect.y && y <= betaToggleRect.y + betaToggleRect.height)
-    {
-      betaToggleHovered = true;
-    }
+  case WM_PAINT:
+    OnPaint(hWnd);
+    return 0;
 
-    if (x >= updateButtonRect.x && x <= updateButtonRect.x + updateButtonRect.width &&
-        y >= updateButtonRect.y && y <= updateButtonRect.y + updateButtonRect.height)
-    {
-      hoveredButton = 1;
-    }
+  case WM_MOUSEMOVE:
+    OnMouseMove(hWnd, LOWORD(lParam), HIWORD(lParam));
+    break;
 
-    if (oldHovered != hoveredButton || oldBetaHovered != betaToggleHovered)
-    {
-      InvalidateRect(hWnd, nullptr, FALSE);
-    }
+  case WM_LBUTTONDOWN:
+    OnMouseDown(hWnd, LOWORD(lParam), HIWORD(lParam));
+    break;
+
+  case WM_LBUTTONUP:
+    OnMouseUp(hWnd, LOWORD(lParam), HIWORD(lParam));
+    break;
+
+  case WM_CLOSE:
+    DestroyWindow(hWnd);
+    return 0;
+
+  case WM_DESTROY:
+    PostQuitMessage(0);
+    return 0;
   }
 
-  void AboutDialog::OnMouseDown(HWND hWnd, int x, int y)
-  {
-    if (betaToggleHovered)
-    {
-      betaEnabled = !betaEnabled;
-      InvalidateRect(hWnd, nullptr, FALSE);
-      return;
-    }
-
-    pressedButton = hoveredButton;
-    InvalidateRect(hWnd, nullptr, FALSE);
-  }
-
-  bool AboutDialog::OnMouseUp(HWND hWnd, int x, int y)
-  {
-    if (pressedButton == hoveredButton && pressedButton == 1)
-    {
-      ShowWindow(hWnd, SW_HIDE);
-
-      UpdateCheckParams *params = (UpdateCheckParams *)PlatformAlloc(sizeof(UpdateCheckParams));
-      if (params)
-      {
-        params->parentWnd = parentWindow;
-        params->checkBeta = betaEnabled;
-        StringCopy(params->currentVersion, "1.0.0", sizeof(params->currentVersion));
-
-        if (betaEnabled)
-        {
-          StringCopy(params->releaseApiUrl, "https://api.github.com/repos/horsicq/HexViewer/releases", sizeof(params->releaseApiUrl));
-        }
-        else
-        {
-          StringCopy(params->releaseApiUrl, "https://api.github.com/repos/horsicq/HexViewer/releases/latest", sizeof(params->releaseApiUrl));
-        }
-
-        HANDLE hThread = CreateThread(nullptr, 0, UpdateCheckThread, params, 0, nullptr);
-        if (hThread)
-        {
-          CloseHandle(hThread);
-        }
-        else
-        {
-          PlatformFree(params);
-        }
-      }
-
-      DestroyWindow(hWnd);
-      return true;
-    }
-
-    pressedButton = 0;
-    InvalidateRect(hWnd, nullptr, FALSE);
-    return false;
-  }
-
-
-  LRESULT CALLBACK AboutDialog::DialogProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
-  {
-    switch (message)
-    {
-    case WM_ERASEBKGND:
-      return 1;
-
-    case WM_PAINT:
-      OnPaint(hWnd);
-      return 0;
-
-    case WM_MOUSEMOVE:
-      OnMouseMove(hWnd, LOWORD(lParam), HIWORD(lParam));
-      break;
-
-    case WM_LBUTTONDOWN:
-      OnMouseDown(hWnd, LOWORD(lParam), HIWORD(lParam));
-      break;
-
-    case WM_LBUTTONUP:
-      OnMouseUp(hWnd, LOWORD(lParam), HIWORD(lParam));
-      break;
-
-    case WM_CLOSE:
-      DestroyWindow(hWnd);
-      return 0;
-
-    case WM_DESTROY:
-      PostQuitMessage(0);
-      return 0;
-    }
-
-    return DefWindowProcW(hWnd, message, wParam, lParam);
-  }
+  return DefWindowProcW(hWnd, message, wParam, lParam);
+}
 
 #elif __linux__
 
@@ -986,11 +983,11 @@ bool AboutDialog::OnMouseUp(int x, int y)
 
     if (betaEnabled)
     {
-      info.releaseApiUrl = "https:
+      info.releaseApiUrl = "https://api.github.com/repos/horsicq/HexViewer/releases";
     }
     else
     {
-      info.releaseApiUrl = "https:
+      info.releaseApiUrl = "https://api.github.com/repos/horsicq/HexViewer/releases/latest";
     }
 
     std::string response = HttpGet(info.releaseApiUrl);
@@ -1108,11 +1105,11 @@ bool AboutDialog::OnMouseUp(int x, int y)
 
     if (betaEnabled)
     {
-      info.releaseApiUrl = "https:
+      info.releaseApiUrl = "https://api.github.com/repos/horsicq/HexViewer/releases";
     }
     else
     {
-      info.releaseApiUrl = "https:
+      info.releaseApiUrl = "https://api.github.com/repos/horsicq/HexViewer/releases/latest";
     }
 
     std::string response = HttpGet(info.releaseApiUrl);
