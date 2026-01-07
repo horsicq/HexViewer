@@ -1,8 +1,3 @@
-/*
- * NO-CRT / NO-STL Cross-Platform Hex Viewer
- * Updated to use HexData class for better data management
- */
-
 #if defined(_WIN32)
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -23,6 +18,8 @@ typedef unsigned long long size_t_custom;
 #include "global.h"
 #include "darkmode.h"
 #include "panelcontent.h"
+#include "about.h"
+#include "pluginmanager.h"
 
 void SaveOptionsToFile(const AppOptions &opts);
 void LoadOptionsFromFile(AppOptions &opts);
@@ -82,6 +79,7 @@ void __cdecl operator delete(void *p, size_t_custom)
         HeapFree(GetProcessHeap(), 0, p);
 }
 
+extern "C" void __chkstk() {}
 extern "C" int __cdecl atexit(void(__cdecl *)(void)) { return 0; }
 
 typedef void(__cdecl *_PVFV)(void);
@@ -135,7 +133,8 @@ int g_SearchCaretX = 0;
 int g_SearchCaretY = 0;
 int g_SearchBoxXStart = 0;
 bool caretVisible = true;
-
+ScrollbarState g_MainScrollbar;
+SelectionState g_Selection;
 HexData g_HexData;
 size_t editingOffset = (size_t)-1;
 int g_ScrollY = 0;
@@ -241,7 +240,6 @@ void OnNew()
 void OnFileOpen()
 {
 #if defined(_WIN32)
-
     if (!g_Hwnd)
         return;
 
@@ -264,10 +262,20 @@ void OnFileOpen()
     {
         if (g_HexData.loadFile(ofn.lpstrFile))
         {
-            CopyString(g_CurrentFilePath, ofn.lpstrFile, MAX_PATH_LEN);
+            StrCopy(g_CurrentFilePath, ofn.lpstrFile);
             g_TotalLines = (int)g_HexData.getHexLines().count;
             g_ScrollY = 0;
-            SendMessage(g_Hwnd, WM_SIZE, 0, 0);
+            RECT rc;
+            GetClientRect(g_Hwnd, &rc);
+            int w = rc.right - rc.left;
+            int h = rc.bottom - rc.top;
+
+            g_Renderer.resize(w, h);
+
+            g_LinesPerPage = (h - g_MenuBar.getHeight() - 40) / 16;
+            if (g_LinesPerPage < 1)
+                g_LinesPerPage = 1;
+
             InvalidateRect(g_Hwnd, 0, FALSE);
         }
         else
@@ -277,22 +285,21 @@ void OnFileOpen()
     }
 
 #elif defined(__APPLE__)
-
     @autoreleasepool
     {
-        NSOpenPanel* panel = [NSOpenPanel openPanel];
+        NSOpenPanel *panel = [NSOpenPanel openPanel];
         [panel setCanChooseFiles:YES];
         [panel setCanChooseDirectories:NO];
         [panel setAllowsMultipleSelection:NO];
 
         if ([panel runModal] == NSModalResponseOK)
         {
-            NSString* path = [[[panel URLs] objectAtIndex:0] path];
-            const char* cpath = [path UTF8String];
+            NSString *path = [[[panel URLs] objectAtIndex:0] path];
+            const char *cpath = [path UTF8String];
 
             if (g_HexData.loadFile(cpath))
             {
-                CopyString(g_CurrentFilePath, cpath, MAX_PATH_LEN);
+                StrCopy(g_CurrentFilePath, cpath);
                 g_TotalLines = (int)g_HexData.getHexLines().count;
                 g_ScrollY = 0;
                 g_Renderer.resize(g_Renderer.getWindowWidth(), g_Renderer.getWindowHeight());
@@ -301,8 +308,7 @@ void OnFileOpen()
     }
 
 #elif defined(__linux__)
-
-    FILE* fp = popen("zenity --file-selection 2>/dev/null", "r");
+    FILE *fp = popen("zenity --file-selection 2>/dev/null", "r");
     if (!fp)
     {
         printf("Failed to open file dialog.\n");
@@ -318,13 +324,13 @@ void OnFileOpen()
     }
     pclose(fp);
 
-    size_t len = strlen(path);
+    size_t len = StrLen(path);
     if (len > 0 && path[len - 1] == '\n')
         path[len - 1] = 0;
 
     if (g_HexData.loadFile(path))
     {
-        CopyString(g_CurrentFilePath, path, MAX_PATH_LEN);
+        StrCopy(g_CurrentFilePath, path);
         g_TotalLines = (int)g_HexData.getHexLines().count;
         g_ScrollY = 0;
         LinuxRedraw();
@@ -333,11 +339,8 @@ void OnFileOpen()
     {
         printf("Failed to open file: %s\n", path);
     }
-
 #endif
 }
-
-
 
 void OnFileSave()
 {
@@ -413,11 +416,27 @@ void OnOptionsDialog()
         InvalidateRect(g_Hwnd, 0, FALSE);
     }
 #else
-    if (OptionsDialog::Show(g_Hwnd, g_Options))
+    if (OptionsDialog::Show((NativeWindow)(uintptr_t)g_Hwnd, g_Options))
     {
         SaveOptionsToFile(g_Options);
         LinuxRedraw();
     }
+#endif
+}
+
+void OnPluginsDialog()
+{
+#if defined(_WIN32)
+    if (g_Hwnd && PluginManager::Show(g_Hwnd))
+    {
+        InvalidateRect(g_Hwnd, 0, FALSE);
+    }
+#else
+    if (PluginManager::Show((NativeWindow)(uintptr_t)g_Hwnd))
+    {
+        LinuxRedraw();
+    }
+
 #endif
 }
 
@@ -514,7 +533,13 @@ void OnZoomIn() { MessageBoxA(g_Hwnd, "Zoom In not implemented.", "Info", MB_OK)
 void OnZoomOut() { MessageBoxA(g_Hwnd, "Zoom Out not implemented.", "Info", MB_OK); }
 void OnAbout()
 {
-    MessageBoxA(g_Hwnd, "HexViewer v1.0.2", "About", MB_OK | MB_ICONINFORMATION);
+#ifdef _WIN32
+    AboutDialog::Show(g_Hwnd, darkmode);
+#elif defined(__APPLE__)
+    AboutDialog::Show(g_nsWindow, g_darkMode);
+#elif defined(__linux__)
+    AboutDialog::Show(g_window, g_darkMode);
+#endif
 }
 void OnDocumentation()
 {
@@ -528,22 +553,6 @@ void OnDocumentation() {}
 #endif
 
 #if defined(_WIN32)
-
-void UpdateScrollbar(int /*windowWidth*/, int /*windowHeight*/)
-{
-    if (!g_Hwnd)
-        return;
-
-    SCROLLINFO si;
-    si.cbSize = sizeof(si);
-    si.fMask = SIF_RANGE | SIF_PAGE | SIF_POS;
-    si.nMin = 0;
-    si.nMax = (g_TotalLines > 0) ? (g_TotalLines - 1) : 0;
-    si.nPage = (g_LinesPerPage > 0) ? g_LinesPerPage : 1;
-    si.nPos = g_ScrollY;
-
-    SetScrollInfo(g_Hwnd, SB_VERT, &si, TRUE);
-}
 
 LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
@@ -566,7 +575,8 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
         g_Renderer.initialize(hwnd);
         g_Hwnd = hwnd;
         ApplyDarkTitleBar(g_Hwnd, g_Options.darkMode);
-
+        ShowScrollBar(hwnd, SB_VERT, FALSE);
+        ShowScrollBar(hwnd, SB_HORZ, FALSE);
         cursorBytePos = -1;
         caretVisible = true;
         InvalidateRect(hwnd, NULL, FALSE);
@@ -590,6 +600,68 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 
         g_MenuBar.setPosition(0, 0);
         SetTimer(hwnd, 1, 500, nullptr);
+        char pluginDir[512];
+        GetPluginDirectory(pluginDir, 512);
+
+        char configPath[600];
+        StrCopy(configPath, pluginDir);
+        int configLen = (int)StrLen(configPath);
+        StrCopy(configPath + configLen, "\\enabled_plugins.txt");
+
+        HANDLE hFile = CreateFileA(configPath, GENERIC_READ, FILE_SHARE_READ, NULL,
+                                   OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+
+        if (hFile != INVALID_HANDLE_VALUE)
+        {
+            char buf[2048];
+            DWORD bytesRead = 0;
+            if (ReadFile(hFile, buf, sizeof(buf) - 1, &bytesRead, NULL))
+            {
+                buf[bytesRead] = '\0';
+
+                int lineStart = 0;
+                bool foundDisassembler = false;
+
+                for (int i = 0; i <= (int)bytesRead && !foundDisassembler; i++)
+                {
+                    if (buf[i] == '\n' || buf[i] == '\r' || buf[i] == '\0')
+                    {
+                        if (i > lineStart)
+                        {
+                            buf[i] = '\0';
+                            char *pluginName = buf + lineStart;
+
+                            while (*pluginName == ' ' || *pluginName == '\t')
+                                pluginName++;
+
+                            if (*pluginName != '\0')
+                            {
+                                char fullPluginPath[600];
+                                StrCopy(fullPluginPath, pluginDir);
+                                int pathLen = (int)StrLen(fullPluginPath);
+                                fullPluginPath[pathLen] = '\\';
+                                StrCopy(fullPluginPath + pathLen + 1, pluginName);
+
+                                extern bool CanPluginDisassemble(const char *);
+                                if (CanPluginDisassemble(fullPluginPath))
+                                {
+                                    g_HexData.setDisassemblyPlugin(fullPluginPath);
+                                    foundDisassembler = true;
+
+                                    char msg[600];
+                                    StrCopy(msg, "Auto-activated plugin: ");
+                                    StrCat(msg, pluginName);
+                                }
+                            }
+                        }
+                        lineStart = i + 1;
+                    }
+                }
+            }
+            CloseHandle(hFile);
+        }
+        int leftPanelWidth = g_LeftPanel.visible ? g_LeftPanel.width : 0;
+        g_Renderer.UpdateHexMetrics(leftPanelWidth, g_MenuBar.getHeight());
         return 0;
     }
 
@@ -609,65 +681,10 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
         if (g_LinesPerPage < 1)
             g_LinesPerPage = 1;
 
-        SCROLLINFO si;
-        si.cbSize = sizeof(si);
-        si.fMask = SIF_RANGE | SIF_PAGE | SIF_POS;
-        si.nMin = 0;
-        si.nMax = g_TotalLines > 0 ? g_TotalLines - 1 : 0;
-        si.nPage = g_LinesPerPage;
-        si.nPos = g_ScrollY;
-        SetScrollInfo(hwnd, SB_VERT, &si, TRUE);
-
         g_MenuBar.closeAllMenus();
 
         InvalidateRect(hwnd, NULL, FALSE);
 
-        return 0;
-    }
-
-    case WM_VSCROLL:
-    {
-        int oldY = g_ScrollY;
-        SCROLLINFO si;
-        si.cbSize = sizeof(si);
-        si.fMask = SIF_ALL;
-        GetScrollInfo(hwnd, SB_VERT, &si);
-
-        switch (LOWORD(wParam))
-        {
-        case SB_TOP:
-            g_ScrollY = 0;
-            break;
-        case SB_BOTTOM:
-            g_ScrollY = g_TotalLines - 1;
-            break;
-        case SB_LINEUP:
-            g_ScrollY -= 1;
-            break;
-        case SB_LINEDOWN:
-            g_ScrollY += 1;
-            break;
-        case SB_PAGEUP:
-            g_ScrollY -= g_LinesPerPage;
-            break;
-        case SB_PAGEDOWN:
-            g_ScrollY += g_LinesPerPage;
-            break;
-        case SB_THUMBTRACK:
-            g_ScrollY = si.nTrackPos;
-            break;
-        }
-
-        if (g_ScrollY < 0)
-            g_ScrollY = 0;
-        if (g_ScrollY > g_TotalLines - 1)
-            g_ScrollY = g_TotalLines - 1;
-
-        if (g_ScrollY != oldY)
-        {
-            SetScrollPos(hwnd, SB_VERT, g_ScrollY, TRUE);
-            InvalidateRect(hwnd, 0, FALSE);
-        }
         return 0;
     }
 
@@ -678,14 +695,27 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
         int oldY = g_ScrollY;
         g_ScrollY -= lines * 3;
 
+        int maxScroll = g_TotalLines - g_LinesPerPage;
+        if (maxScroll < 0)
+            maxScroll = 0;
+
         if (g_ScrollY < 0)
             g_ScrollY = 0;
-        if (g_ScrollY > g_TotalLines - 1)
-            g_ScrollY = g_TotalLines - 1;
+        if (g_ScrollY > maxScroll)
+            g_ScrollY = maxScroll;
+
+        if (maxScroll > 0)
+        {
+            g_MainScrollbar.position = (float)g_ScrollY / (float)maxScroll;
+
+            if (g_MainScrollbar.position < 0.0f)
+                g_MainScrollbar.position = 0.0f;
+            if (g_MainScrollbar.position > 1.0f)
+                g_MainScrollbar.position = 1.0f;
+        }
 
         if (g_ScrollY != oldY)
         {
-            SetScrollPos(hwnd, SB_VERT, g_ScrollY, TRUE);
             InvalidateRect(hwnd, 0, FALSE);
         }
         return 0;
@@ -700,6 +730,55 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
         GetClientRect(hwnd, &rect);
         int windowWidth = rect.right;
         int windowHeight = rect.bottom;
+
+        static bool g_DebugScrollbarMsgShown = false;
+
+        if (g_MainScrollbar.pressed)
+        {
+            int maxScroll = g_TotalLines - g_LinesPerPage;
+            if (maxScroll < 0)
+                maxScroll = 0;
+
+            int desiredThumbTop = y - g_MainScrollbar.dragOffsetY;
+            int relativeTop = desiredThumbTop - g_MainScrollbar.trackY - 2;
+            int maxThumbTravel = g_MainScrollbar.trackHeight - g_MainScrollbar.thumbHeight - 4;
+
+            if (maxThumbTravel > 0)
+            {
+                float newPos = (float)relativeTop / (float)maxThumbTravel;
+
+                if (newPos < 0.0f)
+                    newPos = 0.0f;
+                if (newPos > 1.0f)
+                    newPos = 1.0f;
+
+                g_MainScrollbar.position = newPos;
+                g_ScrollY = (int)(newPos * maxScroll);
+
+                if (g_ScrollY < 0)
+                    g_ScrollY = 0;
+                if (g_ScrollY > maxScroll)
+                    g_ScrollY = maxScroll;
+
+                g_MainScrollbar.thumbY =
+                    g_MainScrollbar.trackY + 2 + (int)(maxThumbTravel * newPos);
+            }
+
+            InvalidateRect(hwnd, NULL, FALSE);
+            return 0;
+        }
+
+        if (g_MainScrollbar.visible)
+        {
+            bool wasHovered = g_MainScrollbar.hovered;
+            g_MainScrollbar.hovered = g_Renderer.isPointInScrollbarTrack(x, y, g_MainScrollbar);
+            g_MainScrollbar.thumbHovered = g_Renderer.isPointInScrollbarThumb(x, y, g_MainScrollbar);
+
+            if (wasHovered != g_MainScrollbar.hovered)
+            {
+                InvalidateRect(hwnd, NULL, FALSE);
+            }
+        }
 
         if (g_LeftPanel.dragging)
         {
@@ -848,6 +927,35 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
             return 0;
         }
 
+        if (g_Selection.dragging)
+        {
+            int leftPanelWidth = g_LeftPanel.visible ? g_LeftPanel.width : 0;
+            if (g_Renderer.IsPointInHexArea(x, y, leftPanelWidth, g_MenuBar.getHeight(),
+                                            windowWidth, windowHeight))
+            {
+                BytePositionInfo hoverInfo = g_Renderer.GetHexBytePositionInfo(Point(x, y));
+
+                if (hoverInfo.Index >= 0 &&
+                    hoverInfo.Index < (long long)g_HexData.getFileSize())
+                {
+                    g_Selection.endByte = hoverInfo.Index;
+                    cursorBytePos = hoverInfo.Index;
+
+                    long long cursorLine = hoverInfo.Index / 16;
+                    if (cursorLine < g_ScrollY)
+                    {
+                        g_ScrollY = (int)cursorLine;
+                    }
+                    else if (cursorLine >= g_ScrollY + g_LinesPerPage)
+                    {
+                        g_ScrollY = (int)(cursorLine - g_LinesPerPage + 1);
+                    }
+
+                    InvalidateRect(hwnd, NULL, FALSE);
+                }
+            }
+            return 0;
+        }
         bool overLeftHandle = g_Renderer.isLeftPanelResizeHandle(x, y, g_LeftPanel);
         bool overBottomHandle = g_Renderer.isBottomPanelResizeHandle(x, y, g_BottomPanel,
                                                                      g_LeftPanel.visible ? g_LeftPanel.width : 0);
@@ -877,13 +985,36 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
         int x = LOWORD(lParam);
         int y = HIWORD(lParam);
 
+        if (g_Selection.dragging)
+        {
+            g_Selection.dragging = false;
+            ReleaseCapture();
+
+            if (g_Selection.startByte == g_Selection.endByte)
+            {
+                g_Selection.clear();
+            }
+
+            InvalidateRect(hwnd, NULL, FALSE);
+            return 0;
+        }
+        if (g_MainScrollbar.pressed)
+        {
+            g_MainScrollbar.pressed = false;
+            g_MainScrollbar.thumbHovered = false;
+
+            ReleaseCapture();
+            InvalidateRect(hwnd, NULL, FALSE);
+            return 0;
+        }
+
         if (g_LeftPanel.dragging || g_BottomPanel.dragging)
         {
             g_LeftPanel.dragging = false;
             g_BottomPanel.dragging = false;
+
             ReleaseCapture();
             InvalidateRect(hwnd, NULL, FALSE);
-
             return 0;
         }
 
@@ -893,15 +1024,16 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
             g_ResizingBottomPanel = false;
             g_LeftPanel.resizing = false;
             g_BottomPanel.resizing = false;
+
             ReleaseCapture();
             InvalidateRect(hwnd, NULL, FALSE);
-
             return 0;
         }
 
         if (g_MenuBar.handleMouseUp(x, y))
         {
             InvalidateRect(hwnd, NULL, FALSE);
+            return 0;
         }
 
         return 0;
@@ -917,7 +1049,41 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
         GetClientRect(hwnd, &rect);
         int windowWidth = rect.right;
         int windowHeight = rect.bottom;
+        int leftPanelWidth = g_LeftPanel.visible ? g_LeftPanel.width : 0;
 
+        if (g_MainScrollbar.visible &&
+            g_Renderer.isPointInScrollbarThumb(x, y, g_MainScrollbar))
+        {
+            g_MainScrollbar.pressed = true;
+            g_MainScrollbar.thumbHovered = true;
+
+            g_MainScrollbar.dragOffsetY = y - g_MainScrollbar.thumbY;
+
+            SetCapture(hwnd);
+            InvalidateRect(hwnd, NULL, FALSE);
+            return 0;
+        }
+
+        if (g_MainScrollbar.visible && g_Renderer.isPointInScrollbarTrack(x, y, g_MainScrollbar))
+        {
+            float newPos = g_Renderer.getScrollbarPositionFromMouse(y, g_MainScrollbar, true);
+
+            int maxScroll = g_TotalLines - g_LinesPerPage;
+            if (maxScroll < 0)
+                maxScroll = 0;
+
+            g_ScrollY = (int)(newPos * maxScroll);
+
+            if (g_ScrollY < 0)
+                g_ScrollY = 0;
+            if (g_ScrollY > maxScroll)
+                g_ScrollY = maxScroll;
+
+            g_MainScrollbar.position = newPos;
+
+            InvalidateRect(hwnd, NULL, FALSE);
+            return 0;
+        }
         if (g_MenuBar.handleMouseDown(x, y))
         {
             InvalidateRect(hwnd, NULL, FALSE);
@@ -1083,8 +1249,6 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
             return 0;
         }
 
-        int leftPanelWidth = g_LeftPanel.visible ? g_LeftPanel.width : 0;
-
         g_Renderer.UpdateHexMetrics(leftPanelWidth, g_MenuBar.getHeight());
 
         if (g_Renderer.IsPointInHexArea(x, y, leftPanelWidth, g_MenuBar.getHeight(),
@@ -1097,6 +1261,22 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
             if (clickInfo.Index >= 0 &&
                 clickInfo.Index < (long long)g_HexData.getFileSize())
             {
+                bool shiftHeld = (GetKeyState(VK_SHIFT) & 0x8000) != 0;
+
+                if (shiftHeld && g_Selection.active)
+                {
+                    g_Selection.endByte = clickInfo.Index;
+                }
+                else
+                {
+                    g_Selection.startByte = clickInfo.Index;
+                    g_Selection.endByte = clickInfo.Index;
+                    g_Selection.active = true;
+                    g_Selection.dragging = true;
+
+                    SetCapture(hwnd);
+                }
+
                 cursorBytePos = clickInfo.Index;
                 cursorNibblePos = clickInfo.CharacterPosition;
                 caretVisible = true;
@@ -1111,106 +1291,111 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
         InvalidateRect(hwnd, NULL, FALSE);
         return 0;
     }
+
     case WM_CHAR:
-{
-    if (g_PatternSearch.hasFocus)
     {
-        char c = (char)wParam;
-
-        if (c == 8)
+        if (g_PatternSearch.hasFocus)
         {
-            size_t len = StrLen(g_PatternSearch.searchPattern);
-            if (len > 0)
+            char c = (char)wParam;
+
+            if (c == 8)
             {
-                g_PatternSearch.searchPattern[len - 1] = 0;
-
-                g_SearchCaretX -= g_Renderer.getCharWidth();
-                if (g_SearchCaretX < g_SearchBoxXStart)
-                    g_SearchCaretX = g_SearchBoxXStart;
-            }
-
-            InvalidateRect(hwnd, NULL, FALSE);
-            return 0;
-        }
-
-        if (c >= 'a' && c <= 'f')
-            c -= 32;
-
-        if ((c >= '0' && c <= '9') ||
-            (c >= 'A' && c <= 'F') ||
-            c == ' ')
-        {
-            size_t len = StrLen(g_PatternSearch.searchPattern);
-            if (len < (sizeof(g_PatternSearch.searchPattern) - 1))
-            {
-                g_PatternSearch.searchPattern[len] = c;
-                g_PatternSearch.searchPattern[len + 1] = 0;
-
-                g_SearchCaretX += g_Renderer.getCharWidth();
-            }
-
-            InvalidateRect(hwnd, NULL, FALSE);
-            return 0;
-        }
-
-        return 0;
-    }
-
-    if (cursorBytePos >= 0 && cursorBytePos < (long long)g_HexData.getFileSize())
-    {
-        char c = (char)wParam;
-
-        if (c >= 'a' && c <= 'f')
-            c -= 32;
-
-        if ((c >= '0' && c <= '9') || (c >= 'A' && c <= 'F'))
-        {
-            int nibbleValue = (c <= '9') ? (c - '0') : (c - 'A' + 10);
-
-            uint8_t currentByte = g_HexData.getByte((size_t)cursorBytePos);
-            uint8_t newByte;
-
-            if (cursorNibblePos == 0)
-                newByte = (nibbleValue << 4) | (currentByte & 0x0F);
-            else
-                newByte = (currentByte & 0xF0) | nibbleValue;
-
-            g_HexData.editByte((size_t)cursorBytePos, newByte);
-
-            if (cursorNibblePos == 0)
-            {
-                cursorNibblePos = 1;
-            }
-            else
-            {
-                if (cursorBytePos < (long long)g_HexData.getFileSize() - 1)
+                size_t len = StrLen(g_PatternSearch.searchPattern);
+                if (len > 0)
                 {
-                    cursorBytePos++;
-                    cursorNibblePos = 0;
+                    g_PatternSearch.searchPattern[len - 1] = 0;
 
-                    long long cursorLine = cursorBytePos / 16;
-                    if (cursorLine >= g_ScrollY + g_LinesPerPage)
+                    g_SearchCaretX -= g_Renderer.getCharWidth();
+                    if (g_SearchCaretX < g_SearchBoxXStart)
+                        g_SearchCaretX = g_SearchBoxXStart;
+                }
+
+                InvalidateRect(hwnd, NULL, FALSE);
+                return 0;
+            }
+
+            if (c >= 'a' && c <= 'f')
+                c -= 32;
+
+            if ((c >= '0' && c <= '9') ||
+                (c >= 'A' && c <= 'F') ||
+                c == ' ')
+            {
+                size_t len = StrLen(g_PatternSearch.searchPattern);
+                if (len < (sizeof(g_PatternSearch.searchPattern) - 1))
+                {
+                    g_PatternSearch.searchPattern[len] = c;
+                    g_PatternSearch.searchPattern[len + 1] = 0;
+
+                    g_SearchCaretX += g_Renderer.getCharWidth();
+                }
+
+                InvalidateRect(hwnd, NULL, FALSE);
+                return 0;
+            }
+
+            return 0;
+        }
+
+        if (cursorBytePos >= 0 && cursorBytePos < (long long)g_HexData.getFileSize())
+        {
+            char c = (char)wParam;
+
+            if (c >= 'a' && c <= 'f')
+                c -= 32;
+
+            if ((c >= '0' && c <= '9') || (c >= 'A' && c <= 'F'))
+            {
+                int nibbleValue = (c <= '9') ? (c - '0') : (c - 'A' + 10);
+
+                uint8_t currentByte = g_HexData.getByte((size_t)cursorBytePos);
+                uint8_t newByte;
+
+                if (cursorNibblePos == 0)
+                    newByte = (nibbleValue << 4) | (currentByte & 0x0F);
+                else
+                    newByte = (currentByte & 0xF0) | nibbleValue;
+
+                g_HexData.editByte((size_t)cursorBytePos, newByte);
+
+                if (cursorNibblePos == 0)
+                {
+                    cursorNibblePos = 1;
+                }
+                else
+                {
+                    if (cursorBytePos < (long long)g_HexData.getFileSize() - 1)
                     {
-                        g_ScrollY = (int)(cursorLine - g_LinesPerPage + 1);
-                        SetScrollPos(hwnd, SB_VERT, g_ScrollY, TRUE);
+                        cursorBytePos++;
+                        cursorNibblePos = 0;
+
+                        long long cursorLine = cursorBytePos / 16;
+                        if (cursorLine >= g_ScrollY + g_LinesPerPage)
+                        {
+                            g_ScrollY = (int)(cursorLine - g_LinesPerPage + 1);
+                        }
                     }
                 }
+
+                caretVisible = true;
+                InvalidateRect(hwnd, NULL, FALSE);
+                return 0;
             }
-
-            caretVisible = true;
-            InvalidateRect(hwnd, NULL, FALSE);
-            return 0;
         }
+
+        break;
     }
-
-    break;
-}
-
 
     case WM_KEYDOWN:
     {
         if (wParam == VK_ESCAPE)
         {
+            if (g_Selection.active)
+            {
+                g_Selection.clear();
+                InvalidateRect(hwnd, NULL, FALSE);
+                return 0;
+            }
             if (g_PatternSearch.hasFocus)
             {
                 g_PatternSearch.hasFocus = false;
@@ -1289,12 +1474,10 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
                     if (cursorLine < g_ScrollY)
                     {
                         g_ScrollY = (int)cursorLine;
-                        SetScrollPos(hwnd, SB_VERT, g_ScrollY, TRUE);
                     }
                     else if (cursorLine >= g_ScrollY + g_LinesPerPage)
                     {
                         g_ScrollY = (int)(cursorLine - g_LinesPerPage + 1);
-                        SetScrollPos(hwnd, SB_VERT, g_ScrollY, TRUE);
                     }
 
                     caretVisible = true;
@@ -1350,12 +1533,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 
         if (lines.count > 0)
         {
-            int startLine = g_ScrollY;
-            int endLine = startLine + g_LinesPerPage + 1;
-            if (endLine > (int)lines.count)
-                endLine = (int)lines.count;
-
-            for (int i = startLine; i < endLine; i++)
+            for (int i = 0; i < (int)lines.count; i++)
             {
                 const SimpleString *line = &lines.lines[i];
                 char *buf = (char *)HeapAlloc(GetProcessHeap(), 0, line->length + 1);
@@ -1371,13 +1549,26 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
         const SimpleString &header = g_HexData.getHeaderLine();
         const char *headerStr = header.data ? header.data : "No File Loaded";
 
+        int effectiveWindowHeight = windowHeight;
+        if (g_BottomPanel.visible && g_BottomPanel.dockPosition == PanelDockPosition::Bottom)
+        {
+            effectiveWindowHeight -= g_BottomPanel.height;
+        }
+
+        g_LinesPerPage = (effectiveWindowHeight - menuBarHeight - 40) / 16;
+        if (g_LinesPerPage < 1)
+            g_LinesPerPage = 1;
+        int maxScrollPos = g_TotalLines - g_LinesPerPage;
+        if (maxScrollPos < 0)
+            maxScrollPos = 0;
+
         g_Renderer.renderHexViewer(
             hexLines,
             headerStr,
             g_ScrollY,
-            g_TotalLines,
-            false,
-            false,
+            maxScrollPos,
+            g_MainScrollbar.hovered,
+            g_MainScrollbar.pressed,
             Rect(0, 0, 0, 0),
             Rect(0, 0, 0, 0),
             g_Options.darkMode,
@@ -1387,7 +1578,8 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
             cursorBytePos,
             cursorNibblePos,
             (long long)g_HexData.getFileSize(),
-            g_LeftPanel.visible ? g_LeftPanel.width : 0);
+            g_LeftPanel.visible ? g_LeftPanel.width : 0,
+            effectiveWindowHeight);
 
         for (size_t i = 0; i < hexLines.size(); i++)
             HeapFree(GetProcessHeap(), 0, hexLines[i]);
@@ -1415,12 +1607,30 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
         g_MenuBar.render(&g_Renderer, windowWidth);
 
         g_Renderer.endFrame(hdc);
-
         EndPaint(hwnd, &ps);
         return 0;
     }
 
+    case WM_KILLFOCUS:
+    {
+        if (GetCapture() == hwnd)
+        {
+            ReleaseCapture();
+        }
+        g_MainScrollbar.pressed = false;
+        g_MainScrollbar.thumbHovered = false;
+        g_LeftPanel.dragging = false;
+        g_BottomPanel.dragging = false;
+        g_ResizingLeftPanel = false;
+        g_ResizingBottomPanel = false;
+        InvalidateRect(hwnd, NULL, FALSE);
+        return 0;
+    }
     case WM_DESTROY:
+        if (GetCapture() == hwnd)
+        {
+            ReleaseCapture();
+        }
         PostQuitMessage(0);
         return 0;
     }
@@ -1436,7 +1646,7 @@ extern "C" void entry()
     g_MenuBar.setPosition(0, 0);
     g_MenuBar.addMenu(MenuHelper::createFileMenu(OnNew, OnFileOpen, OnFileSave, OnFileExit));
     g_MenuBar.addMenu(MenuHelper::createSearchMenu(OnFindReplace, OnGoTo));
-    g_MenuBar.addMenu(MenuHelper::createToolsMenu(OnOptionsDialog));
+    g_MenuBar.addMenu(MenuHelper::createToolsMenu(OnOptionsDialog, OnPluginsDialog));
     g_MenuBar.addMenu(MenuHelper::createHelpMenu(OnAbout, OnDocumentation));
 
     char *filename = GetFileNameFromCmdLine();
@@ -1469,9 +1679,9 @@ extern "C" void entry()
         0,
         "HexViewClass",
         "HexViewer",
-        WS_OVERLAPPEDWINDOW | WS_VISIBLE | WS_VSCROLL,
+        WS_OVERLAPPEDWINDOW | WS_VISIBLE | WS_CLIPCHILDREN,
         CW_USEDEFAULT, CW_USEDEFAULT,
-        800, 600,
+        2000, 900,
         0, 0,
         wc.hInstance,
         0);
@@ -1481,7 +1691,8 @@ extern "C" void entry()
         MessageBoxA(0, "CreateWindowExA failed", "Error", MB_OK | MB_ICONERROR);
         ExitProcess(1);
     }
-
+    ShowScrollBar(hwnd, SB_VERT, FALSE);
+    ShowScrollBar(hwnd, SB_HORZ, FALSE);
     MSG msg;
     while (GetMessageA(&msg, 0, 0, 0))
     {
@@ -1526,19 +1737,31 @@ void UpdateLinuxScrollbar()
 void HandleLinuxKeyPress(XKeyEvent *event)
 {
     KeySym keysym = XLookupKeysym(event, 0);
-    bool ctrl  = (event->state & ControlMask) != 0;
+    bool ctrl = (event->state & ControlMask) != 0;
     bool shift = (event->state & ShiftMask) != 0;
-    bool alt   = (event->state & Mod1Mask) != 0;
+    bool alt = (event->state & Mod1Mask) != 0;
 
     int vk = 0;
     switch (keysym)
     {
-    case XK_Return: vk = 13; break;
-    case XK_Escape: vk = 27; break;
-    case XK_Left:   vk = 37; break;
-    case XK_Up:     vk = 38; break;
-    case XK_Right:  vk = 39; break;
-    case XK_Down:   vk = 40; break;
+    case XK_Return:
+        vk = 13;
+        break;
+    case XK_Escape:
+        vk = 27;
+        break;
+    case XK_Left:
+        vk = 37;
+        break;
+    case XK_Up:
+        vk = 38;
+        break;
+    case XK_Right:
+        vk = 39;
+        break;
+    case XK_Down:
+        vk = 40;
+        break;
 
     default:
         if (keysym >= XK_a && keysym <= XK_z)
@@ -1592,9 +1815,7 @@ void HandleLinuxKeyPress(XKeyEvent *event)
             }
         }
     }
-
 }
-
 
 void HandleLinuxResize(int width, int height)
 {
@@ -1611,7 +1832,6 @@ void HandleLinuxResize(int width, int height)
 
     g_MenuBar.closeAllMenus();
 }
-
 
 void HandleLinuxMouseButton(XButtonEvent *event, bool pressed)
 {
@@ -2071,19 +2291,18 @@ int main(int argc, char **argv)
 
     XMapWindow(g_display, g_window);
 
-    g_Renderer.initialize((void *)g_window);
+    g_Renderer.initialize((NativeWindow)(uintptr_t)g_window);
 
     g_LeftPanel.visible = true;
     g_LeftPanel.width = 280;
     g_BottomPanel.visible = true;
     g_BottomPanel.height = 250;
-
     g_Renderer.resize(800, 600);
     g_MenuBar.setPosition(0, 0);
 
     g_MenuBar.addMenu(MenuHelper::createFileMenu(OnNew, OnFileOpen, OnFileSave, OnFileExit));
     g_MenuBar.addMenu(MenuHelper::createSearchMenu(OnFindReplace, OnGoTo));
-    g_MenuBar.addMenu(MenuHelper::createToolsMenu(OnOptionsDialog));
+    g_MenuBar.addMenu(MenuHelper::createToolsMenu(OnOptionsDialog, OnPluginsDialog));
     g_MenuBar.addMenu(MenuHelper::createHelpMenu(OnAbout, OnDocumentation));
 
     char *filename = GetFileNameFromCmdLine();

@@ -224,6 +224,12 @@ void RenderManager::UpdateHexMetrics(int leftPanelWidth, int menuBarHeight)
   }
 #endif
 
+  layout.margin = 10.0f;
+  layout.headerHeight = layout.lineHeight;
+  
+  _charWidth = (int)layout.charWidth;
+  _charHeight = (int)layout.lineHeight;
+  
   _hexAreaX = leftPanelWidth + (int)(layout.margin + (10 * layout.charWidth));
   _hexAreaY = menuBarHeight + (int)(layout.margin + layout.headerHeight + 2);
 }
@@ -241,6 +247,7 @@ bool RenderManager::IsPointInHexArea(int mouseX, int mouseY, int leftPanelWidth,
   return (mouseX >= hexAreaLeft && mouseX <= hexAreaRight &&
           mouseY >= hexAreaTop && mouseY <= hexAreaBottom);
 }
+
 void RenderManager::createFont()
 {
 #ifdef _WIN32
@@ -863,7 +870,12 @@ BytePositionInfo RenderManager::GetHexBytePositionInfo(Point screenPoint)
   int relX = screenPoint.X - _hexAreaX;
   int relY = screenPoint.Y - _hexAreaY;
 
-  int row = (relY + (_charHeight / 2)) / _charHeight;
+  if (relX < 0)
+  {
+    return BytePositionInfo(-1, 0);
+  }
+
+  int row = relY / _charHeight;
   if (row < 0)
     row = 0;
 
@@ -1093,87 +1105,172 @@ void RenderManager::drawLeftPanel(
   Color borderColor = theme.separator;
   drawRect(panelBounds, borderColor, false);
 
-  int currentY = panelBounds.y + PANEL_TITLE_HEIGHT + 10;
+  int contentX = panelBounds.x + 15;
+  int contentY = panelBounds.y + PANEL_TITLE_HEIGHT + 10;
 
-  for (size_t i = 0; i < state.sections.size(); i++)
+  drawText("File Information", contentX, contentY, theme.headerColor);
+  contentY += 25;
+
+  extern HexData g_HexData;
+  long long fileSize = (long long)g_HexData.getFileSize();
+
+  char buf[256];
+
+  drawText("Size:", contentX, contentY, Color(theme.textColor.r - 40, theme.textColor.g - 40, theme.textColor.b - 40));
+  if (fileSize < 1024)
   {
-    const PanelSection &section = state.sections[i];
+    ItoaDec(fileSize, buf, 256);
+    StrCat(buf, " bytes");
+  }
+  else if (fileSize < 1024 * 1024)
+  {
+    ItoaDec(fileSize / 1024, buf, 256);
+    StrCat(buf, " KB");
+  }
+  else
+  {
+    ItoaDec(fileSize / (1024 * 1024), buf, 256);
+    StrCat(buf, " MB");
+  }
+  drawText(buf, contentX + 70, contentY, theme.textColor);
+  contentY += 20;
 
-    Rect headerRect(panelBounds.x, currentY, panelBounds.width, 28);
-    Color headerBg = panelBg;
-    if ((int)i == state.hoveredSection)
+  drawText("Type:", contentX, contentY, Color(theme.textColor.r - 40, theme.textColor.g - 40, theme.textColor.b - 40));
+  if (fileSize >= 4)
+  {
+    uint8_t b0 = g_HexData.getByte(0);
+    uint8_t b1 = g_HexData.getByte(1);
+    uint8_t b2 = g_HexData.getByte(2);
+    uint8_t b3 = g_HexData.getByte(3);
+
+    if (b0 == 0x4D && b1 == 0x5A)
     {
-      headerBg = Color(
-          Clamp(panelBg.r + 15, 0, 255),
-          Clamp(panelBg.g + 15, 0, 255),
-          Clamp(panelBg.b + 15, 0, 255));
+      drawText("PE Executable", contentX + 70, contentY, Color(100, 200, 150));
     }
-    drawRect(headerRect, headerBg, true);
-
-    int arrowX = panelBounds.x + 10;
-    int arrowY = currentY + 14;
-    Color arrowColor = theme.textColor;
-
-    if (section.expanded)
+    else if (b0 == 0x7F && b1 == 'E' && b2 == 'L' && b3 == 'F')
     {
-      drawLine(arrowX, arrowY - 3, arrowX + 4, arrowY + 2, arrowColor);
-      drawLine(arrowX + 8, arrowY - 3, arrowX + 4, arrowY + 2, arrowColor);
+      drawText("ELF Executable", contentX + 70, contentY, Color(100, 200, 150));
+    }
+    else if (b0 == 0x89 && b1 == 'P' && b2 == 'N' && b3 == 'G')
+    {
+      drawText("PNG Image", contentX + 70, contentY, Color(100, 200, 150));
+    }
+    else if (b0 == 0xFF && b1 == 0xD8 && b2 == 0xFF)
+    {
+      drawText("JPEG Image", contentX + 70, contentY, Color(100, 200, 150));
     }
     else
     {
-      drawLine(arrowX, arrowY - 4, arrowX + 5, arrowY, arrowColor);
-      drawLine(arrowX, arrowY + 4, arrowX + 5, arrowY, arrowColor);
+      drawText("Binary Data", contentX + 70, contentY, Color(100, 200, 150));
     }
+  }
+  else
+  {
+    drawText("Unknown", contentX + 70, contentY, theme.textColor);
+  }
+  contentY += 30;
 
-    drawText(section.title, panelBounds.x + 25, currentY + 7, theme.textColor);
-    currentY += 28;
+  drawText("Data Inspector", contentX, contentY, theme.headerColor);
+  contentY += 25;
 
-    if (section.expanded)
+  extern long long cursorBytePos;
+
+  if (cursorBytePos >= 0 && cursorBytePos < fileSize)
+  {
+    uint8_t byteVal = g_HexData.getByte((size_t)cursorBytePos);
+
+    drawText("Offset:", contentX, contentY, Color(theme.textColor.r - 40, theme.textColor.g - 40, theme.textColor.b - 40));
+    StrCopy(buf, "0x");
+    ItoaHex(cursorBytePos, buf + 2, 254);
+    drawText(buf, contentX + 85, contentY, Color(100, 150, 255));
+    contentY += 20;
+
+    drawText("Uint8:", contentX, contentY, Color(theme.textColor.r - 40, theme.textColor.g - 40, theme.textColor.b - 40));
+    ItoaDec(byteVal, buf, 256);
+    drawText(buf, contentX + 85, contentY, theme.textColor);
+    contentY += 18;
+
+    drawText("Int8:", contentX, contentY, Color(theme.textColor.r - 40, theme.textColor.g - 40, theme.textColor.b - 40));
+    ItoaDec((int8_t)byteVal, buf, 256);
+    drawText(buf, contentX + 85, contentY, theme.textColor);
+    contentY += 18;
+
+    drawText("Hex:", contentX, contentY, Color(theme.textColor.r - 40, theme.textColor.g - 40, theme.textColor.b - 40));
+    StrCopy(buf, "0x");
+    ByteToHex(byteVal, buf + 2);
+    buf[4] = 0;
+    drawText(buf, contentX + 85, contentY, theme.textColor);
+    contentY += 18;
+
+    drawText("ASCII:", contentX, contentY, Color(theme.textColor.r - 40, theme.textColor.g - 40, theme.textColor.b - 40));
+    if (byteVal >= 32 && byteVal < 127)
     {
-      for (size_t j = 0; j < section.items.size(); j++)
-      {
-        Rect itemRect(panelBounds.x, currentY, panelBounds.width, 24);
-        Color itemBg = panelBg;
-
-        if ((int)i == state.hoveredSection && (int)j == state.hoveredItem)
-        {
-          itemBg = Color(
-              Clamp(panelBg.r + 10, 0, 255),
-              Clamp(panelBg.g + 10, 0, 255),
-              Clamp(panelBg.b + 10, 0, 255));
-          drawRect(itemRect, itemBg, true);
-        }
-
-        Rect iconRect(panelBounds.x + 30, currentY + 5, 12, 12);
-        drawRect(iconRect, theme.controlBorder, false);
-
-        char *itemText = section.items[j];
-        int maxChars = (panelBounds.width - 55) / 8;
-        size_t itemLen = StrLen(itemText);
-
-        if (itemLen > (size_t)maxChars)
-        {
-          char tempBuf[256];
-          size_t copyLen = maxChars - 3;
-          for (size_t k = 0; k < copyLen; k++)
-          {
-            tempBuf[k] = itemText[k];
-          }
-          tempBuf[copyLen] = '.';
-          tempBuf[copyLen + 1] = '.';
-          tempBuf[copyLen + 2] = '.';
-          tempBuf[copyLen + 3] = '\0';
-          drawText(tempBuf, panelBounds.x + 48, currentY + 5, theme.textColor);
-        }
-        else
-        {
-          drawText(itemText, panelBounds.x + 48, currentY + 5, theme.textColor);
-        }
-
-        currentY += 24;
-      }
-      currentY += 5;
+      buf[0] = '\'';
+      buf[1] = (char)byteVal;
+      buf[2] = '\'';
+      buf[3] = 0;
     }
+    else
+    {
+      StrCopy(buf, ".");
+    }
+    drawText(buf, contentX + 85, contentY, theme.textColor);
+    contentY += 25;
+  }
+  else
+  {
+    drawText("Move cursor to view data", contentX, contentY,
+             Color(theme.textColor.r / 2, theme.textColor.g / 2, theme.textColor.b / 2));
+    contentY += 40;
+  }
+
+  drawText("Bookmarks", contentX, contentY, theme.headerColor);
+  contentY += 25;
+
+  extern BookmarksState g_Bookmarks;
+  if (g_Bookmarks.bookmarks.empty())
+  {
+    drawText("No bookmarks", contentX, contentY,
+             Color(theme.textColor.r / 2, theme.textColor.g / 2, theme.textColor.b / 2));
+    contentY += 18;
+    drawText("Ctrl+B to add", contentX, contentY,
+             Color(theme.textColor.r / 3, theme.textColor.g / 3, theme.textColor.b / 3));
+    contentY += 25;
+  }
+  else
+  {
+    for (size_t i = 0; i < g_Bookmarks.bookmarks.size() && i < 5; i++)
+    {
+      const Bookmark &bm = g_Bookmarks.bookmarks[i];
+
+      Rect colorBox(contentX, contentY + 3, 10, 10);
+      drawRect(colorBox, bm.color, true);
+
+      StrCopy(buf, bm.name);
+      drawText(buf, contentX + 15, contentY, theme.textColor);
+      contentY += 18;
+    }
+    contentY += 10;
+  }
+
+  drawText("Byte Statistics", contentX, contentY, theme.headerColor);
+  contentY += 25;
+
+  extern ByteStatistics g_ByteStats;
+  if (!g_ByteStats.computed)
+  {
+    drawText("Click to compute", contentX, contentY,
+             Color(theme.textColor.r / 2, theme.textColor.g / 2, theme.textColor.b / 2));
+    contentY += 20;
+  }
+  else
+  {
+    drawText("Most Common:", contentX, contentY, Color(theme.textColor.r - 40, theme.textColor.g - 40, theme.textColor.b - 40));
+    StrCopy(buf, "0x");
+    ByteToHex(g_ByteStats.mostCommonByte, buf + 2);
+    buf[4] = 0;
+    drawText(buf, contentX + 110, contentY, theme.textColor);
+    contentY += 18;
   }
 
   if (state.dockPosition == PanelDockPosition::Floating)
@@ -1355,7 +1452,7 @@ void RenderManager::drawBottomPanel(
   }
 
   case BottomPanelState::Tab::PatternSearch:
-{
+  {
     drawText("Hex Pattern Search", contentX, contentY, theme.headerColor);
     contentY += 25;
 
@@ -1374,9 +1471,9 @@ void RenderManager::drawBottomPanel(
     extern bool caretVisible;
     if (g_PatternSearch.hasFocus && caretVisible)
     {
-        int caretX = contentX + 8 + (int)StrLen(g_PatternSearch.searchPattern) * 8;
-        Rect caret(caretX, contentY + 4, 2, 20);
-        drawRect(caret, theme.textColor, true);
+      int caretX = contentX + 8 + (int)StrLen(g_PatternSearch.searchPattern) * 8;
+      Rect caret(caretX, contentY + 4, 2, 20);
+      drawRect(caret, theme.textColor, true);
     }
 
     WidgetState btn;
@@ -1394,8 +1491,7 @@ void RenderManager::drawBottomPanel(
     drawModernButton(btn, theme, "Find Next");
 
     break;
-}
-
+  }
 
   case BottomPanelState::Tab::Checksum:
   {
@@ -1719,6 +1815,501 @@ int RenderManager::getContextMenuHoveredItem(
   return -1;
 }
 
+void RenderManager::updateScrollbarMetrics(
+    ScrollbarState &state,
+    int x, int y, int width, int height,
+    float contentSize, float viewportSize,
+    bool vertical)
+{
+  state.visible = contentSize > viewportSize;
+
+  if (!state.visible)
+  {
+    state.thumbSize = 1.0f;
+    return;
+  }
+
+  state.thumbSize = viewportSize / contentSize;
+  if (state.thumbSize > 1.0f)
+    state.thumbSize = 1.0f;
+  if (state.thumbSize < 0.05f)
+    state.thumbSize = 0.05f;
+
+  if (vertical)
+  {
+    state.trackX = x;
+    state.trackY = y;
+    state.trackWidth = width;
+    state.trackHeight = height;
+
+    int scrollbarWidth = 8;
+    if (state.hovered || state.pressed)
+      scrollbarWidth = 12;
+
+    state.trackX = x + width - scrollbarWidth;
+    state.trackWidth = scrollbarWidth;
+
+    int availableHeight = height - 4;
+    int thumbHeight = (int)(availableHeight * state.thumbSize);
+    if (thumbHeight < 20)
+      thumbHeight = 20;
+
+    int maxThumbTravel = availableHeight - thumbHeight;
+
+    int thumbY = y + 2 + (int)(maxThumbTravel * state.position);
+
+    state.thumbX = state.trackX + 2;
+    state.thumbY = thumbY;
+    state.thumbWidth = scrollbarWidth - 3;
+    state.thumbHeight = thumbHeight;
+  }
+  else
+  {
+    state.trackX = x;
+    state.trackY = y;
+    state.trackWidth = width;
+    state.trackHeight = height;
+
+    int scrollbarHeight = 8;
+    if (state.hovered || state.pressed)
+      scrollbarHeight = 12;
+
+    state.trackY = y + height - scrollbarHeight;
+    state.trackHeight = scrollbarHeight;
+
+    int availableWidth = width - 4;
+    int thumbWidth = (int)(availableWidth * state.thumbSize);
+    if (thumbWidth < 20)
+      thumbWidth = 20;
+
+    int maxThumbTravel = availableWidth - thumbWidth;
+
+    int thumbX = x + 2 + (int)(maxThumbTravel * state.position);
+
+    state.thumbX = thumbX;
+    state.thumbY = state.trackY + 2;
+    state.thumbWidth = thumbWidth;
+    state.thumbHeight = scrollbarHeight - 3;
+  }
+}
+
+void RenderManager::drawModernScrollbar(
+    const ScrollbarState &state,
+    const Theme &theme,
+    bool vertical)
+{
+  if (!state.visible)
+    return;
+
+  Color trackColor = theme.scrollbarBg;
+  trackColor.a = 0;
+
+  Color thumbColor = theme.scrollbarThumb;
+  thumbColor.a = 128;
+
+  if (state.hovered || state.pressed)
+  {
+    trackColor.a = 30;
+    thumbColor.a = 180;
+  }
+
+  if (state.pressed)
+  {
+    thumbColor.a = 220;
+  }
+
+  if (state.hovered || state.pressed)
+  {
+    Rect trackRect(state.trackX, state.trackY,
+                   state.trackWidth, state.trackHeight);
+    drawRoundedRect(trackRect, 6.0f, trackColor, true);
+  }
+
+  Rect thumbRect(state.thumbX, state.thumbY,
+                 state.thumbWidth, state.thumbHeight);
+
+  Color finalThumbColor = thumbColor;
+  if (state.thumbHovered && !state.pressed)
+  {
+    finalThumbColor.r = (uint8_t)(thumbColor.r * 1.2f > 255 ? 255 : thumbColor.r * 1.2f);
+    finalThumbColor.g = (uint8_t)(thumbColor.g * 1.2f > 255 ? 255 : thumbColor.g * 1.2f);
+    finalThumbColor.b = (uint8_t)(thumbColor.b * 1.2f > 255 ? 255 : thumbColor.b * 1.2f);
+  }
+
+  float radius = (float)state.thumbWidth / 2.0f;
+  if (!vertical)
+    radius = (float)state.thumbHeight / 2.0f;
+
+  drawRoundedRect(thumbRect, radius, finalThumbColor, true);
+}
+
+bool RenderManager::isPointInScrollbarThumb(
+    int mouseX, int mouseY,
+    const ScrollbarState &state)
+{
+  if (!state.visible)
+    return false;
+
+  return mouseX >= state.thumbX &&
+         mouseX < state.thumbX + state.thumbWidth &&
+         mouseY >= state.thumbY &&
+         mouseY < state.thumbY + state.thumbHeight;
+}
+
+bool RenderManager::isPointInScrollbarTrack(
+    int mouseX, int mouseY,
+    const ScrollbarState &state)
+{
+  if (!state.visible)
+    return false;
+
+  return mouseX >= state.trackX &&
+         mouseX < state.trackX + state.trackWidth &&
+         mouseY >= state.trackY &&
+         mouseY < state.trackY + state.trackHeight;
+}
+
+float RenderManager::getScrollbarPositionFromMouse(
+    int mouseY,
+    const ScrollbarState &state,
+    bool vertical)
+{
+  if (!state.visible)
+    return 0.0f;
+
+  if (vertical)
+  {
+    int maxThumbTravel = state.trackHeight - state.thumbHeight - 4;
+    if (maxThumbTravel <= 0)
+      return 0.0f;
+
+    int thumbTop = mouseY - state.trackY - 2;
+
+    float position = (float)thumbTop / (float)maxThumbTravel;
+
+    if (position < 0.0f)
+      position = 0.0f;
+    if (position > 1.0f)
+      position = 1.0f;
+
+    return position;
+  }
+  else
+  {
+    int maxThumbTravel = state.trackWidth - state.thumbWidth - 4;
+    if (maxThumbTravel <= 0)
+      return 0.0f;
+
+    int thumbLeft = mouseY - state.trackX - 2;
+
+    float position = (float)thumbLeft / (float)maxThumbTravel;
+
+    if (position < 0.0f)
+      position = 0.0f;
+    if (position > 1.0f)
+      position = 1.0f;
+
+    return position;
+  }
+}
+
+void RenderManager::drawDataInspectorContent(
+    int contentX, int &contentY, int panelWidth,
+    const DataInspectorValues &vals,
+    const Theme &theme)
+{
+  if (!vals.hasData)
+  {
+    drawText("Move cursor to view data", contentX, contentY,
+             Color(theme.textColor.r / 2, theme.textColor.g / 2, theme.textColor.b / 2));
+    contentY += 20;
+    return;
+  }
+
+  char buf[256];
+  int labelWidth = 85;
+  int valueX = contentX + labelWidth;
+  Color labelColor = Color(theme.textColor.r - 40, theme.textColor.g - 40, theme.textColor.b - 40);
+
+  StrCopy(buf, "Offset: ");
+  ItoaHex(vals.byteOffset, buf + StrLen(buf), 256 - StrLen(buf));
+  drawText(buf, contentX, contentY, Color(100, 150, 255));
+  contentY += 20;
+
+  drawLine(contentX, contentY, contentX + panelWidth - 30, contentY, theme.separator);
+  contentY += 8;
+
+  drawText("Uint8:", contentX, contentY, labelColor);
+  ItoaDec(vals.uint8Val, buf, 256);
+  StrCat(buf, " (0x");
+  char hexBuf[8];
+  ByteToHex(vals.uint8Val, hexBuf);
+  hexBuf[2] = ')';
+  hexBuf[3] = 0;
+  StrCat(buf, hexBuf);
+  drawText(buf, valueX, contentY, theme.textColor);
+  contentY += 16;
+
+  drawText("Int8:", contentX, contentY, labelColor);
+  ItoaDec(vals.int8Val, buf, 256);
+  drawText(buf, valueX, contentY, theme.textColor);
+  contentY += 16;
+
+  drawText("Binary:", contentX, contentY, labelColor);
+  drawText(vals.binaryStr, valueX, contentY, Color(150, 200, 150));
+  contentY += 16;
+
+  drawText("ASCII:", contentX, contentY, labelColor);
+  if (vals.isASCIIPrintable)
+  {
+    buf[0] = '\'';
+    buf[1] = vals.asciiChar;
+    buf[2] = '\'';
+    buf[3] = 0;
+  }
+  else
+  {
+    StrCopy(buf, ".");
+  }
+  drawText(buf, valueX, contentY, theme.textColor);
+  contentY += 18;
+
+  drawLine(contentX, contentY, contentX + panelWidth - 30, contentY, theme.separator);
+  contentY += 8;
+
+  drawText("Uint16 LE:", contentX, contentY, labelColor);
+  ItoaDec(vals.uint16LE, buf, 256);
+  StrCat(buf, " (0x");
+  for (int i = 0; i < 4; i++)
+  {
+    int nibble = (vals.uint16LE >> (12 - i * 4)) & 0xF;
+    buf[StrLen(buf)] = IntToHexChar(nibble);
+    buf[StrLen(buf) + 1] = 0;
+  }
+  StrCat(buf, ")");
+  drawText(buf, valueX, contentY, theme.textColor);
+  contentY += 16;
+
+  drawText("Int16 LE:", contentX, contentY, labelColor);
+  ItoaDec(vals.int16LE, buf, 256);
+  drawText(buf, valueX, contentY, theme.textColor);
+  contentY += 18;
+
+  drawLine(contentX, contentY, contentX + panelWidth - 30, contentY, theme.separator);
+  contentY += 8;
+
+  drawText("Uint32 LE:", contentX, contentY, labelColor);
+  ItoaDec(vals.uint32LE, buf, 256);
+  drawText(buf, valueX, contentY, theme.textColor);
+  contentY += 16;
+
+  drawText("Int32 LE:", contentX, contentY, labelColor);
+  ItoaDec(vals.int32LE, buf, 256);
+  drawText(buf, valueX, contentY, theme.textColor);
+  contentY += 16;
+
+  drawText("Float LE:", contentX, contentY, labelColor);
+  StrCopy(buf, "<float>");
+  drawText(buf, valueX, contentY, theme.textColor);
+  contentY += 18;
+
+  drawLine(contentX, contentY, contentX + panelWidth - 30, contentY, theme.separator);
+  contentY += 8;
+
+  drawText("Uint64 LE:", contentX, contentY, labelColor);
+  ItoaDec(vals.uint64LE, buf, 256);
+  drawText(buf, valueX, contentY, theme.textColor);
+  contentY += 16;
+
+  drawText("Double LE:", contentX, contentY, labelColor);
+  StrCopy(buf, "<double>");
+  drawText(buf, valueX, contentY, theme.textColor);
+  contentY += 16;
+}
+
+void RenderManager::drawFileInfoContent(
+    int contentX, int &contentY, int panelWidth,
+    const FileInfoValues &info,
+    const Theme &theme)
+{
+  char buf[256];
+  int labelWidth = 70;
+  int valueX = contentX + labelWidth;
+  Color labelColor = Color(theme.textColor.r - 40, theme.textColor.g - 40, theme.textColor.b - 40);
+
+  drawText("Size:", contentX, contentY, labelColor);
+  drawText(info.fileSizeFormatted, valueX, contentY, theme.textColor);
+  contentY += 18;
+
+  drawText("Type:", contentX, contentY, labelColor);
+  drawText(info.fileType, valueX, contentY, Color(100, 200, 150));
+  contentY += 18;
+
+  drawText("Format:", contentX, contentY, labelColor);
+  ItoaDec(info.fileSize, buf, 256);
+  StrCat(buf, " bytes");
+  drawText(buf, valueX, contentY, theme.textColor);
+  contentY += 18;
+}
+
+void RenderManager::drawBookmarksContent(
+    int contentX, int &contentY, int panelWidth,
+    const Theme &theme)
+{
+  extern BookmarksState g_Bookmarks;
+
+  if (g_Bookmarks.bookmarks.empty())
+  {
+    drawText("No bookmarks", contentX, contentY,
+             Color(theme.textColor.r / 2, theme.textColor.g / 2, theme.textColor.b / 2));
+    contentY += 18;
+
+    drawText("Ctrl+B to add bookmark", contentX, contentY + 5,
+             Color(theme.textColor.r / 3, theme.textColor.g / 3, theme.textColor.b / 3));
+    contentY += 18;
+    return;
+  }
+
+  for (size_t i = 0; i < g_Bookmarks.bookmarks.size(); i++)
+  {
+    const Bookmark &bm = g_Bookmarks.bookmarks[i];
+
+    Rect colorBox(contentX, contentY + 3, 10, 10);
+    drawRect(colorBox, bm.color, true);
+
+    char buf[128];
+    StrCopy(buf, bm.name);
+    StrCat(buf, " (");
+    char hexBuf[32];
+    ItoaHex(bm.byteOffset, hexBuf, 32);
+    StrCat(buf, hexBuf);
+    StrCat(buf, ")");
+
+    Color textColor = ((int)i == g_Bookmarks.selectedIndex)
+                          ? Color(100, 150, 255)
+                          : theme.textColor;
+
+    drawText(buf, contentX + 15, contentY, textColor);
+    contentY += 18;
+  }
+}
+
+void RenderManager::drawByteStatsContent(
+    int contentX, int &contentY, int panelWidth,
+    const Theme &theme)
+{
+  extern ByteStatistics g_ByteStats;
+
+  if (!g_ByteStats.computed)
+  {
+    drawText("Click to compute statistics", contentX, contentY,
+             Color(theme.textColor.r / 2, theme.textColor.g / 2, theme.textColor.b / 2));
+    contentY += 20;
+    return;
+  }
+
+  char buf[256];
+  int labelWidth = 110;
+  int valueX = contentX + labelWidth;
+  Color labelColor = Color(theme.textColor.r - 40, theme.textColor.g - 40, theme.textColor.b - 40);
+
+  drawText("Entropy:", contentX, contentY, labelColor);
+  StrCopy(buf, "<entropy> bits");
+
+  Color entropyColor = theme.textColor;
+  if (g_ByteStats.entropy > 7.5)
+  {
+    entropyColor = Color(255, 100, 100);
+  }
+  else if (g_ByteStats.entropy < 3.0)
+  {
+    entropyColor = Color(100, 255, 100);
+  }
+
+  drawText(buf, valueX, contentY, entropyColor);
+  contentY += 18;
+
+  drawText("Most Common:", contentX, contentY, labelColor);
+  StrCopy(buf, "0x");
+  ByteToHex(g_ByteStats.mostCommonByte, buf + 2);
+  buf[4] = ' ';
+  buf[5] = '(';
+  ItoaDec(g_ByteStats.mostCommonCount, buf + 6, 250);
+  StrCat(buf, ")");
+  drawText(buf, valueX, contentY, theme.textColor);
+  contentY += 16;
+
+  drawText("Least Common:", contentX, contentY, labelColor);
+  StrCopy(buf, "0x");
+  ByteToHex(g_ByteStats.leastCommonByte, buf + 2);
+  buf[4] = ' ';
+  buf[5] = '(';
+  ItoaDec(g_ByteStats.leastCommonCount, buf + 6, 250);
+  StrCat(buf, ")");
+  drawText(buf, valueX, contentY, theme.textColor);
+  contentY += 16;
+
+  drawText("Null Bytes:", contentX, contentY, labelColor);
+  ItoaDec(g_ByteStats.nullByteCount, buf, 256);
+  drawText(buf, valueX, contentY, theme.textColor);
+  contentY += 18;
+
+  contentY += 5;
+  drawText("Byte Distribution:", contentX, contentY, labelColor);
+  contentY += 18;
+
+  int histWidth = panelWidth - 30;
+  int histHeight = 60;
+  Rect histRect(contentX, contentY, histWidth, histHeight);
+
+  drawRect(histRect, Color(20, 20, 25), true);
+  drawRect(histRect, theme.controlBorder, false);
+
+  int barCount = Clamp(histWidth / 2, 32, 256);
+  int bytesPerBar = 256 / barCount;
+  int barWidth = histWidth / barCount;
+
+  int maxCount = 0;
+  for (int i = 0; i < 256; i++)
+  {
+    if (g_ByteStats.histogram[i] > maxCount)
+    {
+      maxCount = g_ByteStats.histogram[i];
+    }
+  }
+
+  if (maxCount > 0)
+  {
+    for (int i = 0; i < barCount; i++)
+    {
+      int sum = 0;
+      for (int j = 0; j < bytesPerBar; j++)
+      {
+        sum += g_ByteStats.histogram[i * bytesPerBar + j];
+      }
+
+      int barHeight = (sum * (histHeight - 10)) / maxCount;
+      if (barHeight > 0)
+      {
+        Rect bar(contentX + i * barWidth + 1,
+                 contentY + histHeight - barHeight - 5,
+                 barWidth - 2,
+                 barHeight);
+
+        Color barColor(70, 130, 180);
+        if (i * bytesPerBar == 0)
+        {
+          barColor = Color(255, 100, 100);
+        }
+
+        drawRect(bar, barColor, true);
+      }
+    }
+  }
+
+  contentY += histHeight + 5;
+}
+
 void RenderManager::renderHexViewer(
     const Vector<char *> &hexLines,
     const char *headerLine,
@@ -1735,7 +2326,8 @@ void RenderManager::renderHexViewer(
     long long cursorBytePos,
     int cursorNibblePos,
     long long totalBytes,
-    int leftPanelWidth)
+    int leftPanelWidth,
+    int effectiveWindowHeight)
 {
   currentTheme = darkMode ? Theme::Dark() : Theme::Light();
   LayoutMetrics layout;
@@ -1776,6 +2368,10 @@ void RenderManager::renderHexViewer(
   }
 #endif
 
+  layout.margin = 10.0f;
+  layout.headerHeight = layout.lineHeight;
+  layout.scrollbarWidth = 16.0f;
+
   _bytesPerLine = 16;
   _startByte = scrollPos * _bytesPerLine;
   _bytePos = cursorBytePos;
@@ -1783,17 +2379,19 @@ void RenderManager::renderHexViewer(
   _charWidth = (int)layout.charWidth;
   _charHeight = (int)layout.lineHeight;
 
+  layout.charWidth = (float)_charWidth;
+  layout.lineHeight = (float)_charHeight;
+
+  int workingHeight = (effectiveWindowHeight > 0) ? effectiveWindowHeight : windowHeight;
+
   int menuBarHeight = 24;
 
   Rect contentArea(leftPanelWidth, menuBarHeight,
                    windowWidth - leftPanelWidth,
-                   windowHeight - menuBarHeight);
+                   workingHeight - menuBarHeight);
   drawRect(contentArea, currentTheme.windowBackground, true);
 
   int disasmColumnWidth = 300;
-
-  _hexAreaX = leftPanelWidth + (int)(layout.margin + (10 * layout.charWidth));
-  _hexAreaY = menuBarHeight + (int)(layout.margin + layout.headerHeight + 2);
 
   if (headerLine && headerLine[0])
   {
@@ -1819,64 +2417,84 @@ void RenderManager::renderHexViewer(
   drawLine(separatorX,
            menuBarHeight + (int)(layout.margin + layout.headerHeight),
            separatorX,
-           windowHeight - (int)layout.margin,
+           workingHeight - (int)layout.margin,
            currentTheme.separator);
 
   int contentY = _hexAreaY;
-  int contentHeight = windowHeight - contentY - (int)layout.margin;
+  int contentHeight = workingHeight - contentY - (int)layout.margin;
+  if (contentHeight < 0)
+    contentHeight = 0;
+
   size_t maxVisibleLines = (size_t)(contentHeight / layout.lineHeight);
   _visibleLines = (int)maxVisibleLines;
 
-  size_t startLine = scrollPos;
+  size_t startLine = (size_t)scrollPos;
   size_t endLine = Clamp(startLine + maxVisibleLines, (size_t)0, hexLines.size());
+
+  extern HexData g_HexData;
+  const LineArray &disasmLines = g_HexData.getDisassemblyLines();
+
+  extern SelectionState g_Selection;
+  if (g_Selection.active)
+  {
+    long long selMin, selMax;
+    g_Selection.getRange(selMin, selMax);
+    
+    long long firstLine = selMin / _bytesPerLine;
+    long long lastLine = selMax / _bytesPerLine;
+    
+    Color highlightColor = currentTheme.controlCheck;
+    highlightColor.a = 80;
+    
+    for (long long line = firstLine; line <= lastLine; line++)
+    {
+        if (line < (long long)startLine) continue;
+        if (line >= (long long)endLine) break;
+        
+        int displayLine = (int)(line - startLine);
+        int yPos = contentY + displayLine * _charHeight;
+        
+        long long lineStart = line * _bytesPerLine;
+        long long lineEnd = lineStart + _bytesPerLine - 1;
+        
+        long long drawStart = (lineStart < selMin) ? selMin : lineStart;
+        long long drawEnd = (lineEnd > selMax) ? selMax : lineEnd;
+        
+        int startCol = (int)(drawStart % _bytesPerLine);
+        int endCol = (int)(drawEnd % _bytesPerLine);
+        
+        int xStart = _hexAreaX + (startCol * 3 * _charWidth);
+        int xEnd = _hexAreaX + ((endCol + 1) * 3 * _charWidth) - _charWidth;
+        
+        Rect highlightRect(xStart, yPos, xEnd - xStart, _charHeight);
+        drawRect(highlightRect, highlightColor, true);
+        
+        int asciiAreaX = _hexAreaX + (16 * 3 * _charWidth) + (2 * _charWidth);
+        int asciiStart = asciiAreaX + (startCol * _charWidth);
+        int asciiEnd = asciiAreaX + ((endCol + 1) * _charWidth);
+        
+        Rect asciiHighlight(asciiStart, yPos, asciiEnd - asciiStart, _charHeight);
+        drawRect(asciiHighlight, highlightColor, true);
+    }
+  }
 
   for (size_t i = startLine; i < endLine; i++)
   {
     int y = contentY + (int)((i - startLine) * layout.lineHeight);
     const char *line = hexLines[i];
 
-    const char *disasmStart = nullptr;
-    size_t lineLen = StrLen(line);
+    drawText(line,
+             leftPanelWidth + (int)layout.margin,
+             y,
+             currentTheme.textColor);
 
-    if (lineLen > 6)
+    if (i < disasmLines.count && disasmLines.lines[i].data != nullptr)
     {
-      for (size_t pos = lineLen - 1; pos >= 6; pos--)
+      if (disasmLines.lines[i].length > 0)
       {
-        if (line[pos - 6] == ' ' && line[pos - 5] == ' ' &&
-            line[pos - 4] == ' ' && line[pos - 3] == ' ' &&
-            line[pos - 2] == ' ' && line[pos - 1] == ' ')
-        {
-          disasmStart = line + pos;
-          break;
-        }
-        if (pos == 6)
-          break;
+        int disasmX = separatorX + 10;
+        drawText(disasmLines.lines[i].data, disasmX, y, currentTheme.disassemblyColor);
       }
-    }
-
-    if (disasmStart)
-    {
-      size_t hexLen = disasmStart - line - 6;
-      char hexPart[512];
-
-      for (size_t k = 0; k < hexLen && k < 511; k++)
-        hexPart[k] = line[k];
-      hexPart[hexLen] = '\0';
-
-      drawText(hexPart,
-               leftPanelWidth + (int)layout.margin,
-               y,
-               currentTheme.textColor);
-
-      int disasmX = separatorX + 10;
-      drawText(disasmStart, disasmX, y, currentTheme.disassemblyColor);
-    }
-    else
-    {
-      drawText(line,
-               leftPanelWidth + (int)layout.margin,
-               y,
-               currentTheme.textColor);
     }
   }
 
@@ -1888,12 +2506,41 @@ void RenderManager::renderHexViewer(
 
   if (maxScrollPos > 0)
   {
-    drawRect(scrollbarRect, currentTheme.scrollbarBg, true);
+    extern ScrollbarState g_MainScrollbar;
 
-    Color thumbColor = currentTheme.scrollbarThumb;
-    if (scrollbarHovered || scrollbarPressed)
-      thumbColor.a = 200;
+    if (maxScrollPos > 0)
+    {
+      g_MainScrollbar.position = (float)scrollPos / (float)maxScrollPos;
+    }
+    else
+    {
+      g_MainScrollbar.position = 0.0f;
+    }
 
-    drawRect(thumbRect, thumbColor, true);
+    if (g_MainScrollbar.position < 0.0f)
+      g_MainScrollbar.position = 0.0f;
+    if (g_MainScrollbar.position > 1.0f)
+      g_MainScrollbar.position = 1.0f;
+
+    g_MainScrollbar.hovered = scrollbarHovered;
+    g_MainScrollbar.pressed = scrollbarPressed;
+    g_MainScrollbar.thumbHovered = scrollbarHovered;
+
+    int totalContentHeight = (int)hexLines.size() * _charHeight;
+    int viewportHeight = contentHeight;
+
+    int scrollbarX = windowWidth - 16;
+    int scrollbarY = menuBarHeight + (int)(layout.margin + layout.headerHeight);
+    int scrollbarWidth = 16;
+    int scrollbarHeight = contentHeight;
+
+    updateScrollbarMetrics(
+        g_MainScrollbar,
+        scrollbarX, scrollbarY,
+        scrollbarWidth, scrollbarHeight,
+        (float)totalContentHeight, (float)viewportHeight,
+        true);
+
+    drawModernScrollbar(g_MainScrollbar, currentTheme, true);
   }
 }

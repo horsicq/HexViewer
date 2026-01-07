@@ -100,6 +100,6 @@ namespace MenuHelper {
     Menu createFileMenu(MenuCallback onNew, MenuCallback onOpen, MenuCallback onSave, MenuCallback onExit);
     Menu createSearchMenu(MenuCallback onFindReplace, MenuCallback onGoTo);
     Menu createHelpMenu(MenuCallback onAbout, MenuCallback onDocumentation);
-    Menu createToolsMenu(MenuCallback onOptions);
+    Menu createToolsMenu(MenuCallback onOptions, MenuCallback onPlugins);
 }
 

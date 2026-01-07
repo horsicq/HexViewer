@@ -11,10 +11,11 @@
 
 #include "global.h"
 
-
 struct PatternSearchState;
 struct ChecksumState;
 struct CompareState;
+struct DataInspectorValues;
+struct FileInfoValues;
 
 struct Rect
 {
@@ -177,15 +178,14 @@ struct LayoutMetrics
 
 struct CaretInfo
 {
-    int x;
-    int y;
-    int width;
-    int height;
+  int x;
+  int y;
+  int width;
+  int height;
 
-    CaretInfo(int x = 0, int y = 0, int w = 2, int h = 0)
-        : x(x), y(y), width(w), height(h) {}
+  CaretInfo(int x = 0, int y = 0, int w = 2, int h = 0)
+      : x(x), y(y), width(w), height(h) {}
 };
-
 
 enum class PanelDockPosition
 {
@@ -259,7 +259,7 @@ struct BottomPanelState
   int width;
   bool resizing;
   bool dragging;
-  int dragOffsetX; 
+  int dragOffsetX;
   int dragOffsetY;
   PanelDockPosition dockPosition;
   int floatingX;
@@ -287,6 +287,47 @@ struct BottomPanelState
       PlatformFree(searchPattern, StrLen(searchPattern) + 1);
   }
 };
+
+struct SelectionState {
+    bool active;
+    bool dragging;
+    long long startByte;
+    long long endByte;
+    
+    SelectionState() : active(false), dragging(false), startByte(-1), endByte(-1) {}
+    
+    void getRange(long long &min, long long &max) const {
+        if (startByte <= endByte) {
+            min = startByte;
+            max = endByte;
+        } else {
+            min = endByte;
+            max = startByte;
+        }
+    }
+    
+    bool isSelected(long long bytePos) const {
+        if (!active) return false;
+        long long min, max;
+        getRange(min, max);
+        return bytePos >= min && bytePos <= max;
+    }
+    
+    long long getLength() const {
+        if (!active) return 0;
+        long long min, max;
+        getRange(min, max);
+        return max - min + 1;
+    }
+    
+    void clear() {
+        active = false;
+        dragging = false;
+        startByte = -1;
+        endByte = -1;
+    }
+};
+
 
 Rect GetLeftPanelBounds(const LeftPanelState &state, int windowWidth, int windowHeight, int menuBarHeight);
 Rect GetBottomPanelBounds(const BottomPanelState &state, int windowWidth, int windowHeight,
@@ -372,6 +413,31 @@ struct WidgetState
   WidgetState(const Rect &r, bool h, bool p, bool e) : rect(r), hovered(h), pressed(p), enabled(e) {}
 };
 
+struct ScrollbarState
+{
+  float position;
+  float thumbSize;
+  bool hovered;
+  bool thumbHovered;
+  int dragOffsetY;
+  bool pressed;
+  bool visible;
+  float animationProgress;
+  int trackX, trackY;
+  int trackWidth, trackHeight;
+  int thumbX, thumbY;
+  int thumbWidth, thumbHeight;
+
+  ScrollbarState()
+      : position(0.0f), thumbSize(0.3f), hovered(false),
+        thumbHovered(false), dragOffsetY(0), pressed(false), visible(true),
+        animationProgress(0.0f), trackX(0), trackY(0),
+        trackWidth(0), trackHeight(0), thumbX(0), thumbY(0),
+        thumbWidth(0), thumbHeight(0)
+  {
+  }
+};
+
 #ifdef _WIN32
 typedef HDC NativeDrawContext;
 #elif __APPLE__
@@ -385,13 +451,14 @@ typedef HWND NativeWindow;
 #elif __APPLE__
 typedef void *NativeWindow;
 #else
-typedef void* NativeWindow;
+typedef Window NativeWindow;
 #endif
-
 
 class RenderManager
 {
 public:
+  int getHexAreaX() const { return _hexAreaX; }
+  int getHexAreaY() const { return _hexAreaY; }
   RenderManager();
   ~RenderManager();
 
@@ -418,17 +485,59 @@ public:
   void UpdateCaret();
   void DrawCaret();
   long long ScreenToByteIndex(int mouseX, int mouseY);
- bool IsPointInHexArea(int mouseX, int mouseY, int leftPanelWidth, 
-                         int menuBarHeight, int windowWidth, int windowHeight);
+  bool IsPointInHexArea(int mouseX, int mouseY, int leftPanelWidth,
+                        int menuBarHeight, int windowWidth, int windowHeight);
 
-CaretInfo GetCaretPosition();
+  void drawModernScrollbar(
+      const ScrollbarState &state,
+      const Theme &theme,
+      bool vertical = true);
 
-void UpdateHexMetrics(int leftPanelWidth, int menuBarHeight);
+  void updateScrollbarMetrics(
+      ScrollbarState &state,
+      int x, int y, int width, int height,
+      float contentSize, float viewportSize,
+      bool vertical = true);
 
-int GetHexAreaX() const { return _hexAreaX; }
-int GetHexAreaY() const { return _hexAreaY; }
-int GetCharWidth() const { return _charWidth; }
-int GetCharHeight() const { return _charHeight; }
+  bool isPointInScrollbarThumb(
+      int mouseX, int mouseY,
+      const ScrollbarState &state);
+
+  bool isPointInScrollbarTrack(
+      int mouseX, int mouseY,
+      const ScrollbarState &state);
+
+  float getScrollbarPositionFromMouse(
+      int mouseY,
+      const ScrollbarState &state,
+      bool vertical = true);
+
+  void drawByteStatsContent(
+      int contentX, int &contentY, int panelWidth,
+      const Theme &theme);
+
+  void drawBookmarksContent(
+      int contentX, int &contentY, int panelWidth,
+      const Theme &theme);
+
+  void drawDataInspectorContent(
+      int contentX, int &contentY, int panelWidth,
+      const DataInspectorValues &vals,
+      const Theme &theme);
+
+  void drawFileInfoContent(
+      int contentX, int &contentY, int panelWidth,
+      const FileInfoValues &info,
+      const Theme &theme);
+
+  CaretInfo GetCaretPosition();
+
+  void UpdateHexMetrics(int leftPanelWidth, int menuBarHeight);
+
+  int GetHexAreaX() const { return _hexAreaX; }
+  int GetHexAreaY() const { return _hexAreaY; }
+  int GetCharWidth() const { return _charWidth; }
+  int GetCharHeight() const { return _charHeight; }
   NativeDrawContext getDrawContext() const
   {
 #ifdef _WIN32
@@ -482,8 +591,6 @@ int GetCharHeight() const { return _charHeight; }
   void drawX11Pixmap(Pixmap pixmap, int width, int height, int x, int y);
 #endif
 
-
-
   void drawDropdown(
       const WidgetState &state,
       const Theme &theme,
@@ -510,7 +617,8 @@ int GetCharHeight() const { return _charHeight; }
       long long cursorBytePos,
       int cursorNibblePos,
       long long totalBytes,
-      int leftPanelWidth);
+      int leftPanelWidth,
+      int effectiveWindowHeight = 0);
 
   Theme getCurrentTheme() const { return currentTheme; }
 

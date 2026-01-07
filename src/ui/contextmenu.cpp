@@ -606,12 +606,7 @@ static void GoToOffsetCallback(int offset)
     int targetRow = offset / bytesPerLine;
     g_ScrollY = Clamp(targetRow - 5, 0, maxScrolls);
 
-#ifdef _WIN32
-    extern void UpdateScrollbar(int, int);
-    RECT rc;
-    GetClientRect(g_Hwnd, &rc);
-    UpdateScrollbar(rc.right - rc.left, rc.bottom - rc.top);
-#endif
+
     InvalidateWindow();
   }
 }
@@ -823,7 +818,7 @@ void AppContextMenu::executeAction(int actionId)
         });
 #else
     SearchDialogs::ShowGoToDialog(
-        (NativeWindow)(uintptr_t)g_window,
+        (void*)g_window,
         g_Options.darkMode,
         [](int offset)
         {

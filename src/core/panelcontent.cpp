@@ -11,6 +11,8 @@ extern BottomPanelState g_BottomPanel;
 extern ChecksumResults g_Checksums;
 const int PANEL_TITLE_HEIGHT = 28;
 extern HexData g_HexData;
+BookmarksState g_Bookmarks = {{}, -1};
+ByteStatistics g_ByteStats = {{0}, 0, 0, 0, 0, 0, 0.0, false};
 
 extern long long cursorBytePos;
 extern int cursorNibblePos;
@@ -224,6 +226,120 @@ static int ParseHexPattern(const char* text, uint8_t* out, int maxOut)
     return count;
 }
 
+void Bookmarks_Add(long long byteOffset, const char* name, Color color) {
+    if (Bookmarks_FindAtOffset(byteOffset) >= 0) {
+        return;
+    }
+    
+    Bookmark bm;
+    bm.byteOffset = byteOffset;
+    StrCopy(bm.name, name);
+    bm.color = color;
+    bm.description[0] = '\0';
+    
+    g_Bookmarks.bookmarks.push_back(bm);
+    InvalidateWindow();
+}
+
+void Bookmarks_Remove(int index) {
+    if (index >= 0 && index < (int)g_Bookmarks.bookmarks.size()) {
+        g_Bookmarks.bookmarks.remove(index);
+        
+        if (g_Bookmarks.selectedIndex == index) {
+            g_Bookmarks.selectedIndex = -1;
+        } else if (g_Bookmarks.selectedIndex > index) {
+            g_Bookmarks.selectedIndex--;
+        }
+        InvalidateWindow();
+    }
+}
+
+void Bookmarks_JumpTo(int index) {
+    if (index >= 0 && index < (int)g_Bookmarks.bookmarks.size()) {
+        cursorBytePos = g_Bookmarks.bookmarks[index].byteOffset;
+        cursorNibblePos = 0;
+        g_Bookmarks.selectedIndex = index;
+        
+        long long line = cursorBytePos / 16;
+        if (line < g_ScrollY || line >= g_ScrollY + g_LinesPerPage) {
+            g_ScrollY = (int)line;
+            
+#ifdef _WIN32
+            extern HWND g_Hwnd;
+            SetScrollPos(g_Hwnd, SB_VERT, g_ScrollY, TRUE);
+#endif
+        }
+        
+        InvalidateWindow();
+    }
+}
+
+void Bookmarks_Clear() {
+    g_Bookmarks.bookmarks.clear();
+    g_Bookmarks.selectedIndex = -1;
+    InvalidateWindow();
+}
+
+int Bookmarks_FindAtOffset(long long byteOffset) {
+    for (int i = 0; i < (int)g_Bookmarks.bookmarks.size(); i++) {
+        if (g_Bookmarks.bookmarks[i].byteOffset == byteOffset) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+void ByteStats_Compute(HexData& hexData) {
+    MemSet(&g_ByteStats, 0, sizeof(ByteStatistics));
+
+    uint64_t fileSize = (uint64_t)hexData.getFileSize();
+    if (fileSize == 0) {
+        g_ByteStats.computed = false;
+        return;
+    }
+
+    for (uint64_t i = 0; i < fileSize; i++) {
+        uint8_t b = hexData.getByte((size_t)i);
+        g_ByteStats.histogram[b]++;
+    }
+
+    g_ByteStats.mostCommonCount = 0;
+    g_ByteStats.leastCommonCount = (int)fileSize + 1;
+
+    for (int i = 0; i < 256; i++) {
+        int count = g_ByteStats.histogram[i];
+
+        if (count > g_ByteStats.mostCommonCount) {
+            g_ByteStats.mostCommonCount = count;
+            g_ByteStats.mostCommonByte = i;
+        }
+
+        if (count > 0 && count < g_ByteStats.leastCommonCount) {
+            g_ByteStats.leastCommonCount = count;
+            g_ByteStats.leastCommonByte = i;
+        }
+    }
+
+    g_ByteStats.nullByteCount = g_ByteStats.histogram[0];
+
+    int distinct = 0;
+    for (int i = 0; i < 256; i++) {
+        if (g_ByteStats.histogram[i] > 0)
+            distinct++;
+    }
+
+    double entropy = (double)distinct * (8.0 / 256.0);
+
+    g_ByteStats.entropy = entropy;
+
+    g_ByteStats.computed = true;
+    InvalidateWindow();
+}
+
+void ByteStats_Clear() {
+    MemSet(&g_ByteStats, 0, sizeof(ByteStatistics));
+    g_ByteStats.computed = false;
+}
 
 bool HandleBottomPanelContentClick(int x, int y, int windowWidth, int windowHeight)
 {
@@ -401,6 +517,86 @@ bool HandleBottomPanelContentClick(int x, int y, int windowWidth, int windowHeig
 
         return false;
     }
+    }
+
+    return false;
+}
+
+bool HandleLeftPanelContentClick(int x, int y, int windowWidth, int windowHeight)
+{
+    if (!g_LeftPanel.visible)
+        return false;
+
+    Rect leftBounds = GetLeftPanelBounds(
+        g_LeftPanel, windowWidth, windowHeight, g_MenuBar.getHeight());
+
+    int contentX = leftBounds.x + 15;
+    int contentY = leftBounds.y + PANEL_TITLE_HEIGHT + 10;
+
+    contentY += 25;
+    contentY += 20;
+    contentY += 20;
+    contentY += 30;
+
+    contentY += 25;
+    
+    extern long long cursorBytePos;
+    extern HexData g_HexData;
+    long long fileSize = (long long)g_HexData.getFileSize();
+    
+    if (cursorBytePos >= 0 && cursorBytePos < fileSize) {
+        contentY += 20;
+        contentY += 18;
+        contentY += 18;
+        contentY += 18;
+        contentY += 18;
+        contentY += 25;
+    } else {
+        contentY += 40;
+    }
+
+    int bookmarksHeaderY = contentY;
+    contentY += 25;
+
+    extern BookmarksState g_Bookmarks;
+    if (!g_Bookmarks.bookmarks.empty()) {
+        for (size_t i = 0; i < g_Bookmarks.bookmarks.size() && i < 5; i++) {
+            Rect bookmarkRect(contentX, contentY, leftBounds.width - 30, 18);
+            
+            if (IsPointInRect(x, y, bookmarkRect)) {
+                Bookmarks_JumpTo((int)i);
+                InvalidateWindow();
+                return true;
+            }
+            
+            contentY += 18;
+        }
+        contentY += 10;
+    } else {
+        contentY += 18;
+        contentY += 18;
+        contentY += 25;
+    }
+
+    int statsHeaderY = contentY;
+    contentY += 25;
+    
+    if (!g_ByteStats.computed) {
+        Rect computeRect(contentX, contentY, leftBounds.width - 30, 20);
+        
+        if (IsPointInRect(x, y, computeRect)) {
+            ByteStats_Compute(g_HexData);
+            InvalidateWindow();
+            return true;
+        }
+        
+        contentY += 20;
+    } else {
+        contentY += 18;
+    }
+
+    if (IsPointInRect(x, y, leftBounds)) {
+        return true;
     }
 
     return false;

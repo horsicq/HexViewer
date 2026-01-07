@@ -923,8 +923,8 @@ namespace MenuHelper
     return menu;
   }
 
-  Menu createToolsMenu(MenuCallback onOptions)
-  {
+ Menu createToolsMenu(MenuCallback onOptions, MenuCallback onPlugins)
+{
     Menu toolsMenu;
     toolsMenu.title = StrDup("Tools");
 
@@ -932,10 +932,17 @@ namespace MenuHelper
     optionsItem.label = StrDup("Options");
     optionsItem.type = MenuItemType::Normal;
     optionsItem.callback = onOptions;
-
     toolsMenu.addItem(optionsItem);
+
+    MenuItem pluginsItem;
+    pluginsItem.label = StrDup("Plugins...");
+    pluginsItem.type = MenuItemType::Normal;
+    pluginsItem.callback = onPlugins;
+    toolsMenu.addItem(pluginsItem);
+
     return toolsMenu;
-  }
+}
+
 
   Menu createHelpMenu(MenuCallback onAbout, MenuCallback onDocumentation)
   {

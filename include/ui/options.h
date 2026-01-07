@@ -78,6 +78,14 @@ inline bool& GetIsMsixFlag() {
   return g_isMsix;
 }
 
+inline bool IsMsixPackage() {
+#ifdef _WIN32
+  return GetIsMsixFlag();
+#else
+  return false;
+#endif
+}
+
 void DetectNative();
 void LoadOptionsFromFile(AppOptions& options);
 void SaveOptionsToFile(const AppOptions& options);

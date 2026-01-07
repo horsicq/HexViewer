@@ -1,6 +1,6 @@
 @echo off
 setlocal enabledelayedexpansion
-
+cls
 set "VSVARS_PATH="
 
 for /f "tokens=*" %%a in ('
