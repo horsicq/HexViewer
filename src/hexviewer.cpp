@@ -2294,7 +2294,7 @@ int main(int argc, char **argv)
         CWBackPixel | CWEventMask,
         &attrs);
 
-    XStoreName(g_display, g_window, "NO-CRT Hex Viewer");
+    XStoreName(g_display, g_window, "Hex Viewer");
 
     g_WmDeleteWindow = XInternAtom(g_display, "WM_DELETE_WINDOW", False);
     XSetWMProtocols(g_display, g_window, &g_WmDeleteWindow, 1);
