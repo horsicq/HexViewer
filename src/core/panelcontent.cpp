@@ -310,7 +310,7 @@ int Bookmarks_FindAtOffset(long long byteOffset)
 
 void ByteStats_Compute(HexData &hexData)
 {
-    MemSet(&g_ByteStats, 0, sizeof(ByteStatistics));
+    memSet(&g_ByteStats, 0, sizeof(ByteStatistics));
 
     uint64_t fileSize = (uint64_t)hexData.getFileSize();
     if (fileSize == 0)
@@ -364,7 +364,7 @@ void ByteStats_Compute(HexData &hexData)
 
 void ByteStats_Clear()
 {
-    MemSet(&g_ByteStats, 0, sizeof(ByteStatistics));
+    memSet(&g_ByteStats, 0, sizeof(ByteStatistics));
     g_ByteStats.computed = false;
 }
 

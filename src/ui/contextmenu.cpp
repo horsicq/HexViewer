@@ -301,7 +301,7 @@ void InvalidateWindow()
   {
     XClearWindow(g_display, g_window);
     XEvent exposeEvent;
-    MemSet(&exposeEvent, 0, sizeof(exposeEvent));
+    memSet(&exposeEvent, 0, sizeof(exposeEvent));
     exposeEvent.type = Expose;
     exposeEvent.xexpose.window = g_window;
     XSendEvent(g_display, g_window, False, ExposureMask, &exposeEvent);

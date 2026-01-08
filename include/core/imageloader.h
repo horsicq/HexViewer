@@ -115,7 +115,7 @@ public:
         }
     }
 
-    static void MemSet(void *dst, unsigned char val, unsigned int size)
+    static void memSet(void *dst, unsigned char val, unsigned int size)
     {
         unsigned char *d = (unsigned char *)dst;
         for (unsigned int i = 0; i < size; i++)

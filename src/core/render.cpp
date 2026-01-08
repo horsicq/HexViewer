@@ -172,7 +172,7 @@ void RenderManager::resize(int width, int height)
     DeleteObject(memBitmap);
   }
 
-  MemSet(&bitmapInfo, 0, sizeof(BITMAPINFO));
+  memSet(&bitmapInfo, 0, sizeof(BITMAPINFO));
   bitmapInfo.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
   bitmapInfo.bmiHeader.biWidth = width;
   bitmapInfo.bmiHeader.biHeight = -height;
