@@ -314,7 +314,7 @@ static DWORD WINAPI UpdateCheckThread(LPVOID lpParam)
       }
 
       info->updateAvailable =
-          !StrEquals(info->latestVersion, info->currentVersion) &&
+          !strEquals(info->latestVersion, info->currentVersion) &&
           !StringIsEmpty(info->latestVersion);
     }
     else

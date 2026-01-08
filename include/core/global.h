@@ -288,7 +288,7 @@ inline double Floor(double x)
     return (double)(i - (x < i));
 }
 
-inline bool StrEquals(const char* a, const char* b)
+inline bool strEquals(const char* a, const char* b)
 {
     if (a == b) return true;
     if (!a || !b) return false;
