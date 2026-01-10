@@ -265,7 +265,7 @@ void PluginManager::ScanDirectory(const char *path, PluginManagerData *data)
             continue;
 
         PluginInfo *info = (PluginInfo *)PlatformAlloc(sizeof(PluginInfo));
-        MemSet(info, 0, sizeof(PluginInfo));
+        memSet(info, 0, sizeof(PluginInfo));
 
         WideCharToMultiByte(CP_UTF8, 0, findData.cFileName, -1, info->name, 128, nullptr, nullptr);
 

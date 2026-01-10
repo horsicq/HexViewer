@@ -93,7 +93,7 @@ extern int g_SearchCaretX;
 extern int g_SearchCaretY;
 extern bool caretVisible;
 
-inline void* MemSet(void* dest, int val, size_t count)
+inline void* memSet(void* dest, int val, size_t count)
 {
     unsigned char* p = (unsigned char*)dest;
     while (count--) {
