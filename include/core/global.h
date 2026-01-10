@@ -110,7 +110,7 @@ inline char* StrCopy(char* dest, const char* src)
     return original;
 }
 
-inline int StringLength(const char *str)
+inline int stringLength(const char *str)
 {
     int len = 0;
     while (str[len])
@@ -129,7 +129,7 @@ inline void StringCopy(char *dest, const char *src, int maxLen)
     dest[i] = 0;
 }
 
-inline int StrHexToInt(const char* hex)
+inline int strHexToInt(const char* hex)
 {
     int value = 0;
     for (int i = 0; i < 4; i++)
@@ -154,7 +154,7 @@ inline int StrHexToInt(const char* hex)
 
 inline void StringAppend(char *dest, char ch, int maxLen)
 {
-    int len = StringLength(dest);
+    int len = stringLength(dest);
     if (len < maxLen - 1)
     {
         dest[len] = ch;
@@ -164,7 +164,7 @@ inline void StringAppend(char *dest, char ch, int maxLen)
 
 inline void StringRemoveLast(char *str)
 {
-    int len = StringLength(str);
+    int len = stringLength(str);
     if (len > 0)
     {
         str[len - 1] = 0;
