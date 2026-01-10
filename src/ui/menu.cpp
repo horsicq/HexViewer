@@ -32,31 +32,31 @@ MenuItem::MenuItem(const char *lbl, MenuItemType t)
 MenuItem::~MenuItem()
 {
   if (label)
-    memFree(label, StrLen(label) + 1);
+    MemFree(label, StrLen(label) + 1);
   if (shortcut)
-    memFree(shortcut, StrLen(shortcut) + 1);
+    MemFree(shortcut, StrLen(shortcut) + 1);
 
   if (submenu)
   {
     for (int i = 0; i < submenuCount; i++)
     {
       if (submenu[i].label)
-        memFree(submenu[i].label, StrLen(submenu[i].label) + 1);
+        MemFree(submenu[i].label, StrLen(submenu[i].label) + 1);
       if (submenu[i].shortcut)
-        memFree(submenu[i].shortcut, StrLen(submenu[i].shortcut) + 1);
+        MemFree(submenu[i].shortcut, StrLen(submenu[i].shortcut) + 1);
       if (submenu[i].submenu)
       {
         for (int j = 0; j < submenu[i].submenuCount; j++)
         {
           if (submenu[i].submenu[j].label)
-            memFree(submenu[i].submenu[j].label, StrLen(submenu[i].submenu[j].label) + 1);
+            MemFree(submenu[i].submenu[j].label, StrLen(submenu[i].submenu[j].label) + 1);
           if (submenu[i].submenu[j].shortcut)
-            memFree(submenu[i].submenu[j].shortcut, StrLen(submenu[i].submenu[j].shortcut) + 1);
+            MemFree(submenu[i].submenu[j].shortcut, StrLen(submenu[i].submenu[j].shortcut) + 1);
         }
-        memFree(submenu[i].submenu, submenu[i].submenuCount * sizeof(MenuItem));
+        MemFree(submenu[i].submenu, submenu[i].submenuCount * sizeof(MenuItem));
       }
     }
-    memFree(submenu, submenuCount * sizeof(MenuItem));
+    MemFree(submenu, submenuCount * sizeof(MenuItem));
   }
 }
 
