@@ -339,7 +339,7 @@ inline void* MemAlloc(size_t size) {
     return PlatformAlloc(size);
 }
 
-inline void MemFree(void* ptr, size_t size = 0) {
+inline void memFree(void* ptr, size_t size = 0) {
     PlatformFree(ptr, size);
 }
 
