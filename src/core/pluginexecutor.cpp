@@ -475,18 +475,33 @@ bool ExecutePythonDisassembly(
             return false;
     }
 
+    static void *cachedModule = nullptr;
+    static void *cachedFunc = nullptr;
+    static char cachedModuleName[256] = {0};
+
     char moduleName[256];
     ExtractModuleName(pluginPath, moduleName, 256);
 
-    void *pModule = PyImport_ImportModule(moduleName);
-    if (!pModule)
-        return false;
-
-    void *pFunc = PyObject_GetAttrString(pModule, "disassemble");
-    if (!pFunc)
+    if (!cachedModule || !strEquals(cachedModuleName, moduleName))
     {
-        Py_DecRef(pModule);
-        return false;
+        if (cachedFunc)
+            Py_DecRef(cachedFunc);
+        if (cachedModule)
+            Py_DecRef(cachedModule);
+
+        cachedModule = PyImport_ImportModule(moduleName);
+        if (!cachedModule)
+            return false;
+
+        cachedFunc = PyObject_GetAttrString(cachedModule, "disassemble");
+        if (!cachedFunc)
+        {
+            Py_DecRef(cachedModule);
+            cachedModule = nullptr;
+            return false;
+        }
+
+        StrCopy(cachedModuleName, moduleName);
     }
 
     void *pArgs = PyTuple_New(4);
@@ -500,14 +515,15 @@ bool ExecutePythonDisassembly(
     void *pArch = PyUnicode_FromString("x64");
     PyTuple_SetItem(pArgs, 2, pArch);
 
-    void *pMaxInst = PyLong_FromLongLong(1);
+    void *pMaxInst = PyLong_FromLongLong((long long)dataSize);
     PyTuple_SetItem(pArgs, 3, pMaxInst);
 
-    void *pResult = PyObject_CallObject(pFunc, pArgs);
+    void *pResult = PyObject_CallObject(cachedFunc, pArgs);
 
     if (pResult && PyList_Size)
     {
         long long listSize = PyList_Size(pResult);
+
 
         for (long long j = 0; j < listSize; j++)
         {
@@ -522,12 +538,6 @@ bool ExecutePythonDisassembly(
                 char *ops = pOps ? PyUnicode_AsUTF8(pOps) : nullptr;
 
                 SimpleString line;
-                extern void ss_init(SimpleString *);
-                extern bool ss_append_cstr(SimpleString *, const char *);
-                extern bool ss_append_char(SimpleString *, char);
-                extern void ss_free(SimpleString *);
-                extern bool la_push_back(LineArray *, const SimpleString *);
-
                 ss_init(&line);
                 ss_append_cstr(&line, mnem);
                 if (ops && ops[0])
@@ -545,8 +555,7 @@ bool ExecutePythonDisassembly(
     }
 
     Py_DecRef(pArgs);
-    Py_DecRef(pFunc);
-    Py_DecRef(pModule);
+
 
     return outLines->count > 0;
 }

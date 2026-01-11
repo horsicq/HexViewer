@@ -536,10 +536,11 @@ void MenuBar::render(RenderManager *renderer, int windowWidth)
     renderer->drawRect(shadowRect, Color(0, 0, 0, 80), true);
 
     Rect dropdownRect(dropdownX, dropdownY, maxWidth, dropdownHeight);
-    renderer->drawRect(dropdownRect, theme.menuBackground, true);
-    renderer->drawRect(dropdownRect, theme.menuBorder, false);
+    renderer->drawRoundedRect(dropdownRect, 4.0f, theme.menuBackground, true);
+    renderer->drawRoundedRect(dropdownRect, 4.0f, theme.menuBorder, false);
 
     int itemY = dropdownY + 8;
+
     for (int i = 0; i < menu.itemCount; i++)
     {
       const MenuItem &item = menu.items[i];
@@ -593,109 +594,103 @@ void MenuBar::render(RenderManager *renderer, int windowWidth)
       }
     }
 
-if (openSubmenuIndex >= 0 && openSubmenuIndex < menu.itemCount)
-{
-  const MenuItem &parentItem = menu.items[openSubmenuIndex];
-  
-  if (parentItem.type == MenuItemType::Submenu && parentItem.submenuCount > 0)
-  {
-    int submenuX = dropdownX + maxWidth - 2;
-    int submenuY = dropdownY + 8;
-    
-    for (int i = 0; i < openSubmenuIndex; i++)
+    if (openSubmenuIndex >= 0 && openSubmenuIndex < menu.itemCount)
     {
-      submenuY += (menu.items[i].type == MenuItemType::Separator) ? 8 : 32;
-    }
-    
-    int submenuWidth = 250;
-    for (int i = 0; i < parentItem.submenuCount; i++)
-    {
-      if (parentItem.submenu[i].label)
+      const MenuItem &parentItem = menu.items[openSubmenuIndex];
+
+      if (parentItem.type == MenuItemType::Submenu && parentItem.submenuCount > 0)
       {
-        int labelLen = StrLen(parentItem.submenu[i].label);
-        int itemWidth = labelLen * charWidth + 50;
-        if (itemWidth > submenuWidth)
+        int submenuX = dropdownX + maxWidth - 2;
+        int submenuY = dropdownY + 8;
+
+        for (int i = 0; i < openSubmenuIndex; i++)
         {
-          submenuWidth = itemWidth;
+          submenuY += (menu.items[i].type == MenuItemType::Separator) ? 8 : 32;
+        }
+
+        int submenuWidth = 250;
+        for (int i = 0; i < parentItem.submenuCount; i++)
+        {
+          if (parentItem.submenu[i].label)
+          {
+            int labelLen = StrLen(parentItem.submenu[i].label);
+            int itemWidth = labelLen * charWidth + 50;
+            if (itemWidth > submenuWidth)
+            {
+              submenuWidth = itemWidth;
+            }
+          }
+        }
+
+        int maxAllowedWidth = windowWidth - submenuX - 20;
+        if (submenuWidth > maxAllowedWidth && maxAllowedWidth > 250)
+        {
+          submenuWidth = maxAllowedWidth;
+        }
+
+        int submenuHeight = 16;
+        for (int i = 0; i < parentItem.submenuCount; i++)
+        {
+          submenuHeight += (parentItem.submenu[i].type == MenuItemType::Separator) ? 8 : 32;
+        }
+
+        submenuBounds = Rect(submenuX, submenuY, submenuWidth, submenuHeight);
+
+        Rect subShadow(submenuX + 3, submenuY + 3, submenuWidth, submenuHeight);
+        renderer->drawRect(subShadow, Color(0, 0, 0, 80), true);
+
+        Rect submenuRect(submenuX, submenuY, submenuWidth, submenuHeight);
+        renderer->drawRoundedRect(submenuRect, 4.0f, theme.menuBackground, true);
+        renderer->drawRoundedRect(submenuRect, 4.0f, theme.menuBorder, false);
+
+        int subItemY = submenuY + 8;
+
+        for (int i = 0; i < parentItem.submenuCount; i++)
+        {
+          const MenuItem &subItem = parentItem.submenu[i];
+
+          if (subItem.type == MenuItemType::Separator)
+          {
+            int sepY = subItemY + 4;
+            renderer->drawLine(submenuX + 10, sepY, submenuX + submenuWidth - 10, sepY, theme.separator);
+            subItemY += 8;
+          }
+          else
+          {
+            Rect subItemRect(submenuX, subItemY, submenuWidth, 32);
+
+            if (i == hoveredSubmenuIndex && subItem.enabled)
+            {
+              renderer->drawRoundedRect(subItemRect, 3.0f, theme.menuHover, true);
+            }
+
+            if (subItem.checked)
+            {
+              renderer->drawText("✓", submenuX + 10, subItemY + (32 - charHeight) / 2,
+                                 subItem.enabled ? theme.textColor : theme.disabledText);
+            }
+
+            Color subTextColor = subItem.enabled ? theme.textColor : theme.disabledText;
+            if (subItem.label)
+            {
+              int labelX = submenuX + (subItem.checked ? 35 : 15);
+              int labelY = subItemY + (32 - charHeight) / 2;
+              renderer->drawText(subItem.label, labelX, labelY, subTextColor);
+            }
+
+            if (subItem.shortcut)
+            {
+              int shortcutLen = StrLen(subItem.shortcut);
+              int shortcutX = submenuX + submenuWidth - (shortcutLen * charWidth) - 15;
+              int shortcutY = subItemY + (32 - charHeight) / 2;
+              renderer->drawText(subItem.shortcut, shortcutX, shortcutY, theme.disabledText);
+            }
+
+            subItemY += 32;
+          }
         }
       }
     }
-    int maxAllowedWidth = windowWidth - submenuX - 20;
-    if (submenuWidth > maxAllowedWidth && maxAllowedWidth > 250)
-    {
-      submenuWidth = maxAllowedWidth;
-    }
-    
-    int submenuHeight = 16;
-    for (int i = 0; i < parentItem.submenuCount; i++)
-    {
-      if (parentItem.submenu[i].type == MenuItemType::Separator)
-      {
-        submenuHeight += 8;
-      }
-      else
-      {
-        submenuHeight += 32;
-      }
-    }
-
-    submenuBounds = Rect(submenuX, submenuY, submenuWidth, submenuHeight);
-
-    Rect subShadow(submenuX + 3, submenuY + 3, submenuWidth, submenuHeight);
-    renderer->drawRect(subShadow, Color(0, 0, 0, 80), true);
-
-    Rect submenuRect(submenuX, submenuY, submenuWidth, submenuHeight);
-    renderer->drawRect(submenuRect, theme.menuBackground, true);
-    renderer->drawRect(submenuRect, theme.menuBorder, false);
-
-    int subItemY = submenuY + 8;
-    for (int i = 0; i < parentItem.submenuCount; i++)
-    {
-      const MenuItem &subItem = parentItem.submenu[i];
-
-      if (subItem.type == MenuItemType::Separator)
-      {
-        int sepY = subItemY + 4;
-        renderer->drawLine(submenuX + 10, sepY, submenuX + submenuWidth - 10, sepY, theme.separator);
-        subItemY += 8;
-      }
-      else
-      {
-        Rect subItemRect(submenuX, subItemY, submenuWidth, 32);
-        
-        if (i == hoveredSubmenuIndex && subItem.enabled)
-        {
-          renderer->drawRoundedRect(subItemRect, 3.0f, theme.menuHover, true);
-        }
-
-        if (subItem.checked)
-        {
-          renderer->drawText("✓", submenuX + 10, subItemY + (32 - charHeight) / 2,
-                             subItem.enabled ? theme.textColor : theme.disabledText);
-        }
-
-        Color subTextColor = subItem.enabled ? theme.textColor : theme.disabledText;
-        if (subItem.label)
-        {
-          int labelX = submenuX + (subItem.checked ? 35 : 15);
-          int labelY = subItemY + (32 - charHeight) / 2;
-          
-          renderer->drawText(subItem.label, labelX, labelY, subTextColor);
-        }
-
-        if (subItem.shortcut)
-        {
-          int shortcutLen = StrLen(subItem.shortcut);
-          int shortcutX = submenuX + submenuWidth - (shortcutLen * charWidth) - 15;
-          int shortcutY = subItemY + (32 - charHeight) / 2;
-          renderer->drawText(subItem.shortcut, shortcutX, shortcutY, theme.disabledText);
-        }
-
-        subItemY += 32;
-      }
-    }
-  }
-}
   }
 }
 

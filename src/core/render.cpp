@@ -1,10 +1,15 @@
 #include "render.h"
 #include "panelcontent.h"
 #include "hexdata.h"
-#include "platfrom_die.h"
+#include "platform_die.h"
 
-extern HexData g_HexData;
+char buf[256];
 char g_DIEExecutablePath[260];
+extern long long cursorBytePos;
+extern HexData g_HexData;
+extern BookmarksState g_Bookmarks;
+extern ByteStatistics g_ByteStats;
+extern DetectItEasyState g_DIEState;
 
 #ifdef _WIN32
 #include <windows.h>
@@ -1180,19 +1185,49 @@ void RenderManager::drawLeftPanel(
   if (!state.visible)
     return;
 
-  Color panelBg(
-      theme.windowBackground.r - 10,
-      theme.windowBackground.g - 10,
-      theme.windowBackground.b - 10);
+  bool isDarkTheme = (theme.windowBackground.r < 128);
 
-  if (theme.windowBackground.r < 50)
-    panelBg = Color(35, 35, 40);
+  Color panelBg;
+  if (isDarkTheme)
+  {
+    panelBg = Color(
+        min(255, theme.windowBackground.r + 10),
+        min(255, theme.windowBackground.g + 10),
+        min(255, theme.windowBackground.b + 10));
+  }
+  else
+  {
+    panelBg = Color(
+        max(0, theme.windowBackground.r - 20),
+        max(0, theme.windowBackground.g - 20),
+        max(0, theme.windowBackground.b - 20));
+  }
 
   drawRect(panelBounds, panelBg, true);
 
   Rect titleBar(panelBounds.x, panelBounds.y, panelBounds.width, PANEL_TITLE_HEIGHT);
-  Color titleBg = state.dragging ? theme.controlCheck
-                                 : Color(panelBg.r + 15, panelBg.g + 15, panelBg.b + 15);
+  Color titleBg;
+  if (state.dragging)
+  {
+    titleBg = theme.controlCheck;
+  }
+  else
+  {
+    if (isDarkTheme)
+    {
+      titleBg = Color(
+          min(255, panelBg.r + 15),
+          min(255, panelBg.g + 15),
+          min(255, panelBg.b + 15));
+    }
+    else
+    {
+      titleBg = Color(
+          max(0, panelBg.r - 15),
+          max(0, panelBg.g - 15),
+          max(0, panelBg.b - 15));
+    }
+  }
   drawRect(titleBar, titleBg, true);
 
   const char *dockText = "";
@@ -1231,29 +1266,46 @@ void RenderManager::drawLeftPanel(
   int itemSpacing = 4;
   int sectionSpacing = 10;
 
-  char buf[256];
-  extern HexData g_HexData;
-  extern long long cursorBytePos;
-  extern BookmarksState g_Bookmarks;
-  extern ByteStatistics g_ByteStats;
-  extern DetectItEasyState g_DIEState;
-
   long long fileSize = (long long)g_HexData.getFileSize();
 
-  Color faded(
-      theme.textColor.r - 40,
-      theme.textColor.g - 40,
-      theme.textColor.b - 40);
+  Color faded;
+  Color halfText;
+  Color thirdText;
 
-  Color halfText(
-      theme.textColor.r / 2,
-      theme.textColor.g / 2,
-      theme.textColor.b / 2);
+  if (isDarkTheme)
+  {
+    faded = Color(
+        max(0, theme.textColor.r - 40),
+        max(0, theme.textColor.g - 40),
+        max(0, theme.textColor.b - 40));
 
-  Color thirdText(
-      theme.textColor.r / 3,
-      theme.textColor.g / 3,
-      theme.textColor.b / 3);
+    halfText = Color(
+        theme.textColor.r / 2,
+        theme.textColor.g / 2,
+        theme.textColor.b / 2);
+
+    thirdText = Color(
+        theme.textColor.r / 3,
+        theme.textColor.g / 3,
+        theme.textColor.b / 3);
+  }
+  else
+  {
+    faded = Color(
+        max(0, theme.textColor.r + 60),
+        max(0, theme.textColor.g + 60),
+        max(0, theme.textColor.b + 60));
+
+    halfText = Color(
+        min(255, theme.textColor.r + 80),
+        min(255, theme.textColor.g + 80),
+        min(255, theme.textColor.b + 80));
+
+    thirdText = Color(
+        min(255, theme.textColor.r + 120),
+        min(255, theme.textColor.g + 120),
+        min(255, theme.textColor.b + 120));
+  }
 
   drawText("File Information", contentX, currentY, theme.headerColor);
   currentY += headerHeight + sectionSpacing;
@@ -1295,8 +1347,11 @@ void RenderManager::drawLeftPanel(
     else if (b0 == 0xFF && b1 == 0xD8 && b2 == 0xFF)
       typeStr = "JPEG Image";
   }
+
+  Color accentColor = isDarkTheme ? Color(100, 200, 150) : Color(50, 150, 100);
+
   drawText("Type:", contentX, currentY, faded);
-  drawText(typeStr, contentX + 85, currentY, Color(100, 200, 150));
+  drawText(typeStr, contentX + 85, currentY, accentColor);
   currentY += rowHeight + itemSpacing;
 
   currentY += 8;
@@ -1308,10 +1363,12 @@ void RenderManager::drawLeftPanel(
   {
     uint8_t byteVal = g_HexData.getByte((size_t)cursorBytePos);
 
+    Color highlightColor = isDarkTheme ? Color(100, 150, 255) : Color(50, 100, 200);
+
     StrCopy(buf, "0x");
     ItoaHex(cursorBytePos, buf + 2, 254);
     drawText("Offset:", contentX, currentY, faded);
-    drawText(buf, contentX + 85, currentY, Color(100, 150, 255));
+    drawText(buf, contentX + 85, currentY, highlightColor);
     currentY += rowHeight + itemSpacing;
 
     ItoaDec(byteVal, buf, 256);
@@ -1415,17 +1472,17 @@ void RenderManager::drawLeftPanel(
 
   drawText("File Type:", contentX, currentY, faded);
   drawText(g_DIEState.fileType[0] ? g_DIEState.fileType : "Coming Soon",
-           contentX + 85, currentY, Color(100, 200, 150));
+           contentX + 85, currentY, accentColor);
   currentY += rowHeight + itemSpacing;
 
   drawText("Compiler:", contentX, currentY, faded);
   drawText(g_DIEState.compiler[0] ? g_DIEState.compiler : "Coming Soon",
-           contentX + 85, currentY, Color(100, 200, 150));
+           contentX + 85, currentY, accentColor);
   currentY += rowHeight + itemSpacing;
 
   drawText("Arch:", contentX, currentY, faded);
   drawText(g_DIEState.architecture[0] ? g_DIEState.architecture : "Coming Soon",
-           contentX + 85, currentY, Color(100, 200, 150));
+           contentX + 85, currentY, accentColor);
   currentY += rowHeight + itemSpacing;
 
   char diePath[260];
@@ -1496,17 +1553,49 @@ void RenderManager::drawBottomPanel(
   if (!state.visible)
     return;
 
-  Color panelBg = (theme.windowBackground.r < 50)
-                      ? Color(35, 35, 40)
-                      : Color(theme.windowBackground.r - 10,
-                              theme.windowBackground.g - 10,
-                              theme.windowBackground.b - 10);
+  bool isDarkTheme = (theme.windowBackground.r < 128);
+
+  Color panelBg;
+  if (isDarkTheme)
+  {
+    panelBg = Color(
+        min(255, theme.windowBackground.r + 10),
+        min(255, theme.windowBackground.g + 10),
+        min(255, theme.windowBackground.b + 10));
+  }
+  else
+  {
+    panelBg = Color(
+        max(0, theme.windowBackground.r - 20),
+        max(0, theme.windowBackground.g - 20),
+        max(0, theme.windowBackground.b - 20));
+  }
 
   drawRect(panelBounds, panelBg, true);
 
   Rect titleBar(panelBounds.x, panelBounds.y, panelBounds.width, PANEL_TITLE_HEIGHT);
-  Color titleBg = state.dragging ? theme.controlCheck
-                                 : Color(panelBg.r + 15, panelBg.g + 15, panelBg.b + 15);
+  Color titleBg;
+  if (state.dragging)
+  {
+    titleBg = theme.controlCheck;
+  }
+  else
+  {
+    if (isDarkTheme)
+    {
+      titleBg = Color(
+          min(255, panelBg.r + 15),
+          min(255, panelBg.g + 15),
+          min(255, panelBg.b + 15));
+    }
+    else
+    {
+      titleBg = Color(
+          max(0, panelBg.r - 15),
+          max(0, panelBg.g - 15),
+          max(0, panelBg.b - 15));
+    }
+  }
   drawRect(titleBar, titleBg, true);
 
   const char *dockText = "";
@@ -1563,7 +1652,21 @@ void RenderManager::drawBottomPanel(
 
       if (tabs[i] == state.activeTab)
       {
-        Color c(panelBg.r + 20, panelBg.g + 20, panelBg.b + 20);
+        Color c;
+        if (isDarkTheme)
+        {
+          c = Color(
+              min(255, panelBg.r + 20),
+              min(255, panelBg.g + 20),
+              min(255, panelBg.b + 20));
+        }
+        else
+        {
+          c = Color(
+              max(0, panelBg.r - 20),
+              max(0, panelBg.g - 20),
+              max(0, panelBg.b - 20));
+        }
         drawRoundedRect(r, 3, c, true);
       }
 
@@ -1585,7 +1688,21 @@ void RenderManager::drawBottomPanel(
 
       if (tabs[i] == state.activeTab)
       {
-        Color c(panelBg.r + 20, panelBg.g + 20, panelBg.b + 20);
+        Color c;
+        if (isDarkTheme)
+        {
+          c = Color(
+              min(255, panelBg.r + 20),
+              min(255, panelBg.g + 20),
+              min(255, panelBg.b + 20));
+        }
+        else
+        {
+          c = Color(
+              max(0, panelBg.r - 20),
+              max(0, panelBg.g - 20),
+              max(0, panelBg.b - 20));
+        }
         drawRoundedRect(r, 3, c, true);
       }
 
@@ -1611,11 +1728,15 @@ void RenderManager::drawBottomPanel(
     contentY += 25;
 
     Rect graph(contentX, contentY, contentWidth - 15, contentHeight - 30);
-    drawRect(graph, Color(20, 20, 25), true);
+
+    Color graphBg = isDarkTheme ? Color(20, 20, 25) : Color(240, 240, 245);
+    drawRect(graph, graphBg, true);
     drawRect(graph, theme.controlBorder, false);
 
     int barCount = 50;
     int barWidth = graph.width / barCount;
+
+    Color barColor = isDarkTheme ? Color(70, 130, 180) : Color(50, 100, 150);
 
     for (int i = 0; i < barCount; i++)
     {
@@ -1624,7 +1745,7 @@ void RenderManager::drawBottomPanel(
                graph.y + graph.height - h - 5,
                barWidth - 2,
                h);
-      drawRect(bar, Color(70, 130, 180), true);
+      drawRect(bar, barColor, true);
     }
     break;
   }

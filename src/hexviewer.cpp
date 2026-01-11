@@ -492,6 +492,7 @@ void OnOptionsDialog()
     if (g_Hwnd && OptionsDialog::Show(g_Hwnd, g_Options))
     {
         SaveOptionsToFile(g_Options);
+        ApplyDarkTitleBar(g_Hwnd, g_Options.darkMode);
         InvalidateRect(g_Hwnd, 0, FALSE);
     }
 #else
@@ -1090,6 +1091,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 
         return 0;
     }
+    
     case WM_LBUTTONUP:
     {
         int x = LOWORD(lParam);
@@ -1629,47 +1631,21 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
     {
         PAINTSTRUCT ps;
         HDC hdc = BeginPaint(hwnd, &ps);
-
         g_Renderer.beginFrame();
-
         g_Renderer.clear(
             g_Options.darkMode
                 ? Theme::Dark().windowBackground
                 : Theme::Light().windowBackground);
-
         RECT rect;
         GetClientRect(hwnd, &rect);
         int windowWidth = rect.right;
         int windowHeight = rect.bottom;
         int menuBarHeight = g_MenuBar.getHeight();
-
         Rect leftBounds = GetLeftPanelBounds(
             g_LeftPanel, windowWidth, windowHeight, menuBarHeight);
-
         Rect bottomBounds = GetBottomPanelBounds(
             g_BottomPanel, windowWidth, windowHeight,
             menuBarHeight, g_LeftPanel);
-
-        Vector<char *> hexLines;
-        const LineArray &lines = g_HexData.getHexLines();
-
-        if (lines.count > 0)
-        {
-            for (int i = 0; i < (int)lines.count; i++)
-            {
-                const SimpleString *line = &lines.lines[i];
-                char *buf = (char *)HeapAlloc(GetProcessHeap(), 0, line->length + 1);
-
-                for (size_t j = 0; j < line->length; j++)
-                    buf[j] = line->data[j];
-
-                buf[line->length] = '\0';
-                hexLines.push_back(buf);
-            }
-        }
-
-        const SimpleString &header = g_HexData.getHeaderLine();
-        const char *headerStr = header.data ? header.data : "No File Loaded";
 
         int effectiveWindowHeight = windowHeight;
         if (g_BottomPanel.visible && g_BottomPanel.dockPosition == PanelDockPosition::Bottom)
@@ -1680,10 +1656,46 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
         g_LinesPerPage = (effectiveWindowHeight - menuBarHeight - 40) / 16;
         if (g_LinesPerPage < 1)
             g_LinesPerPage = 1;
+
+        if (g_HexData.hasDisassemblyPlugin() && g_HexData.getFileSize() > 0)
+        {
+            int startLine = g_ScrollY;
+            int endLine = g_ScrollY + g_LinesPerPage + 1;
+
+            size_t startOffset = (size_t)startLine * 16;
+            size_t endOffset = (size_t)endLine * 16;
+
+            if (endOffset > g_HexData.getFileSize())
+                endOffset = g_HexData.getFileSize();
+
+            size_t chunkSize = endOffset - startOffset;
+
+            if (chunkSize > 0 && !g_HexData.isRangeDisassembled(startOffset, endOffset))
+            {
+                g_HexData.disassembleRange(startOffset, chunkSize);
+            }
+        }
+
+        Vector<char *> hexLines;
+        const LineArray &lines = g_HexData.getHexLines();
+        if (lines.count > 0)
+        {
+            for (int i = 0; i < (int)lines.count; i++)
+            {
+                const SimpleString *line = &lines.lines[i];
+                char *buf = (char *)HeapAlloc(GetProcessHeap(), 0, line->length + 1);
+                for (size_t j = 0; j < line->length; j++)
+                    buf[j] = line->data[j];
+                buf[line->length] = '\0';
+                hexLines.push_back(buf);
+            }
+        }
+        const SimpleString &header = g_HexData.getHeaderLine();
+        const char *headerStr = header.data ? header.data : "No File Loaded";
+
         int maxScrollPos = g_TotalLines - g_LinesPerPage;
         if (maxScrollPos < 0)
             maxScrollPos = 0;
-
         g_Renderer.renderHexViewer(
             hexLines,
             headerStr,
@@ -1702,10 +1714,8 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
             (long long)g_HexData.getFileSize(),
             g_LeftPanel.visible ? g_LeftPanel.width : 0,
             effectiveWindowHeight);
-
         for (size_t i = 0; i < hexLines.size(); i++)
             HeapFree(GetProcessHeap(), 0, hexLines[i]);
-
         if (g_LeftPanel.visible)
         {
             g_Renderer.drawLeftPanel(
@@ -1714,7 +1724,6 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
                 windowHeight,
                 leftBounds);
         }
-
         if (g_BottomPanel.visible)
         {
             g_Renderer.drawBottomPanel(
@@ -1725,9 +1734,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
                 windowHeight,
                 bottomBounds);
         }
-
         g_MenuBar.render(&g_Renderer, windowWidth);
-
         g_Renderer.endFrame(hdc);
         EndPaint(hwnd, &ps);
         return 0;
@@ -1781,7 +1788,6 @@ extern "C" void entry()
 
             g_TotalLines = (int)g_HexData.getHexLines().count;
         }
-       
     }
 
     WNDCLASSA wc = {0};

@@ -8,12 +8,24 @@
 class HexData
 {
 public:
+    struct DisasmCache
+    {
+        size_t startOffset;
+        size_t endOffset;
+        bool valid;
+    };
+    Vector<DisasmCache> disasmRanges;
+
     HexData();
     ~HexData();
 
     bool loadFile(const char *filepath);
     bool saveFile(const char *filepath);
     void clear();
+
+    bool isRangeDisassembled(size_t startOffset, size_t endOffset);
+    void disassembleRange(size_t offset, size_t size);
+    void clearDisassemblyCache();
 
     const LineArray &getHexLines() const { return hexLines; }
     const LineArray &getDisassemblyLines() const { return disassemblyLines; }

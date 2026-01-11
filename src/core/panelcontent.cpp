@@ -1,5 +1,5 @@
 #include "panelcontent.h"
-#include "platfrom_die.h"
+#include "platform_die.h"
 #include "global.h"
 
 extern MenuBar g_MenuBar;
