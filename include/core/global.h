@@ -632,13 +632,57 @@ private:
     T* data;
     size_t count;
     size_t capacity;
+    
 public:
     Vector() : data(nullptr), count(0), capacity(0) {}
+    
+    Vector(const Vector& other) : data(nullptr), count(0), capacity(0)
+    {
+        if (other.count > 0)
+        {
+            capacity = other.capacity;
+            count = other.count;
+            data = (T*)PlatformAlloc(capacity * sizeof(T));
+            for (size_t i = 0; i < count; i++)
+            {
+                data[i] = other.data[i];
+            }
+        }
+    }
+    
+    Vector& operator=(const Vector& other)
+    {
+        if (this != &other)
+        {
+            if (data)
+            {
+                PlatformFree(data, capacity * sizeof(T));
+                data = nullptr;
+            }
+            
+            count = 0;
+            capacity = 0;
+            
+            if (other.count > 0)
+            {
+                capacity = other.capacity;
+                count = other.count;
+                data = (T*)PlatformAlloc(capacity * sizeof(T));
+                for (size_t i = 0; i < count; i++)
+                {
+                    data[i] = other.data[i];
+                }
+            }
+        }
+        return *this;
+    }
+    
     ~Vector()
     {
         if (data)
             PlatformFree(data, capacity * sizeof(T));
     }
+    
     void push_back(const T& item)
     {
         if (count >= capacity)
@@ -654,6 +698,7 @@ public:
         }
         data[count++] = item;
     }
+    
     void Add(const T& item) { push_back(item); }
     
     void remove(size_t index)
@@ -673,7 +718,7 @@ public:
     const T& operator[](size_t index) const { return data[index]; }
     size_t size() const { return count; }
     size_t Count() const { return count; }
-    bool empty() const { return count == 0; }
+    bool empty() const { return count; 0; }
     void clear() { count = 0; }
 };
 

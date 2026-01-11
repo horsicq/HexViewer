@@ -367,7 +367,7 @@ AppContextMenu::AppContextMenu()
   state.openSubmenuIndex = -1;
 }
 
-void AppContextMenu::show(int x, int y)
+/*void AppContextMenu::show(int x, int y)
 {
   state.visible = true;
   state.x = x;
@@ -529,6 +529,54 @@ void AppContextMenu::show(int x, int y)
   bookmarkItem.separator = false;
   bookmarkItem.id = ID_ADD_BOOKMARK;
   state.items.push_back(bookmarkItem);
+}
+*/
+
+void AppContextMenu::show(int x, int y)
+{
+    MessageBoxA(g_Hwnd, "show() start", "Debug", MB_OK);
+    
+    state.visible = true;
+    MessageBoxA(g_Hwnd, "visible set", "Debug", MB_OK);
+    
+    state.x = x;
+    state.y = y;
+    MessageBoxA(g_Hwnd, "position set", "Debug", MB_OK);
+    
+    state.hoveredIndex = -1;
+    state.openSubmenuIndex = -1;
+    MessageBoxA(g_Hwnd, "indices set", "Debug", MB_OK);
+    
+    state.items.clear();
+    MessageBoxA(g_Hwnd, "items cleared", "Debug", MB_OK);
+    
+    bool hasSelection = (selectionLength > 0);
+    bool hasData = !g_HexData.isEmpty();
+    bool hasCursor = (cursorBytePos != -1);
+    MessageBoxA(g_Hwnd, "flags set", "Debug", MB_OK);
+    
+    ContextMenuItem copyItem;
+    MessageBoxA(g_Hwnd, "copyItem created", "Debug", MB_OK);
+    
+    copyItem.text = (char *)"Copy";
+    MessageBoxA(g_Hwnd, "text assigned", "Debug", MB_OK);
+    
+    copyItem.shortcut = (char *)"Ctrl+C";
+    MessageBoxA(g_Hwnd, "shortcut assigned", "Debug", MB_OK);
+    
+    copyItem.enabled = hasSelection;
+    copyItem.checked = false;
+    copyItem.separator = false;
+    copyItem.id = ID_COPY;
+    MessageBoxA(g_Hwnd, "copyItem fields set", "Debug", MB_OK);
+    
+    state.items.push_back(copyItem);
+    MessageBoxA(g_Hwnd, "copyItem pushed", "Debug", MB_OK);
+    state.items.push_back(copyItem);
+MessageBoxA(g_Hwnd, "copyItem pushed", "Debug", MB_OK);
+
+Vector<ContextMenuItem> copySubmenu;
+MessageBoxA(g_Hwnd, "copySubmenu created", "Debug", MB_OK);
 }
 
 void AppContextMenu::hide()
