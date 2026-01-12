@@ -39,6 +39,7 @@ set(SOURCES
     src/system/update.cpp
     src/ui/pluginmanager.cpp
     src/core/pluginexecutor.cpp
+    src/ui/selectblockdialog.cpp
 )
 
 if (WIN32)

@@ -25,9 +25,9 @@ extern int maxScrolls;
 #ifdef _WIN32
 extern HWND g_Hwnd;
 #elif __APPLE__
-extern NSWindow* g_nsWindow;
+extern NSWindow *g_nsWindow;
 #else
-extern Display* g_display;
+extern Display *g_display;
 extern Window g_window;
 #endif
 
@@ -44,7 +44,7 @@ HKEY ContextMenuRegistry::GetRootKey(UserRole role)
   }
 }
 
-wchar_t* ContextMenuRegistry::GetRegistryPath(UserRole role)
+wchar_t *ContextMenuRegistry::GetRegistryPath(UserRole role)
 {
   switch (role)
   {
@@ -55,43 +55,43 @@ wchar_t* ContextMenuRegistry::GetRegistryPath(UserRole role)
   }
 }
 
-bool ContextMenuRegistry::SetRegistryValue(HKEY hKey, const wchar_t* valueName, const wchar_t* data)
+bool ContextMenuRegistry::SetRegistryValue(HKEY hKey, const wchar_t *valueName, const wchar_t *data)
 {
   LONG result = RegSetValueExW(
-    hKey,
-    valueName,
-    0,
-    REG_SZ,
-    (const BYTE*)data,
-    (DWORD)((WcsLen(data) + 1) * sizeof(wchar_t)));
+      hKey,
+      valueName,
+      0,
+      REG_SZ,
+      (const BYTE *)data,
+      (DWORD)((WcsLen(data) + 1) * sizeof(wchar_t)));
   return result == ERROR_SUCCESS;
 }
 
-bool ContextMenuRegistry::DeleteRegistryKey(HKEY hRootKey, const wchar_t* subKey)
+bool ContextMenuRegistry::DeleteRegistryKey(HKEY hRootKey, const wchar_t *subKey)
 {
   LONG result = RegDeleteTreeW(hRootKey, subKey);
   return result == ERROR_SUCCESS || result == ERROR_FILE_NOT_FOUND;
 }
 
-bool ContextMenuRegistry::Register(const wchar_t* exePath, UserRole role)
+bool ContextMenuRegistry::Register(const wchar_t *exePath, UserRole role)
 {
   HKEY hKey = nullptr;
   HKEY hCommandKey = nullptr;
   bool success = false;
 
   HKEY rootKey = GetRootKey(role);
-  wchar_t* registryPath = GetRegistryPath(role);
+  wchar_t *registryPath = GetRegistryPath(role);
 
   LONG result = RegCreateKeyExW(
-    rootKey,
-    registryPath,
-    0,
-    nullptr,
-    REG_OPTION_NON_VOLATILE,
-    KEY_WRITE,
-    nullptr,
-    &hKey,
-    nullptr);
+      rootKey,
+      registryPath,
+      0,
+      nullptr,
+      REG_OPTION_NON_VOLATILE,
+      KEY_WRITE,
+      nullptr,
+      &hKey,
+      nullptr);
 
   if (result != ERROR_SUCCESS)
   {
@@ -107,7 +107,7 @@ bool ContextMenuRegistry::Register(const wchar_t* exePath, UserRole role)
   }
 
   size_t exePathLen = WcsLen(exePath);
-  wchar_t* iconPath = (wchar_t*)PlatformAlloc((exePathLen + 3) * sizeof(wchar_t));
+  wchar_t *iconPath = (wchar_t *)PlatformAlloc((exePathLen + 3) * sizeof(wchar_t));
   WcsCopy(iconPath, exePath);
   iconPath[exePathLen] = L',';
   iconPath[exePathLen + 1] = L'0';
@@ -117,21 +117,21 @@ bool ContextMenuRegistry::Register(const wchar_t* exePath, UserRole role)
   PlatformFree(iconPath, (exePathLen + 3) * sizeof(wchar_t));
 
   result = RegCreateKeyExW(
-    hKey,
-    L"command",
-    0,
-    nullptr,
-    REG_OPTION_NON_VOLATILE,
-    KEY_WRITE,
-    nullptr,
-    &hCommandKey,
-    nullptr);
+      hKey,
+      L"command",
+      0,
+      nullptr,
+      REG_OPTION_NON_VOLATILE,
+      KEY_WRITE,
+      nullptr,
+      &hCommandKey,
+      nullptr);
 
   if (result == ERROR_SUCCESS)
   {
     size_t cmdLen = exePathLen + 8;
-    wchar_t* command = (wchar_t*)PlatformAlloc(cmdLen * sizeof(wchar_t));
-    wchar_t* p = command;
+    wchar_t *command = (wchar_t *)PlatformAlloc(cmdLen * sizeof(wchar_t));
+    wchar_t *p = command;
 
     *p++ = L'\"';
     WcsCopy(p, exePath);
@@ -163,7 +163,7 @@ bool ContextMenuRegistry::Register(const wchar_t* exePath, UserRole role)
 bool ContextMenuRegistry::Unregister(UserRole role)
 {
   HKEY rootKey = GetRootKey(role);
-  wchar_t* registryPath = GetRegistryPath(role);
+  wchar_t *registryPath = GetRegistryPath(role);
 
   bool success = DeleteRegistryKey(rootKey, registryPath);
   PlatformFree(registryPath, (WcsLen(registryPath) + 1) * sizeof(wchar_t));
@@ -180,14 +180,14 @@ bool ContextMenuRegistry::IsRegistered(UserRole role)
 {
   HKEY hKey = nullptr;
   HKEY rootKey = GetRootKey(role);
-  wchar_t* registryPath = GetRegistryPath(role);
+  wchar_t *registryPath = GetRegistryPath(role);
 
   LONG result = RegOpenKeyExW(
-    rootKey,
-    registryPath,
-    0,
-    KEY_READ,
-    &hKey);
+      rootKey,
+      registryPath,
+      0,
+      KEY_READ,
+      &hKey);
 
   PlatformFree(registryPath, (WcsLen(registryPath) + 1) * sizeof(wchar_t));
 
@@ -201,7 +201,7 @@ bool ContextMenuRegistry::IsRegistered(UserRole role)
 }
 #endif
 
-bool SetClipboardText(const char* text)
+bool SetClipboardText(const char *text)
 {
   if (!text)
     return false;
@@ -214,7 +214,7 @@ bool SetClipboardText(const char* text)
     HGLOBAL hMem = GlobalAlloc(GMEM_MOVEABLE, textLen + 1);
     if (hMem)
     {
-      char* pMem = (char*)GlobalLock(hMem);
+      char *pMem = (char *)GlobalLock(hMem);
       if (pMem)
       {
         MemCopy(pMem, text, textLen + 1);
@@ -229,10 +229,10 @@ bool SetClipboardText(const char* text)
 #elif __APPLE__
   @autoreleasepool
   {
-    NSPasteboard * pasteboard = [NSPasteboard generalPasteboard];
-    [pasteboard clearContents] ;
-    NSString* nsText = [NSString stringWithUTF8String : text];
-    [pasteboard setString : nsText forType : NSPasteboardTypeString] ;
+    NSPasteboard *pasteboard = [NSPasteboard generalPasteboard];
+    [pasteboard clearContents];
+    NSString *nsText = [NSString stringWithUTF8String:text];
+    [pasteboard setString:nsText forType:NSPasteboardTypeString];
     return true;
   }
 #else
@@ -244,7 +244,7 @@ bool SetClipboardText(const char* text)
 
   XSetSelectionOwner(g_display, clipboard, g_window, CurrentTime);
 
-  static char* clipboardData = nullptr;
+  static char *clipboardData = nullptr;
   if (clipboardData)
   {
     PlatformFree(clipboardData, StrLen(clipboardData) + 1);
@@ -255,7 +255,7 @@ bool SetClipboardText(const char* text)
 #endif
 }
 
-char* GetClipboardText()
+char *GetClipboardText()
 {
 #ifdef _WIN32
   if (OpenClipboard(g_Hwnd))
@@ -263,10 +263,10 @@ char* GetClipboardText()
     HANDLE hData = GetClipboardData(CF_TEXT);
     if (hData)
     {
-      char* pData = (char*)GlobalLock(hData);
+      char *pData = (char *)GlobalLock(hData);
       if (pData)
       {
-        char* result = AllocString(pData);
+        char *result = AllocString(pData);
         GlobalUnlock(hData);
         CloseClipboard();
         return result;
@@ -278,8 +278,8 @@ char* GetClipboardText()
 #elif __APPLE__
   @autoreleasepool
   {
-    NSPasteboard * pasteboard = [NSPasteboard generalPasteboard];
-    NSString* nsText = [pasteboard stringForType : NSPasteboardTypeString];
+    NSPasteboard *pasteboard = [NSPasteboard generalPasteboard];
+    NSString *nsText = [pasteboard stringForType:NSPasteboardTypeString];
     if (nsText)
     {
       return AllocString([nsText UTF8String]);
@@ -310,7 +310,7 @@ void InvalidateWindow()
 #endif
 }
 
-void AppendToBuffer(char*& buffer, size_t& capacity, size_t& length, const char* text)
+void AppendToBuffer(char *&buffer, size_t &capacity, size_t &length, const char *text)
 {
   size_t textLen = StrLen(text);
   size_t newLength = length + textLen;
@@ -321,7 +321,7 @@ void AppendToBuffer(char*& buffer, size_t& capacity, size_t& length, const char*
     if (newCapacity < newLength + 1)
       newCapacity = newLength + 1;
 
-    char* newBuffer = (char*)PlatformAlloc(newCapacity);
+    char *newBuffer = (char *)PlatformAlloc(newCapacity);
     if (buffer)
     {
       MemCopy(newBuffer, buffer, length);
@@ -336,7 +336,7 @@ void AppendToBuffer(char*& buffer, size_t& capacity, size_t& length, const char*
   buffer[length] = '\0';
 }
 
-void AppendCharToBuffer(char*& buffer, size_t& capacity, size_t& length, char c)
+void AppendCharToBuffer(char *&buffer, size_t &capacity, size_t &length, char c)
 {
   if (length + 1 >= capacity)
   {
@@ -344,7 +344,7 @@ void AppendCharToBuffer(char*& buffer, size_t& capacity, size_t& length, char c)
     if (newCapacity < length + 2)
       newCapacity = length + 2;
 
-    char* newBuffer = (char*)PlatformAlloc(newCapacity);
+    char *newBuffer = (char *)PlatformAlloc(newCapacity);
     if (buffer)
     {
       MemCopy(newBuffer, buffer, length);
@@ -487,6 +487,16 @@ void AppContextMenu::show(int x, int y)
     item.id = ID_GOTO_OFFSET;
     state.items.push_back(item);
   }
+  {
+    ContextMenuItem item;
+    item.text = AllocString("Select Block...");
+    item.shortcut = AllocString("Ctrl+Shift+B");
+    item.enabled = hasData;
+    item.checked = false;
+    item.separator = false;
+    item.id = ID_SELECT_BLOCK;
+    state.items.push_back(item);
+  }
 
   {
     ContextMenuItem item;
@@ -565,12 +575,12 @@ bool AppContextMenu::isVisible() const
   return state.visible;
 }
 
-const ContextMenuState& AppContextMenu::getState() const
+const ContextMenuState &AppContextMenu::getState() const
 {
   return state;
 }
 
-void AppContextMenu::handleMouseMove(int x, int y, RenderManager* renderer)
+void AppContextMenu::handleMouseMove(int x, int y, RenderManager *renderer)
 {
   if (!state.visible || !renderer)
     return;
@@ -580,7 +590,7 @@ void AppContextMenu::handleMouseMove(int x, int y, RenderManager* renderer)
 
   if (state.hoveredIndex >= 0 && state.hoveredIndex < (int)state.items.size())
   {
-    const ContextMenuItem& item = state.items[state.hoveredIndex];
+    const ContextMenuItem &item = state.items[state.hoveredIndex];
     if (!item.submenu.empty())
     {
       state.openSubmenuIndex = state.hoveredIndex;
@@ -592,7 +602,7 @@ void AppContextMenu::handleMouseMove(int x, int y, RenderManager* renderer)
   }
 }
 
-int AppContextMenu::handleClick(int x, int y, RenderManager* renderer)
+int AppContextMenu::handleClick(int x, int y, RenderManager *renderer)
 {
   if (!state.visible || !renderer)
     return -1;
@@ -601,7 +611,7 @@ int AppContextMenu::handleClick(int x, int y, RenderManager* renderer)
 
   if (clickedIndex >= 0 && clickedIndex < (int)state.items.size())
   {
-    const ContextMenuItem& item = state.items[clickedIndex];
+    const ContextMenuItem &item = state.items[clickedIndex];
 
     if (item.enabled && !item.separator && item.submenu.empty())
     {
@@ -634,6 +644,69 @@ static void GoToOffsetCallback(int offset)
   }
 }
 
+long long ParseNumber(const char *text, int numberFormat)
+{
+  if (!text)
+    return 0;
+
+  while (*text == ' ' || *text == '\t' || *text == '\n' || *text == '\r')
+    ++text;
+
+  int base = 10;
+
+  switch (numberFormat)
+  {
+  case 0:
+    base = 16;
+    break;
+  case 1:
+    base = 10;
+    break;
+  case 2:
+    base = 8;
+    break;
+  default:
+    base = 10;
+    break;
+  }
+
+  long long result = 0;
+  bool negative = false;
+
+  if (*text == '+')
+  {
+    ++text;
+  }
+  else if (*text == '-')
+  {
+    negative = true;
+    ++text;
+  }
+
+  if (base == 16 && text[0] == '0' && (text[1] == 'x' || text[1] == 'X'))
+    text += 2;
+
+  while (*text)
+  {
+    char c = *text++;
+    int v = -1;
+
+    if (c >= '0' && c <= '9')
+      v = c - '0';
+    else if (c >= 'A' && c <= 'Z')
+      v = 10 + (c - 'A');
+    else if (c >= 'a' && c <= 'z')
+      v = 10 + (c - 'a');
+
+    if (v < 0 || v >= base)
+      break;
+
+    result = result * base + v;
+  }
+
+  return negative ? -result : result;
+}
+
 void AppContextMenu::executeAction(int actionId)
 {
   switch (actionId)
@@ -645,7 +718,7 @@ void AppContextMenu::executeAction(int actionId)
     {
       size_t capacity = 1024;
       size_t length = 0;
-      char* hexString = (char*)PlatformAlloc(capacity);
+      char *hexString = (char *)PlatformAlloc(capacity);
       hexString[0] = '\0';
 
       long long start = cursorBytePos;
@@ -678,7 +751,7 @@ void AppContextMenu::executeAction(int actionId)
     {
       size_t capacity = 1024;
       size_t length = 0;
-      char* textString = (char*)PlatformAlloc(capacity);
+      char *textString = (char *)PlatformAlloc(capacity);
       textString[0] = '\0';
 
       long long start = cursorBytePos;
@@ -703,7 +776,7 @@ void AppContextMenu::executeAction(int actionId)
     {
       size_t capacity = 4096;
       size_t length = 0;
-      char* cArrayString = (char*)PlatformAlloc(capacity);
+      char *cArrayString = (char *)PlatformAlloc(capacity);
       cArrayString[0] = '\0';
 
       AppendToBuffer(cArrayString, capacity, length, "unsigned char data[] = {\n    ");
@@ -747,7 +820,7 @@ void AppContextMenu::executeAction(int actionId)
   {
     if (cursorBytePos != -1)
     {
-      char* clipText = GetClipboardText();
+      char *clipText = GetClipboardText();
       if (clipText)
       {
         Vector<uint8_t> bytes;
@@ -757,9 +830,9 @@ void AppContextMenu::executeAction(int actionId)
         while (pos < clipLen)
         {
           while (pos < clipLen &&
-            (clipText[pos] == ' ' || clipText[pos] == ',' ||
-              clipText[pos] == '\n' || clipText[pos] == '\r' ||
-              clipText[pos] == '\t'))
+                 (clipText[pos] == ' ' || clipText[pos] == ',' ||
+                  clipText[pos] == '\n' || clipText[pos] == '\r' ||
+                  clipText[pos] == '\t'))
           {
             pos++;
           }
@@ -768,16 +841,16 @@ void AppContextMenu::executeAction(int actionId)
             break;
 
           if (pos + 1 < clipLen && clipText[pos] == '0' &&
-            (clipText[pos + 1] == 'x' || clipText[pos + 1] == 'X'))
+              (clipText[pos + 1] == 'x' || clipText[pos + 1] == 'X'))
           {
             pos += 2;
           }
 
           if (pos + 1 < clipLen &&
-            IsXDigit(clipText[pos]) && IsXDigit(clipText[pos + 1]))
+              IsXDigit(clipText[pos]) && IsXDigit(clipText[pos + 1]))
           {
             uint8_t byte = (HexDigitToInt(clipText[pos]) << 4) |
-              HexDigitToInt(clipText[pos + 1]);
+                           HexDigitToInt(clipText[pos + 1]);
             bytes.push_back(byte);
             pos += 2;
           }
@@ -822,42 +895,42 @@ void AppContextMenu::executeAction(int actionId)
     SearchDialogs::ShowGoToDialog(g_Hwnd, g_Options.darkMode, GoToOffsetCallback, nullptr);
 #elif __APPLE__
     SearchDialogs::ShowGoToDialog(
-      (NativeWindow)g_nsWindow,
-      g_Options.darkMode,
-      [](int offset)
-      {
-        if (offset >= 0 && offset < (int)g_HexData.getFileSize())
+        (NativeWindow)g_nsWindow,
+        g_Options.darkMode,
+        [](int offset)
         {
-          cursorBytePos = offset;
-          editingOffset = offset;
-          cursorNibblePos = 0;
+          if (offset >= 0 && offset < (int)g_HexData.getFileSize())
+          {
+            cursorBytePos = offset;
+            editingOffset = offset;
+            cursorNibblePos = 0;
 
-          int bytesPerLine = g_HexData.getCurrentBytesPerLine();
-          int targetRow = offset / bytesPerLine;
-          g_ScrollY = Clamp(targetRow - 5, 0, maxScrolls);
+            int bytesPerLine = g_HexData.getCurrentBytesPerLine();
+            int targetRow = offset / bytesPerLine;
+            g_ScrollY = Clamp(targetRow - 5, 0, maxScrolls);
 
-          InvalidateWindow();
-        }
-      });
+            InvalidateWindow();
+          }
+        });
 #else
     SearchDialogs::ShowGoToDialog(
-      (void*)g_window,
-      g_Options.darkMode,
-      [](int offset)
-      {
-        if (offset >= 0 && offset < (int)g_HexData.getFileSize())
+        (void *)g_window,
+        g_Options.darkMode,
+        [](int offset)
         {
-          cursorBytePos = offset;
-          editingOffset = offset;
-          cursorNibblePos = 0;
+          if (offset >= 0 && offset < (int)g_HexData.getFileSize())
+          {
+            cursorBytePos = offset;
+            editingOffset = offset;
+            cursorNibblePos = 0;
 
-          int bytesPerLine = g_HexData.getCurrentBytesPerLine();
-          int targetRow = offset / bytesPerLine;
-          g_ScrollY = Clamp(targetRow - 5, 0, maxScrolls);
+            int bytesPerLine = g_HexData.getCurrentBytesPerLine();
+            int targetRow = offset / bytesPerLine;
+            g_ScrollY = Clamp(targetRow - 5, 0, maxScrolls);
 
-          InvalidateWindow();
-        }
-      });
+            InvalidateWindow();
+          }
+        });
 #endif
     break;
   }
@@ -900,7 +973,7 @@ void AppContextMenu::executeAction(int actionId)
   {
     if (selectionLength > 0)
     {
-      uint8_t patternBytes[] = { 0xAA, 0xBB, 0xCC, 0xDD };
+      uint8_t patternBytes[] = {0xAA, 0xBB, 0xCC, 0xDD};
       int patternLen = 4;
       long long start = cursorBytePos;
       long long end = start + selectionLength;
@@ -937,8 +1010,7 @@ void AppContextMenu::executeAction(int actionId)
           Color(100, 100, 255),
           Color(255, 255, 100),
           Color(255, 100, 255),
-          Color(100, 255, 255)
-      };
+          Color(100, 255, 255)};
       int colorIndex = g_Bookmarks.bookmarks.size() % 6;
       newBookmark.color = colors[colorIndex];
 
@@ -954,15 +1026,117 @@ void AppContextMenu::executeAction(int actionId)
 #elif __APPLE__
       @autoreleasepool
       {
-        NSAlert * alert = [[NSAlert alloc]init];
-        [alert setMessageText:@"Bookmark"] ;
-        [alert setInformativeText:[NSString stringWithUTF8String:msg] ] ;
-        [alert runModal] ;
+        NSAlert *alert = [[NSAlert alloc] init];
+        [alert setMessageText:@"Bookmark"];
+        [alert setInformativeText:[NSString stringWithUTF8String:msg]];
+        [alert runModal];
       }
 #endif
 
       InvalidateWindow();
     }
+    break;
+  }
+  case ID_SELECT_BLOCK:
+  {
+#ifdef _WIN32
+    ShowSelectBlockDialog(
+        g_Hwnd,
+        g_Options.darkMode,
+        [](const char *startStr,
+           const char *endOrLengthStr,
+           bool useLength,
+           int numberFormat)
+        {
+          long long start = ParseNumber(startStr, numberFormat);
+          long long value = ParseNumber(endOrLengthStr, numberFormat);
+
+          long long length = useLength ? value : (value - start);
+
+          if (start >= 0 &&
+              length > 0 &&
+              start < (long long)g_HexData.getFileSize())
+          {
+            long long end = start + length;
+            long long maxEnd = (long long)g_HexData.getFileSize();
+            if (end > maxEnd)
+              end = maxEnd;
+
+            cursorBytePos = start;
+            selectionLength = end - start;
+            editingOffset = start;
+            cursorNibblePos = 0;
+
+            InvalidateWindow();
+          }
+        },
+        nullptr);
+
+#elif __APPLE__
+    ShowSelectBlockDialog(
+        (NativeWindow)g_nsWindow,
+        g_Options.darkMode,
+        [](const std::string &startStr,
+           const std::string &endOrLengthStr,
+           bool useLength,
+           int numberFormat)
+        {
+          long long start = ParseNumber(startStr.c_str(), numberFormat);
+          long long value = ParseNumber(endOrLengthStr.c_str(), numberFormat);
+
+          long long length = useLength ? value : (value - start);
+
+          if (start >= 0 &&
+              length > 0 &&
+              start < (long long)g_HexData.getFileSize())
+          {
+            long long end = start + length;
+            long long maxEnd = (long long)g_HexData.getFileSize();
+            if (end > maxEnd)
+              end = maxEnd;
+
+            cursorBytePos = start;
+            selectionLength = end - start;
+            editingOffset = start;
+            cursorNibblePos = 0;
+
+            InvalidateWindow();
+          }
+        });
+
+#else
+    ShowSelectBlockDialog(
+        (void *)g_window,
+        g_Options.darkMode,
+        [](const std::string &startStr,
+           const std::string &endOrLengthStr,
+           bool useLength,
+           int numberFormat)
+        {
+          long long start = ParseNumber(startStr.c_str(), numberFormat);
+          long long value = ParseNumber(endOrLengthStr.c_str(), numberFormat);
+
+          long long length = useLength ? value : (value - start);
+
+          if (start >= 0 &&
+              length > 0 &&
+              start < (long long)g_HexData.getFileSize())
+          {
+            long long end = start + length;
+            long long maxEnd = (long long)g_HexData.getFileSize();
+            if (end > maxEnd)
+              end = maxEnd;
+
+            cursorBytePos = start;
+            selectionLength = end - start;
+            editingOffset = start;
+            cursorNibblePos = 0;
+
+            InvalidateWindow();
+          }
+        });
+#endif
+
     break;
   }
   }

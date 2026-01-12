@@ -1245,9 +1245,9 @@ void RenderManager::drawLeftPanel(
   if (isDarkTheme)
   {
     faded = Color(
-        max(0, theme.textColor.r - 40),
-        max(0, theme.textColor.g - 40),
-        max(0, theme.textColor.b - 40));
+        Clamp(theme.textColor.r - 40, 0, 255),
+        Clamp(theme.textColor.g - 40, 0, 255),
+        Clamp(theme.textColor.b - 40, 0, 255));
 
     halfText = Color(
         theme.textColor.r / 2,
@@ -1262,19 +1262,19 @@ void RenderManager::drawLeftPanel(
   else
   {
     faded = Color(
-        max(0, theme.textColor.r + 60),
-        max(0, theme.textColor.g + 60),
-        max(0, theme.textColor.b + 60));
+        Clamp(theme.textColor.r + 60, 0, 255),
+        Clamp(theme.textColor.g + 60, 0, 255),
+        Clamp(theme.textColor.b + 60, 0, 255));
 
     halfText = Color(
-        min(255, theme.textColor.r + 80),
-        min(255, theme.textColor.g + 80),
-        min(255, theme.textColor.b + 80));
+        Clamp(theme.textColor.r + 80, 0, 255),
+        Clamp(theme.textColor.g + 80, 0, 255),
+        Clamp(theme.textColor.b + 80, 0, 255));
 
     thirdText = Color(
-        min(255, theme.textColor.r + 120),
-        min(255, theme.textColor.g + 120),
-        min(255, theme.textColor.b + 120));
+        Clamp(theme.textColor.r + 120, 0, 255),
+        Clamp(theme.textColor.g + 120, 0, 255),
+        Clamp(theme.textColor.b + 120, 0, 255));
   }
 
   drawText("File Information", contentX, currentY, theme.headerColor);
@@ -1529,16 +1529,16 @@ void RenderManager::drawBottomPanel(
   if (isDarkTheme)
   {
     panelBg = Color(
-        min(255, theme.windowBackground.r + 10),
-        min(255, theme.windowBackground.g + 10),
-        min(255, theme.windowBackground.b + 10));
+        Clamp(theme.windowBackground.r + 10, 0, 255),
+        Clamp(theme.windowBackground.g + 10, 0, 255),
+        Clamp(theme.windowBackground.b + 10, 0, 255));
   }
   else
   {
     panelBg = Color(
-        max(0, theme.windowBackground.r - 20),
-        max(0, theme.windowBackground.g - 20),
-        max(0, theme.windowBackground.b - 20));
+        Clamp(theme.windowBackground.r - 20, 0, 255),
+        Clamp(theme.windowBackground.g - 20, 0, 255),
+        Clamp(theme.windowBackground.b - 20, 0, 255));
   }
 
   drawRect(panelBounds, panelBg, true);
@@ -1554,18 +1554,19 @@ void RenderManager::drawBottomPanel(
     if (isDarkTheme)
     {
       titleBg = Color(
-          min(255, panelBg.r + 15),
-          min(255, panelBg.g + 15),
-          min(255, panelBg.b + 15));
+          Clamp(panelBg.r + 15, 0, 255),
+          Clamp(panelBg.g + 15, 0, 255),
+          Clamp(panelBg.b + 15, 0, 255));
     }
     else
     {
       titleBg = Color(
-          max(0, panelBg.r - 15),
-          max(0, panelBg.g - 15),
-          max(0, panelBg.b - 15));
+          Clamp(panelBg.r - 15, 0, 255),
+          Clamp(panelBg.g - 15, 0, 255),
+          Clamp(panelBg.b - 15, 0, 255));
     }
   }
+
   drawRect(titleBar, titleBg, true);
 
   const char *dockText = "";
@@ -1626,17 +1627,18 @@ void RenderManager::drawBottomPanel(
         if (isDarkTheme)
         {
           c = Color(
-              min(255, panelBg.r + 20),
-              min(255, panelBg.g + 20),
-              min(255, panelBg.b + 20));
+              Clamp(panelBg.r + 20, 0, 255),
+              Clamp(panelBg.g + 20, 0, 255),
+              Clamp(panelBg.b + 20, 0, 255));
         }
         else
         {
           c = Color(
-              max(0, panelBg.r - 20),
-              max(0, panelBg.g - 20),
-              max(0, panelBg.b - 20));
+              Clamp(panelBg.r - 20, 0, 255),
+              Clamp(panelBg.g - 20, 0, 255),
+              Clamp(panelBg.b - 20, 0, 255));
         }
+
         drawRoundedRect(r, 3, c, true);
       }
 
@@ -1662,17 +1664,18 @@ void RenderManager::drawBottomPanel(
         if (isDarkTheme)
         {
           c = Color(
-              min(255, panelBg.r + 20),
-              min(255, panelBg.g + 20),
-              min(255, panelBg.b + 20));
+              Clamp(panelBg.r + 20, 0, 255),
+              Clamp(panelBg.g + 20, 0, 255),
+              Clamp(panelBg.b + 20, 0, 255));
         }
         else
         {
           c = Color(
-              max(0, panelBg.r - 20),
-              max(0, panelBg.g - 20),
-              max(0, panelBg.b - 20));
+              Clamp(panelBg.r - 20, 0, 255),
+              Clamp(panelBg.g - 20, 0, 255),
+              Clamp(panelBg.b - 20, 0, 255));
         }
+
         drawRoundedRect(r, 3, c, true);
       }
 
@@ -2020,8 +2023,8 @@ void RenderManager::drawContextMenu(
 }
 
 bool RenderManager::isPointInContextMenu(
-  int mouseX, int mouseY,
-  const ContextMenuState& state)
+    int mouseX, int mouseY,
+    const ContextMenuState &state)
 {
   if (!state.visible)
     return false;
@@ -2039,14 +2042,14 @@ bool RenderManager::isPointInContextMenu(
   int menuWidth = state.width > 0 ? state.width : 220;
 
   return mouseX >= state.x &&
-    mouseX <= state.x + menuWidth &&
-    mouseY >= state.y &&
-    mouseY <= state.y + totalHeight;
+         mouseX <= state.x + menuWidth &&
+         mouseY >= state.y &&
+         mouseY <= state.y + totalHeight;
 }
 
 int RenderManager::getContextMenuHoveredItem(
-  int mouseX, int mouseY,
-  const ContextMenuState& state)
+    int mouseX, int mouseY,
+    const ContextMenuState &state)
 {
   if (!state.visible)
     return -1;
@@ -2064,7 +2067,7 @@ int RenderManager::getContextMenuHoveredItem(
   }
 
   if (mouseX < state.x || mouseX > state.x + menuWidth ||
-    mouseY < state.y || mouseY > state.y + totalHeight)
+      mouseY < state.y || mouseY > state.y + totalHeight)
   {
     return -1;
   }
@@ -2074,7 +2077,7 @@ int RenderManager::getContextMenuHoveredItem(
 
   for (size_t i = 0; i < state.items.size(); i++)
   {
-    const ContextMenuItem& item = state.items[i];
+    const ContextMenuItem &item = state.items[i];
     int height = item.separator ? separatorHeight : itemHeight;
 
     if (relativeY >= currentY && relativeY < currentY + height)

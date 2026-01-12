@@ -535,7 +535,6 @@ public:
 
   void beginFrame();
   void endFrame(NativeDrawContext ctx);
-
   void clear(const Color &color);
   void drawRect(const Rect &rect, const Color &color, bool filled = true);
   void drawLine(int x1, int y1, int x2, int y2, const Color &color);

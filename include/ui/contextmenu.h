@@ -2,6 +2,7 @@
 #include "render.h"
 #include "hexdata.h"
 #include <searchdialog.h>
+#include "selectblockdialog.h"
 #include <options.h>
 #include "global.h"
 #ifdef _WIN32
@@ -42,7 +43,8 @@ enum ContextMenuAction
   ID_FILL_ZEROS = 110,
   ID_FILL_FF = 111,
   ID_FILL_PATTERN = 112,
-  ID_ADD_BOOKMARK = 114
+  ID_ADD_BOOKMARK = 114,
+  ID_SELECT_BLOCK = 115
 };
 
 class AppContextMenu
