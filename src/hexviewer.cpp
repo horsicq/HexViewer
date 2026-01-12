@@ -1194,6 +1194,18 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 		int windowHeight = rect.bottom;
 		int leftPanelWidth = g_LeftPanel.visible ? g_LeftPanel.width : 0;
 
+		if (g_ContextMenu.isVisible())
+		{
+			int actionId = g_ContextMenu.handleClick(x, y, &g_Renderer);
+
+			if (actionId > 0)
+			{
+				g_ContextMenu.executeAction(actionId);
+			}
+
+			InvalidateRect(hwnd, NULL, FALSE);
+			return 0;
+		}
 		if (g_MainScrollbar.visible &&
 			g_Renderer.isPointInScrollbarThumb(x, y, g_MainScrollbar))
 		{

@@ -11,7 +11,6 @@
 
 #include "global.h"
 
-
 struct PatternSearchState;
 struct ChecksumState;
 struct CompareState;
@@ -79,28 +78,29 @@ struct Theme
   static Theme Dark()
   {
     Theme t;
-    t.windowBackground = Color(30, 30, 30);
-    t.textColor = Color(220, 220, 220);
-    t.headerColor = Color(100, 149, 237);
-    t.separator = Color(70, 70, 70);
-    t.scrollbarBg = Color(45, 45, 45);
-    t.scrollbarThumb = Color(90, 90, 90);
+    t.windowBackground = Color(32, 32, 32);
+    t.textColor = Color(255, 255, 255);
+    t.headerColor = Color(118, 185, 237);
+    t.separator = Color(255, 255, 255, 20);
+
+    t.scrollbarBg = Color(45, 45, 45, 100);
+    t.scrollbarThumb = Color(90, 90, 90, 180);
     t.disassemblyColor = Color(144, 238, 144);
 
-    t.buttonNormal = Color(50, 50, 50);
-    t.buttonHover = Color(70, 70, 70);
-    t.buttonPressed = Color(35, 35, 35);
-    t.buttonText = Color(220, 220, 220);
-    t.buttonDisabled = Color(40, 40, 40);
+    t.buttonNormal = Color(255, 255, 255, 15);
+    t.buttonHover = Color(255, 255, 255, 25);
+    t.buttonPressed = Color(255, 255, 255, 10);
+    t.buttonText = Color(255, 255, 255);
+    t.buttonDisabled = Color(255, 255, 255, 8);
 
-    t.controlBorder = Color(100, 100, 100);
-    t.controlBackground = Color(45, 45, 45);
-    t.controlCheck = Color(100, 149, 237);
+    t.controlBorder = Color(255, 255, 255, 30);
+    t.controlBackground = Color(50, 50, 50, 200);
+    t.controlCheck = Color(96, 150, 227);
 
-    t.menuBackground = Color(45, 45, 48);
-    t.menuHover = Color(62, 62, 66);
-    t.menuBorder = Color(63, 63, 70);
-    t.disabledText = Color(128, 128, 128);
+    t.menuBackground = Color(44, 44, 44, 245);
+    t.menuHover = Color(255, 255, 255, 25);
+    t.menuBorder = Color(255, 255, 255, 15);
+    t.disabledText = Color(255, 255, 255, 80);
 
     return t;
   }
@@ -108,28 +108,29 @@ struct Theme
   static Theme Light()
   {
     Theme t;
-    t.windowBackground = Color(255, 255, 255);
+    t.windowBackground = Color(243, 243, 243);
     t.textColor = Color(0, 0, 0);
-    t.headerColor = Color(0, 102, 204);
-    t.separator = Color(200, 200, 200);
-    t.scrollbarBg = Color(240, 240, 240);
-    t.scrollbarThumb = Color(180, 180, 180);
-    t.disassemblyColor = Color(0, 128, 0);
+    t.headerColor = Color(0, 95, 184);
+    t.separator = Color(0, 0, 0, 15);
 
-    t.buttonNormal = Color(240, 240, 240);
-    t.buttonHover = Color(225, 225, 225);
-    t.buttonPressed = Color(200, 200, 200);
+    t.scrollbarBg = Color(240, 240, 240, 150);
+    t.scrollbarThumb = Color(150, 150, 150, 180);
+    t.disassemblyColor = Color(16, 124, 16);
+
+    t.buttonNormal = Color(0, 0, 0, 8);
+    t.buttonHover = Color(0, 0, 0, 12);
+    t.buttonPressed = Color(0, 0, 0, 6);
     t.buttonText = Color(0, 0, 0);
-    t.buttonDisabled = Color(245, 245, 245);
+    t.buttonDisabled = Color(0, 0, 0, 5);
 
-    t.controlBorder = Color(180, 180, 180);
-    t.controlBackground = Color(255, 255, 255);
-    t.controlCheck = Color(0, 102, 204);
+    t.controlBorder = Color(0, 0, 0, 20);
+    t.controlBackground = Color(255, 255, 255, 230);
+    t.controlCheck = Color(0, 95, 184);
 
-    t.menuBackground = Color(240, 240, 240);
-    t.menuHover = Color(225, 225, 225);
-    t.menuBorder = Color(200, 200, 200);
-    t.disabledText = Color(160, 160, 160);
+    t.menuBackground = Color(249, 249, 249, 250);
+    t.menuHover = Color(0, 0, 0, 10);
+    t.menuBorder = Color(0, 0, 0, 15);
+    t.disabledText = Color(0, 0, 0, 90);
 
     return t;
   }
@@ -289,46 +290,55 @@ struct BottomPanelState
   }
 };
 
-struct SelectionState {
-    bool active;
-    bool dragging;
-    long long startByte;
-    long long endByte;
-    
-    SelectionState() : active(false), dragging(false), startByte(-1), endByte(-1) {}
-    
-    void getRange(long long &min, long long &max) const {
-        if (startByte <= endByte) {
-            min = startByte;
-            max = endByte;
-        } else {
-            min = endByte;
-            max = startByte;
-        }
-    }
-    
-    bool isSelected(long long bytePos) const {
-        if (!active) return false;
-        long long min, max;
-        getRange(min, max);
-        return bytePos >= min && bytePos <= max;
-    }
-    
-    long long getLength() const {
-        if (!active) return 0;
-        long long min, max;
-        getRange(min, max);
-        return max - min + 1;
-    }
-    
-    void clear() {
-        active = false;
-        dragging = false;
-        startByte = -1;
-        endByte = -1;
-    }
-};
+struct SelectionState
+{
+  bool active;
+  bool dragging;
+  long long startByte;
+  long long endByte;
 
+  SelectionState() : active(false), dragging(false), startByte(-1), endByte(-1) {}
+
+  void getRange(long long &min, long long &max) const
+  {
+    if (startByte <= endByte)
+    {
+      min = startByte;
+      max = endByte;
+    }
+    else
+    {
+      min = endByte;
+      max = startByte;
+    }
+  }
+
+  bool isSelected(long long bytePos) const
+  {
+    if (!active)
+      return false;
+    long long min, max;
+    getRange(min, max);
+    return bytePos >= min && bytePos <= max;
+  }
+
+  long long getLength() const
+  {
+    if (!active)
+      return 0;
+    long long min, max;
+    getRange(min, max);
+    return max - min + 1;
+  }
+
+  void clear()
+  {
+    active = false;
+    dragging = false;
+    startByte = -1;
+    endByte = -1;
+  }
+};
 
 Rect GetLeftPanelBounds(const LeftPanelState &state, int windowWidth, int windowHeight, int menuBarHeight);
 Rect GetBottomPanelBounds(const BottomPanelState &state, int windowWidth, int windowHeight,
@@ -338,8 +348,8 @@ PanelDockPosition GetDockPositionFromMouse(int mouseX, int mouseY, int windowWid
 
 struct ContextMenuItem
 {
-  char* text;
-  char* shortcut;
+  char *text;
+  char *shortcut;
   bool enabled;
   bool checked;
   bool separator;
@@ -347,41 +357,48 @@ struct ContextMenuItem
   Vector<ContextMenuItem> submenu;
 
   ContextMenuItem()
-    : text(nullptr), shortcut(nullptr),
-    enabled(true), checked(false), separator(false), id(0)
+      : text(nullptr), shortcut(nullptr),
+        enabled(true), checked(false), separator(false), id(0)
   {
   }
 
-  ContextMenuItem(const ContextMenuItem& other)
-    : text(nullptr), shortcut(nullptr),
-    enabled(other.enabled), checked(other.checked),
-    separator(other.separator), id(other.id),
-    submenu(other.submenu)
+  ContextMenuItem(const ContextMenuItem &other)
+      : text(nullptr), shortcut(nullptr),
+        enabled(other.enabled), checked(other.checked),
+        separator(other.separator), id(other.id),
+        submenu(other.submenu)
   {
-    if (other.text) {
+    if (other.text)
+    {
       text = AllocString(other.text);
     }
-    if (other.shortcut) {
+    if (other.shortcut)
+    {
       shortcut = AllocString(other.shortcut);
     }
   }
 
-  ContextMenuItem& operator=(const ContextMenuItem& other)
+  ContextMenuItem &operator=(const ContextMenuItem &other)
   {
-    if (this != &other) {
-      if (text) {
+    if (this != &other)
+    {
+      if (text)
+      {
         PlatformFree(text, StrLen(text) + 1);
         text = nullptr;
       }
-      if (shortcut) {
+      if (shortcut)
+      {
         PlatformFree(shortcut, StrLen(shortcut) + 1);
         shortcut = nullptr;
       }
 
-      if (other.text) {
+      if (other.text)
+      {
         text = AllocString(other.text);
       }
-      if (other.shortcut) {
+      if (other.shortcut)
+      {
         shortcut = AllocString(other.shortcut);
       }
 
@@ -396,11 +413,13 @@ struct ContextMenuItem
 
   ~ContextMenuItem()
   {
-    if (text) {
+    if (text)
+    {
       PlatformFree(text, StrLen(text) + 1);
       text = nullptr;
     }
-    if (shortcut) {
+    if (shortcut)
+    {
       PlatformFree(shortcut, StrLen(shortcut) + 1);
       shortcut = nullptr;
     }

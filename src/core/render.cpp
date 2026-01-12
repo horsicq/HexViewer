@@ -551,7 +551,7 @@ PanelDockPosition GetDockPositionFromMouse(int mouseX, int mouseY, int windowWid
 
 void RenderManager::drawModernButton(const WidgetState &state, const Theme &theme, const char *label)
 {
-  float radius = 6.0f;
+  float radius = 4.0f;
 
   Color fillColor = theme.buttonNormal;
   if (!state.enabled)
@@ -567,11 +567,19 @@ void RenderManager::drawModernButton(const WidgetState &state, const Theme &them
     fillColor = theme.buttonHover;
   }
 
+  if (state.enabled && state.hovered)
+  {
+    Rect shadowRect(state.rect.x + 1, state.rect.y + 2,
+                    state.rect.width, state.rect.height);
+    Color shadowColor(0, 0, 0, 30);
+    drawRoundedRect(shadowRect, radius, shadowColor, true);
+  }
+
   drawRoundedRect(state.rect, radius, fillColor, true);
 
   if (state.enabled)
   {
-    Color borderColor = state.pressed ? Color(fillColor.r - 20, fillColor.g - 20, fillColor.b - 20) : Color(fillColor.r - 10, fillColor.g - 10, fillColor.b - 10);
+    Color borderColor(255, 255, 255, state.hovered ? 30 : 15);
     drawRoundedRect(state.rect, radius, borderColor, false);
   }
 
@@ -580,7 +588,7 @@ void RenderManager::drawModernButton(const WidgetState &state, const Theme &them
   int textX = state.rect.x + (state.rect.width - textWidth) / 2;
   int textY = state.rect.y + (state.rect.height - textHeight) / 2;
 
-  Color textColor = state.enabled ? theme.buttonText : Color(theme.buttonText.r / 2, theme.buttonText.g / 2, theme.buttonText.b / 2);
+  Color textColor = state.enabled ? theme.buttonText : theme.disabledText;
   drawText(label, textX, textY, textColor);
 }
 
@@ -792,153 +800,118 @@ void RenderManager::drawDropdown(
   float radius = 4.0f;
 
   Color bgColor = theme.controlBackground;
-  bgColor.a = 255;
-
-  drawRect(state.rect, bgColor, true);
-
-  Color borderColor = theme.controlBorder;
 
   if (state.hovered && !isOpen)
   {
-    borderColor = Color(
-        Clamp(borderColor.r + 30, 0, 255),
-        Clamp(borderColor.g + 30, 0, 255),
-        Clamp(borderColor.b + 30, 0, 255));
+    bgColor.a = (uint8_t)(bgColor.a * 1.15f > 255 ? 255 : bgColor.a * 1.15f);
   }
 
-  drawRect(state.rect, bgColor, true);
   drawRoundedRect(state.rect, radius, bgColor, true);
+
+  Color borderColor = theme.controlBorder;
+  if (state.hovered && !isOpen)
+  {
+    borderColor.a = (uint8_t)(borderColor.a * 1.5f > 255 ? 255 : borderColor.a * 1.5f);
+  }
   drawRoundedRect(state.rect, radius, borderColor, false);
 
-  int textX = state.rect.x + 10;
-  int textY = state.rect.y + (state.rect.height / 2) - 6;
+  int textX = state.rect.x + 12;
+  int textY = state.rect.y + (state.rect.height / 2) - 8;
   drawText(selectedText, textX, textY, theme.textColor);
 
-  int arrowX = state.rect.x + state.rect.width - 18;
-  int arrowY = state.rect.y + (state.rect.height / 2);
+  int chevronX = state.rect.x + state.rect.width - 20;
+  int chevronY = state.rect.y + (state.rect.height / 2);
 
-  Color arrowColor = theme.textColor;
+  Color chevronColor = theme.textColor;
+  chevronColor.a = 150;
 
   if (isOpen)
   {
-    drawLine(arrowX + 4, arrowY - 3, arrowX, arrowY + 2, arrowColor);
-    drawLine(arrowX + 4, arrowY - 3, arrowX + 8, arrowY + 2, arrowColor);
-    drawLine(arrowX, arrowY + 2, arrowX + 8, arrowY + 2, arrowColor);
+    drawLine(chevronX, chevronY + 2, chevronX + 4, chevronY - 2, chevronColor);
+    drawLine(chevronX + 4, chevronY - 2, chevronX + 8, chevronY + 2, chevronColor);
   }
   else
   {
-    drawLine(arrowX, arrowY - 2, arrowX + 8, arrowY - 2, arrowColor);
-    drawLine(arrowX, arrowY - 2, arrowX + 4, arrowY + 3, arrowColor);
-    drawLine(arrowX + 8, arrowY - 2, arrowX + 4, arrowY + 3, arrowColor);
+    drawLine(chevronX, chevronY - 2, chevronX + 4, chevronY + 2, chevronColor);
+    drawLine(chevronX + 4, chevronY + 2, chevronX + 8, chevronY - 2, chevronColor);
   }
 
   if (isOpen && !items.empty())
   {
-    int itemHeight = 28;
-    int maxVisibleItems = 3;
+    int itemHeight = 32;
+    int maxVisibleItems = 5;
 
     int totalItems = (int)items.size();
-
     int maxScroll = Clamp(totalItems - maxVisibleItems, 0, 0x7FFFFFFF);
     scrollOffset = Clamp(scrollOffset, 0, maxScroll);
     int remaining = totalItems - scrollOffset;
     int visibleItems = Clamp(remaining, 0, maxVisibleItems);
 
     int listHeight = itemHeight * visibleItems;
-    int listY = state.rect.y + state.rect.height + 2;
+    int listY = state.rect.y + state.rect.height + 4;
 
-    Rect clearRect(state.rect.x - 5, listY - 5, state.rect.width + 10, listHeight + 10);
-    Color windowBg = theme.windowBackground;
-    windowBg.a = 255;
-    drawRect(clearRect, windowBg, true);
-
-    Rect shadowRect(state.rect.x + 3, listY + 3, state.rect.width, listHeight);
-    Color shadowColor(0, 0, 0, 80);
-    drawRect(shadowRect, shadowColor, true);
+    Rect shadowRect(state.rect.x + 2, listY + 3, state.rect.width, listHeight);
+    Color shadowColor(0, 0, 0, 40);
+    drawRoundedRect(shadowRect, 8.0f, shadowColor, true);
 
     Rect listRect(state.rect.x, listY, state.rect.width, listHeight);
-
     Color listBg = theme.menuBackground;
-    listBg.a = 255;
-
-    drawRect(listRect, listBg, true);
-    drawRoundedRect(listRect, radius, listBg, true);
+    drawRoundedRect(listRect, 8.0f, listBg, true);
 
     Color listBorder = theme.menuBorder;
-    drawRoundedRect(listRect, radius, listBorder, false);
+    drawRoundedRect(listRect, 8.0f, listBorder, false);
 
     for (int visualIndex = 0; visualIndex < visibleItems; visualIndex++)
     {
       size_t actualIndex = scrollOffset + visualIndex;
 
       Rect itemRect(
-          state.rect.x + 1,
-          listY + (visualIndex * itemHeight) + 1,
-          state.rect.width - 2,
-          itemHeight - 1);
+          state.rect.x + 4,
+          listY + (visualIndex * itemHeight) + 4,
+          state.rect.width - 8,
+          itemHeight - 4);
 
       bool isSelected = ((int)actualIndex == selectedIndex);
       bool isHovered = ((int)actualIndex == hoveredIndex);
 
-      Color itemBg;
-
       if (isHovered)
       {
-        itemBg = theme.menuHover;
+        Color hoverBg = theme.menuHover;
+        drawRoundedRect(itemRect, 4.0f, hoverBg, true);
       }
       else if (isSelected)
       {
-        itemBg = Color(
-            (theme.controlCheck.r + theme.menuBackground.r) / 2,
-            (theme.controlCheck.g + theme.menuBackground.g) / 2,
-            (theme.controlCheck.b + theme.menuBackground.b) / 2);
-      }
-      else
-      {
-        itemBg = listBg;
+        Color selectedBg = theme.controlBackground;
+        selectedBg.a = 60;
+        drawRoundedRect(itemRect, 4.0f, selectedBg, true);
       }
 
-      itemBg.a = 255;
-
-      drawRect(itemRect, itemBg, true);
-
-      int itemTextX = itemRect.x + 10;
-      int itemTextY = itemRect.y + (itemRect.height / 2) - 6;
-
+      int itemTextX = itemRect.x + 12;
+      int itemTextY = itemRect.y + (itemRect.height / 2) - 8;
       Color textColor = theme.textColor;
-      if (isSelected)
-      {
-        textColor = Color(
-            Clamp(textColor.r + 20, 0, 255),
-            Clamp(textColor.g + 20, 0, 255),
-            Clamp(textColor.b + 20, 0, 255));
-      }
 
       drawText(items[actualIndex], itemTextX, itemTextY, textColor);
 
       if (isSelected)
       {
-        int checkX = itemRect.x + itemRect.width - 20;
+        int checkX = itemRect.x + itemRect.width - 24;
         int checkY = itemRect.y + itemRect.height / 2;
         Color checkColor = theme.controlCheck;
 
         drawLine(checkX, checkY, checkX + 2, checkY + 3, checkColor);
-        drawLine(checkX + 2, checkY + 3, checkX + 6, checkY - 2, checkColor);
+        drawLine(checkX + 2, checkY + 3, checkX + 7, checkY - 3, checkColor);
         drawLine(checkX + 1, checkY, checkX + 3, checkY + 3, checkColor);
-        drawLine(checkX + 3, checkY + 3, checkX + 7, checkY - 2, checkColor);
+        drawLine(checkX + 3, checkY + 3, checkX + 8, checkY - 3, checkColor);
       }
 
       if (visualIndex < visibleItems - 1)
       {
-        Color separatorColor = Color(
-            theme.separator.r,
-            theme.separator.g,
-            theme.separator.b,
-            100);
+        Color separatorColor = theme.separator;
+        separatorColor.a = 30;
         drawLine(
-            itemRect.x + 8,
+            itemRect.x + 12,
             itemRect.y + itemRect.height,
-            itemRect.x + itemRect.width - 8,
+            itemRect.x + itemRect.width - 12,
             itemRect.y + itemRect.height,
             separatorColor);
       }
@@ -947,17 +920,23 @@ void RenderManager::drawDropdown(
     if (scrollOffset > 0)
     {
       int arrowTopX = state.rect.x + state.rect.width / 2 - 4;
-      int arrowTopY = listY + 8;
+      int arrowTopY = listY + 10;
       Color scrollHint = theme.textColor;
-      drawText("^", arrowTopX, arrowTopY - 4, scrollHint);
+      scrollHint.a = 120;
+
+      drawLine(arrowTopX, arrowTopY + 2, arrowTopX + 4, arrowTopY - 2, scrollHint);
+      drawLine(arrowTopX + 4, arrowTopY - 2, arrowTopX + 8, arrowTopY + 2, scrollHint);
     }
 
     if (scrollOffset < maxScroll)
     {
       int arrowBottomX = state.rect.x + state.rect.width / 2 - 4;
-      int arrowBottomY = listY + listHeight - 12;
+      int arrowBottomY = listY + listHeight - 14;
       Color scrollHint = theme.textColor;
-      drawText("v", arrowBottomX, arrowBottomY, scrollHint);
+      scrollHint.a = 120;
+
+      drawLine(arrowBottomX, arrowBottomY - 2, arrowBottomX + 4, arrowBottomY + 2, scrollHint);
+      drawLine(arrowBottomX + 4, arrowBottomY + 2, arrowBottomX + 8, arrowBottomY - 2, scrollHint);
     }
   }
 }
@@ -1190,45 +1169,38 @@ void RenderManager::drawLeftPanel(
   Color panelBg;
   if (isDarkTheme)
   {
-    panelBg = Color(
-        min(255, theme.windowBackground.r + 10),
-        min(255, theme.windowBackground.g + 10),
-        min(255, theme.windowBackground.b + 10));
+    panelBg = Color(44, 44, 44, 245);
   }
   else
   {
-    panelBg = Color(
-        max(0, theme.windowBackground.r - 20),
-        max(0, theme.windowBackground.g - 20),
-        max(0, theme.windowBackground.b - 20));
+    panelBg = Color(249, 249, 249, 245);
   }
 
   drawRect(panelBounds, panelBg, true);
+
+  Color borderColor = isDarkTheme ? Color(255, 255, 255, 15) : Color(0, 0, 0, 15);
+  drawRect(panelBounds, borderColor, false);
 
   Rect titleBar(panelBounds.x, panelBounds.y, panelBounds.width, PANEL_TITLE_HEIGHT);
   Color titleBg;
   if (state.dragging)
   {
     titleBg = theme.controlCheck;
+    titleBg.a = 200;
   }
   else
   {
     if (isDarkTheme)
     {
-      titleBg = Color(
-          min(255, panelBg.r + 15),
-          min(255, panelBg.g + 15),
-          min(255, panelBg.b + 15));
+      titleBg = Color(50, 50, 50, 230);
     }
     else
     {
-      titleBg = Color(
-          max(0, panelBg.r - 15),
-          max(0, panelBg.g - 15),
-          max(0, panelBg.b - 15));
+      titleBg = Color(255, 255, 255, 230);
     }
   }
-  drawRect(titleBar, titleBg, true);
+
+  drawRoundedRect(titleBar, 8.0f, titleBg, true);
 
   const char *dockText = "";
   switch (state.dockPosition)
@@ -1253,12 +1225,10 @@ void RenderManager::drawLeftPanel(
   char titleText[64];
   StrCopy(titleText, "File Explorer");
   StrCat(titleText, dockText);
-  drawText(titleText, panelBounds.x + 10, panelBounds.y + 7, theme.textColor);
-
-  drawRect(panelBounds, theme.separator, false);
+  drawText(titleText, panelBounds.x + 16, panelBounds.y + 7, theme.textColor);
 
   int contentX = panelBounds.x + 15;
-  int currentY = panelBounds.y + PANEL_TITLE_HEIGHT + 10;
+  int currentY = panelBounds.y + PANEL_TITLE_HEIGHT + 15;
   int contentWidth = panelBounds.width - 30;
 
   int rowHeight = 16;
@@ -1935,28 +1905,28 @@ void RenderManager::drawContextMenu(
   if (!state.visible || state.items.empty())
     return;
 
-  int itemHeight = 24;
-  int separatorHeight = 8;
-  int padding = 8;
-  int shortcutOffset = 120;
-  int submenuArrowOffset = 10;
+  const int itemHeight = 32;
+  const int separatorHeight = 9;
+  const int padding = 4;
+  const int shortcutOffset = 140;
+  const int submenuArrowOffset = 12;
 
   int totalHeight = padding * 2;
   for (size_t i = 0; i < state.items.size(); i++)
-  {
     totalHeight += state.items[i].separator ? separatorHeight : itemHeight;
-  }
 
-  int menuWidth = state.width > 0 ? state.width : 200;
+  int menuWidth = state.width > 0 ? state.width : 220;
   Rect menuRect(state.x, state.y, menuWidth, totalHeight);
 
-  Rect shadowRect(state.x + 4, state.y + 4, menuWidth, totalHeight);
-  Color shadowColor(0, 0, 0, 100);
-  drawRect(shadowRect, shadowColor, true);
+  drawRoundedRect(
+      Rect(state.x + 2, state.y + 4, menuWidth, totalHeight),
+      8.0f,
+      Color(0, 0, 0, 90),
+      true);
 
-  Color menuBg = theme.menuBackground;
-  menuBg.a = 255;
-  drawRoundedRect(menuRect, 4.0f, menuBg, true);
+  drawRoundedRect(menuRect, 8.0f, theme.menuBackground, true);
+
+  drawRoundedRect(menuRect, 8.0f, theme.menuBorder, false);
 
   int currentY = state.y + padding;
 
@@ -1967,111 +1937,98 @@ void RenderManager::drawContextMenu(
     if (item.separator)
     {
       int sepY = currentY + separatorHeight / 2;
-      Color sepColor = theme.separator;
-      drawLine(
-          state.x + padding,
-          sepY,
-          state.x + menuWidth - padding,
-          sepY,
-          sepColor);
+      drawLine(state.x + 12, sepY, state.x + menuWidth - 12, sepY, theme.separator);
       currentY += separatorHeight;
       continue;
     }
 
-    Rect itemRect(
-        state.x + 1,
-        currentY,
-        menuWidth - 2,
-        itemHeight);
+    Rect itemRect(state.x + 4, currentY, menuWidth - 8, itemHeight);
 
     if ((int)i == state.hoveredIndex)
     {
-      Color hoverBg = theme.menuHover;
-      hoverBg.a = 255;
-
-      if (!item.enabled)
-      {
-        hoverBg.r = (hoverBg.r + menuBg.r) / 2;
-        hoverBg.g = (hoverBg.g + menuBg.g) / 2;
-        hoverBg.b = (hoverBg.b + menuBg.b) / 2;
-      }
-
-      drawRect(itemRect, hoverBg, true);
+      drawRoundedRect(itemRect, 4.0f, theme.menuHover, true);
     }
 
     if (item.checked)
     {
-      int checkX = state.x + padding;
-      int checkY = currentY + itemHeight / 2;
-      Color checkColor = item.enabled ? theme.controlCheck : Color(theme.controlCheck.r / 2, theme.controlCheck.g / 2, theme.controlCheck.b / 2);
+      int cx = state.x + 12;
+      int cy = currentY + itemHeight / 2;
+      Color cc = item.enabled ? theme.controlCheck : theme.disabledText;
 
-      drawLine(checkX, checkY, checkX + 2, checkY + 3, checkColor);
-      drawLine(checkX + 2, checkY + 3, checkX + 6, checkY - 2, checkColor);
-      drawLine(checkX + 1, checkY, checkX + 3, checkY + 3, checkColor);
-      drawLine(checkX + 3, checkY + 3, checkX + 7, checkY - 2, checkColor);
+      drawLine(cx, cy, cx + 3, cy + 4, cc);
+      drawLine(cx + 3, cy + 4, cx + 8, cy - 2, cc);
     }
 
-    int textX = state.x + padding + (item.checked ? 20 : 10);
-    int textY = currentY + (itemHeight / 2) - 6;
-    Color textColor = item.enabled ? theme.textColor : Color(theme.textColor.r / 2, theme.textColor.g / 2, theme.textColor.b / 2);
+    int textX = state.x + (item.checked ? 32 : 16);
+    int textY = currentY + (itemHeight / 2) - 8;
+    Color textColor = item.enabled ? theme.textColor : theme.disabledText;
     drawText(item.text, textX, textY, textColor);
 
     if (item.shortcut && item.shortcut[0])
     {
-      int shortcutX = state.x + shortcutOffset;
-      Color shortcutColor = item.enabled ? Color(theme.textColor.r - 40, theme.textColor.g - 40, theme.textColor.b - 40) : Color(theme.textColor.r / 2, theme.textColor.g / 2, theme.textColor.b / 2);
-      drawText(item.shortcut, shortcutX, textY, shortcutColor);
+      drawText(item.shortcut,
+               state.x + shortcutOffset,
+               textY,
+               theme.disabledText);
     }
 
     if (!item.submenu.empty())
     {
-      int arrowX = state.x + menuWidth - submenuArrowOffset - 8;
-      int arrowY = currentY + itemHeight / 2;
-      Color arrowColor = item.enabled ? theme.textColor : Color(theme.textColor.r / 2, theme.textColor.g / 2, theme.textColor.b / 2);
+      int ax = state.x + menuWidth - submenuArrowOffset - 12;
+      int ay = currentY + itemHeight / 2;
+      Color ac = item.enabled ? theme.textColor : theme.disabledText;
 
-      drawLine(arrowX, arrowY - 3, arrowX + 4, arrowY, arrowColor);
-      drawLine(arrowX, arrowY + 3, arrowX + 4, arrowY, arrowColor);
+      drawLine(ax, ay - 4, ax + 5, ay, ac);
+      drawLine(ax, ay + 4, ax + 5, ay, ac);
     }
 
     currentY += itemHeight;
   }
-
-  Color menuBorder = theme.menuBorder;
-  drawRoundedRect(menuRect, 4.0f, menuBorder, false);
 
   if (state.openSubmenuIndex >= 0 &&
       state.openSubmenuIndex < (int)state.items.size() &&
       !state.items[state.openSubmenuIndex].submenu.empty())
   {
     int submenuY = state.y + padding;
+
     for (int i = 0; i < state.openSubmenuIndex; i++)
-    {
       submenuY += state.items[i].separator ? separatorHeight : itemHeight;
-    }
 
     ContextMenuState submenuState;
     submenuState.visible = true;
     submenuState.x = state.x + menuWidth - 2;
-    submenuState.y = submenuY;
     submenuState.width = menuWidth;
     submenuState.hoveredIndex = -1;
+
     submenuState.items = state.items[state.openSubmenuIndex].submenu;
     submenuState.openSubmenuIndex = -1;
+
+    int submenuHeight = padding * 2;
+    for (size_t i = 0; i < submenuState.items.size(); i++)
+    {
+      const ContextMenuItem &sub = submenuState.items[i];
+      submenuHeight += sub.separator ? separatorHeight : itemHeight;
+    }
+
+    int maxY = state.y + totalHeight - submenuHeight - padding;
+    submenuY = Clamp(submenuY, state.y + padding, maxY);
+
+    submenuState.y = submenuY;
 
     drawContextMenu(submenuState, theme);
   }
 }
 
 bool RenderManager::isPointInContextMenu(
-    int mouseX, int mouseY,
-    const ContextMenuState &state)
+  int mouseX, int mouseY,
+  const ContextMenuState& state)
 {
   if (!state.visible)
     return false;
 
-  int itemHeight = 24;
-  int separatorHeight = 8;
-  int padding = 8;
+  const int itemHeight = 32;
+  const int separatorHeight = 9;
+  const int padding = 4;
 
   int totalHeight = padding * 2;
   for (size_t i = 0; i < state.items.size(); i++)
@@ -2079,33 +2036,45 @@ bool RenderManager::isPointInContextMenu(
     totalHeight += state.items[i].separator ? separatorHeight : itemHeight;
   }
 
-  int menuWidth = state.width > 0 ? state.width : 200;
+  int menuWidth = state.width > 0 ? state.width : 220;
 
   return mouseX >= state.x &&
-         mouseX <= state.x + menuWidth &&
-         mouseY >= state.y &&
-         mouseY <= state.y + totalHeight;
+    mouseX <= state.x + menuWidth &&
+    mouseY >= state.y &&
+    mouseY <= state.y + totalHeight;
 }
 
 int RenderManager::getContextMenuHoveredItem(
-    int mouseX, int mouseY,
-    const ContextMenuState &state)
+  int mouseX, int mouseY,
+  const ContextMenuState& state)
 {
   if (!state.visible)
     return -1;
-  if (!isPointInContextMenu(mouseX, mouseY, state))
-    return -1;
 
-  int itemHeight = 24;
-  int separatorHeight = 8;
-  int padding = 8;
+  const int itemHeight = 32;
+  const int separatorHeight = 9;
+  const int padding = 4;
+
+  int menuWidth = state.width > 0 ? state.width : 220;
+
+  int totalHeight = padding * 2;
+  for (size_t i = 0; i < state.items.size(); i++)
+  {
+    totalHeight += state.items[i].separator ? separatorHeight : itemHeight;
+  }
+
+  if (mouseX < state.x || mouseX > state.x + menuWidth ||
+    mouseY < state.y || mouseY > state.y + totalHeight)
+  {
+    return -1;
+  }
 
   int relativeY = mouseY - state.y - padding;
   int currentY = 0;
 
   for (size_t i = 0; i < state.items.size(); i++)
   {
-    const ContextMenuItem &item = state.items[i];
+    const ContextMenuItem& item = state.items[i];
     int height = item.separator ? separatorHeight : itemHeight;
 
     if (relativeY >= currentY && relativeY < currentY + height)
@@ -2209,24 +2178,24 @@ void RenderManager::drawModernScrollbar(
   trackColor.a = 0;
 
   Color thumbColor = theme.scrollbarThumb;
-  thumbColor.a = 128;
+  thumbColor.a = 100;
 
   if (state.hovered || state.pressed)
   {
-    trackColor.a = 30;
-    thumbColor.a = 180;
+    trackColor.a = 20;
+    thumbColor.a = 200;
   }
 
   if (state.pressed)
   {
-    thumbColor.a = 220;
+    thumbColor.a = 240;
   }
 
   if (state.hovered || state.pressed)
   {
     Rect trackRect(state.trackX, state.trackY,
                    state.trackWidth, state.trackHeight);
-    drawRoundedRect(trackRect, 6.0f, trackColor, true);
+    drawRoundedRect(trackRect, 8.0f, trackColor, true);
   }
 
   Rect thumbRect(state.thumbX, state.thumbY,
@@ -2235,15 +2204,10 @@ void RenderManager::drawModernScrollbar(
   Color finalThumbColor = thumbColor;
   if (state.thumbHovered && !state.pressed)
   {
-    finalThumbColor.r = (uint8_t)(thumbColor.r * 1.2f > 255 ? 255 : thumbColor.r * 1.2f);
-    finalThumbColor.g = (uint8_t)(thumbColor.g * 1.2f > 255 ? 255 : thumbColor.g * 1.2f);
-    finalThumbColor.b = (uint8_t)(thumbColor.b * 1.2f > 255 ? 255 : thumbColor.b * 1.2f);
+    finalThumbColor.a = (uint8_t)(thumbColor.a * 1.3f > 255 ? 255 : thumbColor.a * 1.3f);
   }
 
-  float radius = (float)state.thumbWidth / 2.0f;
-  if (!vertical)
-    radius = (float)state.thumbHeight / 2.0f;
-
+  float radius = 8.0f;
   drawRoundedRect(thumbRect, radius, finalThumbColor, true);
 }
 
