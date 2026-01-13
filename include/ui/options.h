@@ -12,14 +12,16 @@ struct AppOptions {
   bool autoReload;
   bool contextMenu;
   char language[64];
+  int fontSize;
   char enabledPlugins[10][128];
   int enabledPluginCount;
-  
+
   AppOptions()
     : darkMode(true),
     defaultBytesPerLine(16),
     autoReload(true),
-    contextMenu(false) {
+    contextMenu(false),
+    fontSize(14) {
     language[0] = 'E';
     language[1] = 'n';
     language[2] = 'g';
@@ -29,12 +31,13 @@ struct AppOptions {
     language[6] = 'h';
     language[7] = 0;
   }
-  
+
   AppOptions(bool dark, int bpl, bool reload, bool ctx, const char* lang)
     : darkMode(dark),
     defaultBytesPerLine(bpl),
     autoReload(reload),
-    contextMenu(ctx) {
+    contextMenu(ctx),
+    fontSize(14) {
     int i = 0;
     while (lang && lang[i] && i < 63) {
       language[i] = lang[i];
@@ -42,25 +45,27 @@ struct AppOptions {
     }
     language[i] = 0;
   }
-  
+
   AppOptions(const AppOptions& other)
     : darkMode(other.darkMode),
     defaultBytesPerLine(other.defaultBytesPerLine),
     autoReload(other.autoReload),
-    contextMenu(other.contextMenu) {
+    contextMenu(other.contextMenu),
+    fontSize(other.fontSize) {
     for (int i = 0; i < 64; i++) {
       language[i] = other.language[i];
       if (other.language[i] == 0) break;
     }
   }
-  
+
   AppOptions& operator=(const AppOptions& other) {
     if (this != &other) {
       darkMode = other.darkMode;
       defaultBytesPerLine = other.defaultBytesPerLine;
       autoReload = other.autoReload;
       contextMenu = other.contextMenu;
-      
+      fontSize = other.fontSize;
+
       for (int i = 0; i < 64; i++) {
         language[i] = other.language[i];
         if (other.language[i] == 0) break;
@@ -92,7 +97,7 @@ void DetectNative();
 void LoadOptionsFromFile(AppOptions& options);
 void SaveOptionsToFile(const AppOptions& options);
 bool IsPointInRect(int x, int y, const Rect& rect);
-void GetConfigPath(char *outPath, int maxLen);
+void GetConfigPath(char* outPath, int maxLen);
 
 class OptionsDialog {
 public:
@@ -104,25 +109,28 @@ public:
 };
 
 struct OptionsDialogData {
-    AppOptions tempOptions;
-    AppOptions* originalOptions;
-    RenderManager* renderer;
-    NativeWindow window;
-    bool dialogResult;
-    bool running;
+  AppOptions tempOptions;
+  AppOptions* originalOptions;
+  RenderManager* renderer;
+  NativeWindow window;
+  bool dialogResult;
+  bool running;
+  int mouseX;
+  int mouseY;
+  bool mouseDown;
+  int hoveredWidget;
+  int pressedWidget;
+  bool dropdownOpen;
+  int dropdownScrollOffset;
+  int hoveredDropdownItem;
+  Vector<char*> languages;
+  int selectedLanguage;
 
-    int mouseX;
-    int mouseY;
-    bool mouseDown;
-
-    int hoveredWidget;
-    int pressedWidget;
-
-    bool dropdownOpen;
-    int dropdownScrollOffset;
-    int hoveredDropdownItem;
-    Vector<char*> languages;
-    int selectedLanguage;
+  Vector<char*> fontSizes;
+  int selectedFontSize;
+  int hoveredFontDropdownItem;
+  int fontDropdownScrollOffset;
+  bool fontDropdownOpen;
 
 #ifdef __linux__
   Display* display;
@@ -142,7 +150,9 @@ struct OptionsDialogData {
 #endif
     dialogResult(false), running(true), originalOptions(nullptr),
     dropdownOpen(false), hoveredDropdownItem(-1), selectedLanguage(0),
-    dropdownScrollOffset(0)
+    dropdownScrollOffset(0),
+    selectedFontSize(5), hoveredFontDropdownItem(-1),
+    fontDropdownScrollOffset(0), fontDropdownOpen(false)
   {
 #ifdef __linux__
     display = nullptr;
@@ -152,19 +162,34 @@ struct OptionsDialogData {
       "Chinese", "Russian", "Italian", "Portuguese", "Korean", "Dutch", "Polish",
       "Turkish", "Swedish", "Arabic", "Hindi", "Czech", "Greek", "Danish",
       "Norwegian", "Finnish", "Vietnamese" };
-
     for (int i = 0; i < 22; i++) {
       size_t len = StrLen(langList[i]);
       char* s = (char*)PlatformAlloc(len + 1);
       StrCopy(s, langList[i]);
       languages.Add(s);
     }
+
+    const char* fontList[] = {
+      "8pt", "9pt", "10pt", "11pt", "12pt", "13pt",
+      "14pt", "15pt", "16pt", "18pt", "20pt", "22pt", "24pt"
+    };
+    for (int i = 0; i < 13; i++) {
+      size_t len = StrLen(fontList[i]);
+      char* s = (char*)PlatformAlloc(len + 1);
+      StrCopy(s, fontList[i]);
+      fontSizes.Add(s);
+    }
   }
-  
+
   ~OptionsDialogData() {
     for (size_t i = 0; i < languages.size(); i++) {
       if (languages[i]) {
         PlatformFree(languages[i], StrLen(languages[i]) + 1);
+      }
+    }
+    for (size_t i = 0; i < fontSizes.size(); i++) {
+      if (fontSizes[i]) {
+        PlatformFree(fontSizes[i], StrLen(fontSizes[i]) + 1);
       }
     }
   }

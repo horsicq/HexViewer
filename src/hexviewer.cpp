@@ -494,6 +494,8 @@ void OnOptionsDialog()
 	{
 		SaveOptionsToFile(g_Options);
 		ApplyDarkTitleBar(g_Hwnd, g_Options.darkMode);
+		g_Renderer.destroyFont();
+		g_Renderer.createFont();
 		InvalidateRect(g_Hwnd, 0, FALSE);
 	}
 #else

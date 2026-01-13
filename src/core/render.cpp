@@ -3,13 +3,18 @@
 #include "hexdata.h"
 #include "platform_die.h"
 
-char buf[256];
-char g_DIEExecutablePath[260];
-extern long long cursorBytePos;
+
+extern AppOptions g_Options;
 extern HexData g_HexData;
 extern BookmarksState g_Bookmarks;
 extern ByteStatistics g_ByteStats;
 extern DetectItEasyState g_DIEState;
+
+char buf[256];
+char g_DIEExecutablePath[260];
+extern long long cursorBytePos;
+int fontSize = g_Options.fontSize;
+
 
 #ifdef _WIN32
 #include <windows.h>
@@ -271,7 +276,7 @@ void RenderManager::createFont()
 {
 #ifdef _WIN32
   font = CreateFontA(
-      16, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
+    g_Options.fontSize, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
       DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
       DEFAULT_QUALITY, FIXED_PITCH | FF_MODERN, "Consolas");
 
@@ -788,14 +793,14 @@ void RenderManager::drawModernRadioButton(const WidgetState &state, const Theme 
 }
 
 void RenderManager::drawDropdown(
-    const WidgetState &state,
-    const Theme &theme,
-    const char *selectedText,
-    bool isOpen,
-    const Vector<char *> &items,
-    int selectedIndex,
-    int hoveredIndex,
-    int scrollOffset)
+  const WidgetState& state,
+  const Theme& theme,
+  const char* selectedText,
+  bool isOpen,
+  const Vector<char*>& items,
+  int selectedIndex,
+  int hoveredIndex,
+  int scrollOffset)
 {
   float radius = 4.0f;
 
@@ -855,7 +860,20 @@ void RenderManager::drawDropdown(
     drawRoundedRect(shadowRect, 8.0f, shadowColor, true);
 
     Rect listRect(state.rect.x, listY, state.rect.width, listHeight);
-    Color listBg = theme.menuBackground;
+
+#ifdef _WIN32
+    if (memDC)
+    {
+      RECT clearRect = { listRect.x, listRect.y,
+                        listRect.x + listRect.width,
+                        listRect.y + listRect.height };
+      HBRUSH brush = CreateSolidBrush(RGB(44, 44, 44));
+      FillRect(memDC, &clearRect, brush);
+      DeleteObject(brush);
+    }
+#endif
+
+    Color listBg(44, 44, 44, 255);
     drawRoundedRect(listRect, 8.0f, listBg, true);
 
     Color listBorder = theme.menuBorder;
@@ -866,10 +884,10 @@ void RenderManager::drawDropdown(
       size_t actualIndex = scrollOffset + visualIndex;
 
       Rect itemRect(
-          state.rect.x + 4,
-          listY + (visualIndex * itemHeight) + 4,
-          state.rect.width - 8,
-          itemHeight - 4);
+        state.rect.x + 4,
+        listY + (visualIndex * itemHeight) + 4,
+        state.rect.width - 8,
+        itemHeight - 4);
 
       bool isSelected = ((int)actualIndex == selectedIndex);
       bool isHovered = ((int)actualIndex == hoveredIndex);
@@ -909,11 +927,11 @@ void RenderManager::drawDropdown(
         Color separatorColor = theme.separator;
         separatorColor.a = 30;
         drawLine(
-            itemRect.x + 12,
-            itemRect.y + itemRect.height,
-            itemRect.x + itemRect.width - 12,
-            itemRect.y + itemRect.height,
-            separatorColor);
+          itemRect.x + 12,
+          itemRect.y + itemRect.height,
+          itemRect.x + itemRect.width - 12,
+          itemRect.y + itemRect.height,
+          separatorColor);
       }
     }
 

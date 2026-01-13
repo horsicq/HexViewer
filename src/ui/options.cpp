@@ -243,6 +243,12 @@ void SaveOptionsToFile(const AppOptions &options)
     StrCopy(buf + len, "\n");
     WriteFile(hFile, buf, (DWORD)StrLen(buf), &written, nullptr);
 
+    StrCopy(buf, "fontSize=");
+    IntToStr(options.fontSize, buf + 9, 247);
+    len = (int)StrLen(buf);
+    StrCopy(buf + len, "\n");
+    WriteFile(hFile, buf, (DWORD)StrLen(buf), &written, nullptr);
+
     StrCopy(buf, "\n[RecentFiles]\n");
     WriteFile(hFile, buf, (DWORD)StrLen(buf), &written, nullptr);
 
@@ -533,6 +539,8 @@ void LoadOptionsFromFile(AppOptions &options)
               options.autoReload = strEquals(val, "1");
             else if (strEquals(key, "language"))
               StrCopy(options.language, val);
+            else if (strEquals(key, "fontSize"))
+              options.fontSize = StrToInt(val);
           }
         }
         
@@ -550,7 +558,13 @@ bool IsPointInRect(int x, int y, const Rect &rect)
          y >= rect.y && y <= rect.y + rect.height;
 }
 
-void RenderOptionsDialog(OptionsDialogData *data, int windowWidth, int windowHeight)
+inline int NextY(int& y, int controlHeight, int spacing)
+{
+  y += controlHeight + spacing;
+  return y;
+}
+
+void RenderOptionsDialog(OptionsDialogData* data, int windowWidth, int windowHeight)
 {
   if (!data || !data->renderer)
     return;
@@ -558,210 +572,372 @@ void RenderOptionsDialog(OptionsDialogData *data, int windowWidth, int windowHei
   Theme theme = data->tempOptions.darkMode ? Theme::Dark() : Theme::Light();
   data->renderer->clear(theme.windowBackground);
 
-  int margin = 20;
+  const int margin = 20;
+  const int controlHeight = 25;
+  const int controlSpacing = 10;
+  const int sectionSpacing = 20;
+
   int y = margin;
-  int controlHeight = 25;
-  int spacing = 10;
+
+#define NEXT_Y(spacing) (y += controlHeight + (spacing))
 
   data->renderer->drawText(Translations::T("Options"), margin, y, theme.headerColor);
-  y += 35;
+  NEXT_Y(15);
 
-  Rect checkboxRect1(margin, y, 18, 18);
-  WidgetState checkboxState1(checkboxRect1);
-  checkboxState1.hovered = (data->hoveredWidget == 0);
-  checkboxState1.pressed = (data->pressedWidget == 0);
+  {
+    Rect r(margin, y, 18, 18);
+    WidgetState ws(r);
+    ws.hovered = (data->hoveredWidget == 0);
+    ws.pressed = (data->pressedWidget == 0);
 
-  data->renderer->drawModernCheckbox(checkboxState1, theme, data->tempOptions.darkMode);
-  data->renderer->drawText(Translations::T("Dark Mode"), margin + 28, y + 2, theme.textColor);
-  y += controlHeight + spacing;
+    data->renderer->drawModernCheckbox(ws, theme, data->tempOptions.darkMode);
+    data->renderer->drawText(Translations::T("Dark Mode"), margin + 28, y + 2, theme.textColor);
+    NEXT_Y(controlSpacing);
+  }
 
-  Rect checkboxRect2(margin, y, 18, 18);
-  WidgetState checkboxState2(checkboxRect2);
-  checkboxState2.hovered = (data->hoveredWidget == 1);
-  checkboxState2.pressed = (data->pressedWidget == 1);
+  {
+    Rect r(margin, y, 18, 18);
+    WidgetState ws(r);
+    ws.hovered = (data->hoveredWidget == 1);
+    ws.pressed = (data->pressedWidget == 1);
 
-  data->renderer->drawModernCheckbox(checkboxState2, theme, data->tempOptions.autoReload);
-  data->renderer->drawText(Translations::T("Auto-reload modified file"), margin + 28, y + 2, theme.textColor);
-  y += controlHeight + spacing;
+    data->renderer->drawModernCheckbox(ws, theme, data->tempOptions.autoReload);
+    data->renderer->drawText(Translations::T("Auto-reload modified file"), margin + 28, y + 2, theme.textColor);
+    NEXT_Y(controlSpacing);
+  }
 
   if (!GetIsNativeFlag())
   {
-    Rect checkboxRect3(margin, y, 18, 18);
-    WidgetState checkboxState3(checkboxRect3);
-    checkboxState3.hovered = (data->hoveredWidget == 2);
-    checkboxState3.pressed = (data->pressedWidget == 2);
+    Rect r(margin, y, 18, 18);
+    WidgetState ws(r);
+    ws.hovered = (data->hoveredWidget == 2);
+    ws.pressed = (data->pressedWidget == 2);
 
-    data->renderer->drawModernCheckbox(checkboxState3, theme, data->tempOptions.contextMenu);
-    data->renderer->drawText(Translations::T("Add to context menu (right-click files)"), margin + 28, y + 2, theme.textColor);
-    y += controlHeight + spacing * 2;
+    data->renderer->drawModernCheckbox(ws, theme, data->tempOptions.contextMenu);
+    data->renderer->drawText(
+      Translations::T("Add to context menu (right-click files)"),
+      margin + 28, y + 2, theme.textColor);
+
+    NEXT_Y(sectionSpacing);
   }
 
   data->renderer->drawText(Translations::T("Language:"), margin, y, theme.textColor);
-  y += controlHeight;
+  NEXT_Y(controlSpacing);
 
-  Rect dropdownRect(margin + 20, y, 200, controlHeight);
-  WidgetState dropdownState(dropdownRect);
-  dropdownState.hovered = (data->hoveredWidget == 7);
-  dropdownState.pressed = (data->pressedWidget == 7);
+  int languageDropdownY = y;
+  {
+    Rect r(margin + 20, languageDropdownY, 200, controlHeight);
+    WidgetState ws(r);
+    ws.hovered = (data->hoveredWidget == 7);
+    ws.pressed = (data->pressedWidget == 7);
 
-  data->renderer->drawDropdown(
-      dropdownState,
+    if (!data->dropdownOpen)
+    {
+      data->renderer->drawDropdown(
+        ws,
+        theme,
+        data->languages[data->selectedLanguage],
+        false,
+        data->languages,
+        data->selectedLanguage,
+        data->hoveredDropdownItem,
+        data->dropdownScrollOffset);
+    }
+
+    NEXT_Y(sectionSpacing);
+  }
+
+  data->renderer->drawText(Translations::T("Font Size:"), margin, y, theme.textColor);
+  NEXT_Y(controlSpacing);
+
+  int fontDropdownY = y;
+  {
+    char fontSizeLabel[32];
+    IntToStr(data->tempOptions.fontSize, fontSizeLabel, 32);
+    StrCat(fontSizeLabel, "pt");
+
+    Rect r(margin + 20, fontDropdownY, 200, controlHeight);
+    WidgetState ws(r);
+    ws.hovered = (data->hoveredWidget == 8);
+    ws.pressed = (data->pressedWidget == 8);
+
+    if (!data->fontDropdownOpen)
+    {
+      data->renderer->drawDropdown(
+        ws,
+        theme,
+        fontSizeLabel,
+        false,
+        data->fontSizes,
+        data->selectedFontSize,
+        data->hoveredFontDropdownItem,
+        data->fontDropdownScrollOffset);
+    }
+
+    NEXT_Y(sectionSpacing);
+  }
+	y += sectionSpacing *2;
+
+  data->renderer->drawText(
+    Translations::T("Default bytes per line:"), margin, y, theme.textColor);
+  NEXT_Y(controlSpacing);
+
+  int radio8Y = y;
+  {
+    Rect r(margin + 20, radio8Y, 16, 16);
+    WidgetState ws(r);
+    ws.hovered = (data->hoveredWidget == 3);
+    ws.pressed = (data->pressedWidget == 3);
+
+    data->renderer->drawModernRadioButton(ws, theme, data->tempOptions.defaultBytesPerLine == 8);
+    data->renderer->drawText(Translations::T("8 bytes"), margin + 45, radio8Y + 1, theme.textColor);
+    NEXT_Y(controlSpacing);
+  }
+
+  int radio16Y = y;
+  {
+    Rect r(margin + 20, radio16Y, 16, 16);
+    WidgetState ws(r);
+    ws.hovered = (data->hoveredWidget == 4);
+    ws.pressed = (data->pressedWidget == 4);
+
+    data->renderer->drawModernRadioButton(ws, theme, data->tempOptions.defaultBytesPerLine == 16);
+    data->renderer->drawText(Translations::T("16 bytes"), margin + 45, radio16Y + 1, theme.textColor);
+  }
+
+  const int buttonWidth = 75;
+  const int buttonHeight = 25;
+  const int buttonSpacing = 8;
+  const int buttonY = windowHeight - margin - buttonHeight - 5;
+
+  {
+    Rect r(windowWidth - margin - buttonWidth * 2 - buttonSpacing,
+      buttonY, buttonWidth, buttonHeight);
+    WidgetState ws(r);
+    ws.hovered = (data->hoveredWidget == 5);
+    ws.pressed = (data->pressedWidget == 5);
+    data->renderer->drawModernButton(ws, theme, Translations::T("OK"));
+  }
+
+  {
+    Rect r(windowWidth - margin - buttonWidth,
+      buttonY, buttonWidth, buttonHeight);
+    WidgetState ws(r);
+    ws.hovered = (data->hoveredWidget == 6);
+    ws.pressed = (data->pressedWidget == 6);
+    data->renderer->drawModernButton(ws, theme, Translations::T("Cancel"));
+  }
+
+
+  if (data->dropdownOpen)
+  {
+    Rect r(margin + 20, languageDropdownY, 200, controlHeight);
+    WidgetState ws(r);
+    ws.hovered = (data->hoveredWidget == 7);
+    ws.pressed = (data->pressedWidget == 7);
+
+    data->renderer->drawDropdown(
+      ws,
       theme,
       data->languages[data->selectedLanguage],
-      data->dropdownOpen,
+      true,
       data->languages,
       data->selectedLanguage,
       data->hoveredDropdownItem,
       data->dropdownScrollOffset);
+  }
 
-  y += controlHeight + spacing * 2 + spacing * 8;
+  if (data->fontDropdownOpen)
+  {
+    char fontSizeLabel[32];
+    IntToStr(data->tempOptions.fontSize, fontSizeLabel, 32);
+    StrCat(fontSizeLabel, "pt");
 
-  data->renderer->drawText(
-      Translations::T("Default bytes per line:"), margin, y, theme.textColor);
-  y += controlHeight;
+    Rect r(margin + 20, fontDropdownY, 200, controlHeight);
+    WidgetState ws(r);
+    ws.hovered = (data->hoveredWidget == 8);
+    ws.pressed = (data->pressedWidget == 8);
 
-  Rect radioRect1(margin + 20, y, 16, 16);
-  WidgetState radioState1(radioRect1);
-  radioState1.hovered = (data->hoveredWidget == 3);
-  radioState1.pressed = (data->pressedWidget == 3);
+    data->renderer->drawDropdown(
+      ws,
+      theme,
+      fontSizeLabel,
+      true,
+      data->fontSizes,
+      data->selectedFontSize,
+      data->hoveredFontDropdownItem,
+      data->fontDropdownScrollOffset);
+  }
 
-  data->renderer->drawModernRadioButton(radioState1, theme, data->tempOptions.defaultBytesPerLine == 8);
-  data->renderer->drawText(Translations::T("8 bytes"), margin + 45, y + 1, theme.textColor);
-  y += controlHeight;
-
-  Rect radioRect2(margin + 20, y, 16, 16);
-  WidgetState radioState2(radioRect2);
-  radioState2.hovered = (data->hoveredWidget == 4);
-  radioState2.pressed = (data->pressedWidget == 4);
-
-  data->renderer->drawModernRadioButton(radioState2, theme, data->tempOptions.defaultBytesPerLine == 16);
-  data->renderer->drawText(Translations::T("16 bytes"), margin + 45, y + 1, theme.textColor);
-
-  int buttonWidth = 75;
-  int buttonHeight = 25;
-  int buttonY = windowHeight - margin - buttonHeight - 5;
-  int buttonSpacing = 8;
-
-  Rect okButtonRect(windowWidth - margin - buttonWidth * 2 - buttonSpacing, buttonY, buttonWidth, buttonHeight);
-  WidgetState okButtonState(okButtonRect);
-  okButtonState.hovered = (data->hoveredWidget == 5);
-  okButtonState.pressed = (data->pressedWidget == 5);
-
-  data->renderer->drawModernButton(okButtonState, theme, Translations::T("OK"));
-
-  Rect cancelButtonRect(windowWidth - margin - buttonWidth, buttonY, buttonWidth, buttonHeight);
-  WidgetState cancelButtonState(cancelButtonRect);
-  cancelButtonState.hovered = (data->hoveredWidget == 6);
-  cancelButtonState.pressed = (data->pressedWidget == 6);
-
-  data->renderer->drawModernButton(cancelButtonState, theme, Translations::T("Cancel"));
+#undef NEXT_Y
 }
 
-void UpdateHoverState(OptionsDialogData *data, int x, int y, int windowWidth, int windowHeight)
+void UpdateHoverState(OptionsDialogData* data, int x, int y, int windowWidth, int windowHeight)
 {
-  int margin = 20;
-  int startY = margin + 35;
-  int controlHeight = 25;
-  int spacing = 10;
+  const int margin = 20;
+  const int controlHeight = 25;
+  const int controlSpacing = 10;
+  const int sectionSpacing = 20;
+
+  int startY = margin;
 
   data->hoveredWidget = -1;
   data->hoveredDropdownItem = -1;
+  data->hoveredFontDropdownItem = -1;
 
-  Rect checkboxRect1(margin, startY, 18, 18);
-  if (IsPointInRect(x, y, checkboxRect1))
-  {
-    data->hoveredWidget = 0;
-    return;
-  }
-  startY += controlHeight + spacing;
+#define NEXT_Y(spacing) (startY += controlHeight + (spacing))
 
-  Rect checkboxRect2(margin, startY, 18, 18);
-  if (IsPointInRect(x, y, checkboxRect2))
+  NEXT_Y(15);
+
   {
-    data->hoveredWidget = 1;
-    return;
+    Rect r(margin, startY, 18, 18);
+    if (IsPointInRect(x, y, r)) { data->hoveredWidget = 0; return; }
+    NEXT_Y(controlSpacing);
   }
-  startY += controlHeight + spacing;
+
+  {
+    Rect r(margin, startY, 18, 18);
+    if (IsPointInRect(x, y, r)) { data->hoveredWidget = 1; return; }
+    NEXT_Y(controlSpacing);
+  }
 
   if (!GetIsNativeFlag())
   {
-    Rect checkboxRect3(margin, startY, 18, 18);
-    if (IsPointInRect(x, y, checkboxRect3))
-    {
-      data->hoveredWidget = 2;
-      return;
-    }
-    startY += controlHeight + spacing * 2;
+    Rect r(margin, startY, 18, 18);
+    if (IsPointInRect(x, y, r)) { data->hoveredWidget = 2; return; }
+    NEXT_Y(sectionSpacing);
   }
 
-  startY += controlHeight;
+  NEXT_Y(controlSpacing);
 
-  Rect dropdownRect(margin + 20, startY, 200, controlHeight);
-  if (IsPointInRect(x, y, dropdownRect))
   {
-    data->hoveredWidget = 7;
-    if (!data->dropdownOpen)
-      return;
-  }
-
-  if (data->dropdownOpen)
-  {
-    int itemHeight = 28;
-    int maxVisibleItems = 3;
-    int dropdownItemY = startY + controlHeight + 2;
-
-    for (size_t i = 0; i < data->languages.size(); i++)
+    Rect dropdownRect(margin + 20, startY, 200, controlHeight);
+    if (IsPointInRect(x, y, dropdownRect))
     {
-      int visualIndex = (int)i - data->dropdownScrollOffset;
-      if (visualIndex < 0 || visualIndex >= maxVisibleItems)
-        continue;
-
-      Rect itemRect(margin + 20, dropdownItemY + (visualIndex * itemHeight), 200, itemHeight);
-      if (IsPointInRect(x, y, itemRect))
+      data->hoveredWidget = 7;
+      if (!data->dropdownOpen)
       {
-        data->hoveredDropdownItem = (int)i;
         return;
       }
     }
+
+    if (data->dropdownOpen)
+    {
+      int itemHeight = 32;
+      int maxVisible = 5;
+      int dropdownItemY = startY + controlHeight + 4;
+
+      for (size_t i = 0; i < data->languages.size(); i++)
+      {
+        int visualIndex = (int)i - data->dropdownScrollOffset;
+        if (visualIndex < 0 || visualIndex >= maxVisible)
+          continue;
+
+        Rect itemRect(
+          margin + 20,
+          dropdownItemY + visualIndex * itemHeight + 4,
+          200,
+          itemHeight - 4);
+
+        if (IsPointInRect(x, y, itemRect))
+        {
+          data->hoveredDropdownItem = (int)i;
+          return;
+        }
+      }
+    }
+
+    NEXT_Y(sectionSpacing);
   }
 
-  startY += controlHeight + spacing * 2 + spacing * 8 + controlHeight;
+  NEXT_Y(controlSpacing);
 
-  Rect radioRect1(margin + 20, startY, 16, 16);
-  if (IsPointInRect(x, y, radioRect1))
   {
-    data->hoveredWidget = 3;
-    return;
-  }
-  startY += controlHeight;
+    Rect fontDropdownRect(margin + 20, startY, 200, controlHeight);
+    if (IsPointInRect(x, y, fontDropdownRect))
+    {
+      data->hoveredWidget = 8;
+      if (!data->fontDropdownOpen)
+      {
+        return;
+      }
+    }
 
-  Rect radioRect2(margin + 20, startY, 16, 16);
-  if (IsPointInRect(x, y, radioRect2))
+    if (data->fontDropdownOpen)
+    {
+      int itemHeight = 32;
+      int maxVisible = 5;
+      int fontDropdownItemY = startY + controlHeight + 4;
+
+      for (size_t i = 0; i < data->fontSizes.size(); i++)
+      {
+        int visualIndex = (int)i - data->fontDropdownScrollOffset;
+        if (visualIndex < 0 || visualIndex >= maxVisible)
+          continue;
+
+        Rect itemRect(
+          margin + 20,
+          fontDropdownItemY + visualIndex * itemHeight + 4,
+          200,
+          itemHeight - 4);
+
+        if (IsPointInRect(x, y, itemRect))
+        {
+          data->hoveredFontDropdownItem = (int)i;
+          return;
+        }
+      }
+    }
+
+    NEXT_Y(sectionSpacing);
+  }
+
+  NEXT_Y(controlSpacing);
+
   {
-    data->hoveredWidget = 4;
-    return;
+    Rect r(margin + 20, startY, 16, 16);
+    if (IsPointInRect(x, y, r)) { data->hoveredWidget = 3; return; }
+    NEXT_Y(controlSpacing);
   }
 
-  int buttonWidth = 75;
-  int buttonHeight = 25;
-  int buttonY = windowHeight - margin - buttonHeight - 5;
-  int buttonSpacing = 8;
+  {
+    Rect r(margin + 20, startY, 16, 16);
+    if (IsPointInRect(x, y, r)) { data->hoveredWidget = 4; return; }
+  }
 
-  Rect okButtonRect(windowWidth - margin - buttonWidth * 2 - buttonSpacing, buttonY, buttonWidth, buttonHeight);
+  const int buttonWidth = 75;
+  const int buttonHeight = 25;
+  const int buttonSpacing = 8;
+  const int buttonY = windowHeight - margin - buttonHeight - 5;
+
+  Rect okButtonRect(
+    windowWidth - margin - buttonWidth * 2 - buttonSpacing,
+    buttonY,
+    buttonWidth,
+    buttonHeight);
+
   if (IsPointInRect(x, y, okButtonRect))
   {
     data->hoveredWidget = 5;
     return;
   }
 
-  Rect cancelButtonRect(windowWidth - margin - buttonWidth, buttonY, buttonWidth, buttonHeight);
+  Rect cancelButtonRect(
+    windowWidth - margin - buttonWidth,
+    buttonY,
+    buttonWidth,
+    buttonHeight);
+
   if (IsPointInRect(x, y, cancelButtonRect))
   {
     data->hoveredWidget = 6;
+    return;
   }
+
+#undef NEXT_Y
 }
 
-void HandleMouseClick(OptionsDialogData *data, int x, int y, int windowWidth, int windowHeight)
+void HandleMouseClick(OptionsDialogData* data, int x, int y, int windowWidth, int windowHeight)
 {
   if (data->dropdownOpen && data->hoveredDropdownItem >= 0)
   {
@@ -769,6 +945,20 @@ void HandleMouseClick(OptionsDialogData *data, int x, int y, int windowWidth, in
     StrCopy(data->tempOptions.language, data->languages[data->selectedLanguage]);
     Translations::SetLanguage(data->tempOptions.language);
     data->dropdownOpen = false;
+    return;
+  }
+
+  if (data->fontDropdownOpen && data->hoveredFontDropdownItem >= 0)
+  {
+    data->selectedFontSize = data->hoveredFontDropdownItem;
+
+    int actualSizes[] = { 8, 9, 10, 11, 12, 13, 14, 15, 16, 18, 20, 22, 24 };
+    if (data->selectedFontSize >= 0 && data->selectedFontSize < 13)
+    {
+      data->tempOptions.fontSize = actualSizes[data->selectedFontSize];
+    }
+
+    data->fontDropdownOpen = false;
     return;
   }
 
@@ -800,18 +990,15 @@ void HandleMouseClick(OptionsDialogData *data, int x, int y, int windowWidth, in
 #ifdef _WIN32
     bool wasRegistered = ContextMenuRegistry::IsRegistered(UserRole::CurrentUser);
     bool shouldBeRegistered = data->tempOptions.contextMenu;
-
     if (shouldBeRegistered && !wasRegistered)
     {
       wchar_t exePath[MAX_PATH];
       GetModuleFileNameW(nullptr, exePath, MAX_PATH);
-
       for (int i = 0; exePath[i]; i++)
       {
         if (exePath[i] == L'/')
           exePath[i] = L'\\';
       }
-
       if (!ContextMenuRegistry::Register(exePath, UserRole::CurrentUser))
       {
         MessageBoxW(nullptr, L"Failed to register context menu.", L"Error", MB_OK | MB_ICONERROR);
@@ -841,6 +1028,18 @@ void HandleMouseClick(OptionsDialogData *data, int x, int y, int windowWidth, in
     data->dropdownOpen = !data->dropdownOpen;
     if (!data->dropdownOpen)
       data->dropdownScrollOffset = 0;
+
+    if (data->dropdownOpen)
+      data->fontDropdownOpen = false;
+    break;
+
+  case 8:
+    data->fontDropdownOpen = !data->fontDropdownOpen;
+    if (!data->fontDropdownOpen)
+      data->fontDropdownScrollOffset = 0;
+
+    if (data->fontDropdownOpen)
+      data->dropdownOpen = false;
     break;
   }
 }
@@ -891,49 +1090,92 @@ LRESULT CALLBACK OptionsWindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lP
 
   case WM_MOUSEWHEEL:
   {
-    if (data && data->dropdownOpen)
+    if (data)
     {
       RECT rect;
       GetClientRect(hwnd, &rect);
-
       int margin = 20;
-      int startY = margin + 35 + 25 + 10 + 25 + 10;
+
+      int startY = margin + 15;
+      startY += 25 + 10;
+      startY += 25 + 10;
+
       if (!GetIsNativeFlag())
         startY += 25 + 20;
+
       startY += 25;
 
-      Rect dropdownRect(margin + 20, startY, 200, 25);
+      int languageDropdownY = startY;
+      int fontDropdownY = languageDropdownY + 20 + 25;
 
-      if (data->mouseX >= dropdownRect.x && data->mouseX <= dropdownRect.x + dropdownRect.width &&
-          data->mouseY >= dropdownRect.y)
+      int delta = GET_WHEEL_DELTA_WPARAM(wParam);
+
+      if (data->dropdownOpen)
       {
-        int delta = GET_WHEEL_DELTA_WPARAM(wParam);
-        int maxVisibleItems = 3;
-        int maxScroll = (int)data->languages.size() - maxVisibleItems;
-        if (maxScroll < 0)
-          maxScroll = 0;
+        Rect dropdownRect(margin + 20, languageDropdownY, 200, 25);
 
-        if (delta > 0)
+        if (data->mouseX >= dropdownRect.x &&
+          data->mouseX <= dropdownRect.x + dropdownRect.width &&
+          data->mouseY >= dropdownRect.y)
         {
-          data->dropdownScrollOffset--;
-          if (data->dropdownScrollOffset < 0)
-            data->dropdownScrollOffset = 0;
-        }
-        else
-        {
-          data->dropdownScrollOffset++;
-          if (data->dropdownScrollOffset > maxScroll)
-            data->dropdownScrollOffset = maxScroll;
-        }
+          int maxVisibleItems = 5;
+          int maxScroll = (int)data->languages.size() - maxVisibleItems;
+          if (maxScroll < 0)
+            maxScroll = 0;
 
-        UpdateHoverState(data, data->mouseX, data->mouseY, rect.right, rect.bottom);
-        InvalidateRect(hwnd, NULL, FALSE);
-        return 0;
+          if (delta > 0)
+          {
+            data->dropdownScrollOffset--;
+            if (data->dropdownScrollOffset < 0)
+              data->dropdownScrollOffset = 0;
+          }
+          else
+          {
+            data->dropdownScrollOffset++;
+            if (data->dropdownScrollOffset > maxScroll)
+              data->dropdownScrollOffset = maxScroll;
+          }
+
+          UpdateHoverState(data, data->mouseX, data->mouseY, rect.right, rect.bottom);
+          InvalidateRect(hwnd, NULL, FALSE);
+          return 0;
+        }
+      }
+
+      if (data->fontDropdownOpen)
+      {
+        Rect fontDropdownRect(margin + 20, fontDropdownY, 200, 25);
+
+        if (data->mouseX >= fontDropdownRect.x &&
+          data->mouseX <= fontDropdownRect.x + fontDropdownRect.width &&
+          data->mouseY >= fontDropdownRect.y)
+        {
+          int maxVisibleItems = 5;
+          int maxScroll = (int)data->fontSizes.size() - maxVisibleItems;
+          if (maxScroll < 0)
+            maxScroll = 0;
+
+          if (delta > 0)
+          {
+            data->fontDropdownScrollOffset--;
+            if (data->fontDropdownScrollOffset < 0)
+              data->fontDropdownScrollOffset = 0;
+          }
+          else
+          {
+            data->fontDropdownScrollOffset++;
+            if (data->fontDropdownScrollOffset > maxScroll)
+              data->fontDropdownScrollOffset = maxScroll;
+          }
+
+          UpdateHoverState(data, data->mouseX, data->mouseY, rect.right, rect.bottom);
+          InvalidateRect(hwnd, NULL, FALSE);
+          return 0;
+        }
       }
     }
     break;
   }
-
   case WM_LBUTTONDOWN:
   {
     if (data)
@@ -993,10 +1235,9 @@ LRESULT CALLBACK OptionsWindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lP
   return DefWindowProcW(hwnd, msg, wParam, lParam);
 }
 
-bool OptionsDialog::Show(HWND parent, AppOptions &options)
+bool OptionsDialog::Show(HWND parent, AppOptions& options)
 {
-  const wchar_t *className = L"CustomOptionsWindow";
-
+  const wchar_t* className = L"CustomOptionsWindow";
   WNDCLASSEXW wc = {};
   wc.cbSize = sizeof(WNDCLASSEXW);
   wc.lpfnWndProc = OptionsWindowProc;
@@ -1004,14 +1245,11 @@ bool OptionsDialog::Show(HWND parent, AppOptions &options)
   wc.lpszClassName = className;
   wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
   wc.hbrBackground = (HBRUSH)GetStockObject(BLACK_BRUSH);
-
   UnregisterClassW(className, wc.hInstance);
   if (!RegisterClassExW(&wc))
     return false;
-
   OptionsDialogData data = {};
   data.tempOptions = options;
-
   if (!GetIsNativeFlag())
   {
     data.tempOptions.contextMenu = ContextMenuRegistry::IsRegistered(UserRole::CurrentUser);
@@ -1020,7 +1258,6 @@ bool OptionsDialog::Show(HWND parent, AppOptions &options)
   {
     data.tempOptions.contextMenu = false;
   }
-
   data.originalOptions = &options;
   data.dialogResult = false;
   data.running = true;
@@ -1035,34 +1272,38 @@ bool OptionsDialog::Show(HWND parent, AppOptions &options)
     }
   }
 
-  int width = 400;
-  int height = 480;
+  int actualSizes[] = { 8, 9, 10, 11, 12, 13, 14, 15, 16, 18, 20, 22, 24 };
+  data.selectedFontSize = 6;
+  for (int i = 0; i < 13; i++)
+  {
+    if (actualSizes[i] == options.fontSize)
+    {
+      data.selectedFontSize = i;
+      break;
+    }
+  }
 
+  int width = 400;
+  int height = 600;
   RECT parentRect;
   GetWindowRect(parent, &parentRect);
-
   int x = parentRect.left + (parentRect.right - parentRect.left - width) / 2;
   int y = parentRect.top + (parentRect.bottom - parentRect.top - height) / 2;
-
   HWND hwnd = CreateWindowExW(WS_EX_DLGMODALFRAME | WS_EX_TOPMOST, className, L"Options",
-                              WS_POPUP | WS_CAPTION | WS_SYSMENU, x, y, width, height, parent, nullptr,
-                              GetModuleHandleW(NULL), nullptr);
-
+    WS_POPUP | WS_CAPTION | WS_SYSMENU, x, y, width, height, parent, nullptr,
+    GetModuleHandleW(NULL), nullptr);
   if (!hwnd)
   {
     g_dialogData = nullptr;
     return false;
   }
-
   data.window = hwnd;
-
   if (data.tempOptions.darkMode)
   {
     BOOL dark = TRUE;
     constexpr DWORD DWMWA_USE_IMMERSIVE_DARK_MODE = 20;
     DwmSetWindowAttribute(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, &dark, sizeof(dark));
   }
-
   data.renderer = new RenderManager();
   if (!data.renderer)
   {
@@ -1070,7 +1311,6 @@ bool OptionsDialog::Show(HWND parent, AppOptions &options)
     g_dialogData = nullptr;
     return false;
   }
-
   if (!data.renderer->initialize(hwnd))
   {
     delete data.renderer;
@@ -1078,36 +1318,30 @@ bool OptionsDialog::Show(HWND parent, AppOptions &options)
     g_dialogData = nullptr;
     return false;
   }
-
   RECT clientRect;
   GetClientRect(hwnd, &clientRect);
   if (clientRect.right > 0 && clientRect.bottom > 0)
   {
     data.renderer->resize(clientRect.right, clientRect.bottom);
   }
-
   EnableWindow(parent, FALSE);
   ShowWindow(hwnd, SW_SHOW);
   UpdateWindow(hwnd);
-
   MSG msg;
   while (data.running && GetMessage(&msg, NULL, 0, 0))
   {
     TranslateMessage(&msg);
     DispatchMessage(&msg);
   }
-
   if (data.renderer)
   {
     delete data.renderer;
     data.renderer = nullptr;
   }
-
   EnableWindow(parent, TRUE);
   SetForegroundWindow(parent);
   DestroyWindow(hwnd);
   UnregisterClassW(className, GetModuleHandleW(NULL));
-
   g_dialogData = nullptr;
   return data.dialogResult;
 }
