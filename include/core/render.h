@@ -70,6 +70,7 @@ struct Theme
   Color controlBackground;
   Color controlCheck;
 
+  Color dropdownBackground;
   Color menuBackground;
   Color menuHover;
   Color menuBorder;
@@ -96,6 +97,8 @@ struct Theme
     t.controlBorder = Color(255, 255, 255, 30);
     t.controlBackground = Color(50, 50, 50, 200);
     t.controlCheck = Color(96, 150, 227);
+
+    t.dropdownBackground = Color(44, 44, 44, 255);
 
     t.menuBackground = Color(44, 44, 44, 245);
     t.menuHover = Color(255, 255, 255, 25);
@@ -126,6 +129,8 @@ struct Theme
     t.controlBorder = Color(0, 0, 0, 20);
     t.controlBackground = Color(255, 255, 255, 230);
     t.controlCheck = Color(0, 95, 184);
+
+    t.dropdownBackground = Color(249, 249, 249, 255);
 
     t.menuBackground = Color(249, 249, 249, 250);
     t.menuHover = Color(0, 0, 0, 10);
@@ -690,6 +695,8 @@ public:
 
   int getWindowWidth() const { return windowWidth; }
   int getWindowHeight() const { return windowHeight; }
+  void createFont();
+  void destroyFont();
 
 private:
   NativeWindow window;
@@ -726,7 +733,5 @@ private:
   XFontStruct *fontInfo;
 #endif
 
-  void createFont();
-  void destroyFont();
   void setColor(const Color &color);
 };
