@@ -13,7 +13,6 @@ struct SelectBlockDialogData
   int activeTextBox = 0;
   int selectedRadio = 0;
   int selectedMode = 0;
-
 #ifdef _WIN32
   char startOffsetText[256] = { 0 };
   char endOffsetText[256] = { 0 };
@@ -29,10 +28,18 @@ struct SelectBlockDialogData
 };
 
 #ifdef _WIN32
-void ShowSelectBlockDialog(void* parentHandle, bool darkMode,
+void ShowSelectBlockDialog(
+  void* parentHandle,
+  bool darkMode,
   void (*callback)(const char*, const char*, bool, int),
-  void* userData);
+  void* userData,
+  long long initialStart = -1,
+  long long initialEnd = -1);
 #else
-void ShowSelectBlockDialog(void* parentHandle, bool darkMode,
-  std::function<void(const std::string&, const std::string&, bool, int)> callback);
+void ShowSelectBlockDialog(
+  void* parentHandle,
+  bool darkMode,
+  std::function<void(const std::string&, const std::string&, bool, int)> callback,
+  long long initialStart = -1,
+  long long initialEnd = -1);
 #endif

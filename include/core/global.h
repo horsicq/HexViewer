@@ -644,6 +644,7 @@ inline int StrCompare(const char *a, const char *b)
     return (int)((unsigned char)*a) - (int)((unsigned char)*b);
 }
 
+
 inline void ItoaDec(long long value, char *out, int max)
 {
     char buf[32];

@@ -1039,102 +1039,139 @@ void AppContextMenu::executeAction(int actionId)
   }
   case ID_SELECT_BLOCK:
   {
+    long long initialStart = -1;
+    long long initialLength = -1;
+    
+    if (selectionLength > 0)
+    {
+      long long selStart = cursorBytePos - (selectionLength - 1);
+      if (selStart < 0) selStart = 0;
+
+      initialStart = selStart;
+      initialLength = selectionLength;
+
+    }
+
+    else if (cursorBytePos >= 0)
+    {
+      initialStart = cursorBytePos;
+      initialLength = 0;
+    
+  }
 #ifdef _WIN32
     ShowSelectBlockDialog(
-        g_Hwnd,
-        g_Options.darkMode,
-        [](const char *startStr,
-           const char *endOrLengthStr,
-           bool useLength,
-           int numberFormat)
+      g_Hwnd,
+      g_Options.darkMode,
+      [](const char* startStr,
+        const char* endOrLengthStr,
+        bool useLength,
+        int numberFormat)
+      {
+        long long start = ParseNumber(startStr, numberFormat);
+        long long value = ParseNumber(endOrLengthStr, numberFormat);
+
+        long long length = useLength ? value : (value - start);
+
+        if (start >= 0 &&
+          length > 0 &&
+          start < (long long)g_HexData.getFileSize())
         {
-          long long start = ParseNumber(startStr, numberFormat);
-          long long value = ParseNumber(endOrLengthStr, numberFormat);
+          long long end = start + length;
+          long long maxEnd = (long long)g_HexData.getFileSize();
+          if (end > maxEnd)
+            end = maxEnd;
 
-          long long length = useLength ? value : (value - start);
+          cursorBytePos = start;
+          selectionLength = end - start;
+          editingOffset = start;
+          cursorNibblePos = 0;
 
-          if (start >= 0 &&
-              length > 0 &&
-              start < (long long)g_HexData.getFileSize())
-          {
-            long long end = start + length;
-            long long maxEnd = (long long)g_HexData.getFileSize();
-            if (end > maxEnd)
-              end = maxEnd;
+          int bytesPerLine = g_HexData.getCurrentBytesPerLine();
+          int targetRow = start / bytesPerLine;
+          g_ScrollY = Clamp(targetRow - 5, 0, maxScrolls);
 
-            cursorBytePos = start;
-            selectionLength = end - start;
-            editingOffset = start;
-            cursorNibblePos = 0;
-
-            InvalidateWindow();
-          }
-        },
-        nullptr);
+          InvalidateWindow();
+        }
+      },
+      nullptr,
+      initialStart,
+      initialLength);
 
 #elif __APPLE__
     ShowSelectBlockDialog(
-        (NativeWindow)g_nsWindow,
-        g_Options.darkMode,
-        [](const std::string &startStr,
-           const std::string &endOrLengthStr,
-           bool useLength,
-           int numberFormat)
+      (NativeWindow)g_nsWindow,
+      g_Options.darkMode,
+      [](const std::string& startStr,
+        const std::string& endOrLengthStr,
+        bool useLength,
+        int numberFormat)
+      {
+        long long start = ParseNumber(startStr.c_str(), numberFormat);
+        long long value = ParseNumber(endOrLengthStr.c_str(), numberFormat);
+
+        long long length = useLength ? value : (value - start);
+
+        if (start >= 0 &&
+          length > 0 &&
+          start < (long long)g_HexData.getFileSize())
         {
-          long long start = ParseNumber(startStr.c_str(), numberFormat);
-          long long value = ParseNumber(endOrLengthStr.c_str(), numberFormat);
+          long long end = start + length;
+          long long maxEnd = (long long)g_HexData.getFileSize();
+          if (end > maxEnd)
+            end = maxEnd;
 
-          long long length = useLength ? value : (value - start);
+          cursorBytePos = start;
+          selectionLength = end - start;
+          editingOffset = start;
+          cursorNibblePos = 0;
 
-          if (start >= 0 &&
-              length > 0 &&
-              start < (long long)g_HexData.getFileSize())
-          {
-            long long end = start + length;
-            long long maxEnd = (long long)g_HexData.getFileSize();
-            if (end > maxEnd)
-              end = maxEnd;
+          int bytesPerLine = g_HexData.getCurrentBytesPerLine();
+          int targetRow = start / bytesPerLine;
+          g_ScrollY = Clamp(targetRow - 5, 0, maxScrolls);
 
-            cursorBytePos = start;
-            selectionLength = end - start;
-            editingOffset = start;
-            cursorNibblePos = 0;
-
-            InvalidateWindow();
-          }
-        });
+          InvalidateWindow();
+        }
+      },
+      initialStart,
+      initialLength);
 
 #else
     ShowSelectBlockDialog(
-        (void *)g_window,
-        g_Options.darkMode,
-        [](const std::string &startStr,
-           const std::string &endOrLengthStr,
-           bool useLength,
-           int numberFormat)
+      (void*)g_window,
+      g_Options.darkMode,
+      [](const std::string& startStr,
+        const std::string& endOrLengthStr,
+        bool useLength,
+        int numberFormat)
+      {
+        long long start = ParseNumber(startStr.c_str(), numberFormat);
+        long long value = ParseNumber(endOrLengthStr.c_str(), numberFormat);
+
+        long long length = useLength ? value : (value - start);
+
+        if (start >= 0 &&
+          length > 0 &&
+          start < (long long)g_HexData.getFileSize())
         {
-          long long start = ParseNumber(startStr.c_str(), numberFormat);
-          long long value = ParseNumber(endOrLengthStr.c_str(), numberFormat);
+          long long end = start + length;
+          long long maxEnd = (long long)g_HexData.getFileSize();
+          if (end > maxEnd)
+            end = maxEnd;
 
-          long long length = useLength ? value : (value - start);
+          cursorBytePos = start;
+          selectionLength = end - start;
+          editingOffset = start;
+          cursorNibblePos = 0;
 
-          if (start >= 0 &&
-              length > 0 &&
-              start < (long long)g_HexData.getFileSize())
-          {
-            long long end = start + length;
-            long long maxEnd = (long long)g_HexData.getFileSize();
-            if (end > maxEnd)
-              end = maxEnd;
+          int bytesPerLine = g_HexData.getCurrentBytesPerLine();
+          int targetRow = start / bytesPerLine;
+          g_ScrollY = Clamp(targetRow - 5, 0, maxScrolls);
 
-            cursorBytePos = start;
-            selectionLength = end - start;
-            editingOffset = start;
-            cursorNibblePos = 0;
-
-            InvalidateWindow();
-          }
-        });
+          InvalidateWindow();
+        }
+      },
+      initialStart,
+      initialLength);
 #endif
 
     break;

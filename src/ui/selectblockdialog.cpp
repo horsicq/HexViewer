@@ -17,144 +17,163 @@ static bool IsPointInRect_SB(int x, int y, const Rect& rect)
 
 void RenderSelectBlockDialog(SelectBlockDialogData* data, int windowWidth, int windowHeight)
 {
-    if (!data || !data->renderer)
-        return;
+  if (!data || !data->renderer)
+    return;
 
 #ifdef _WIN32
-    HDC hdc = GetDC(data->platformWindow.hwnd);
+  HDC hdc = GetDC(data->platformWindow.hwnd);
 #endif
 
-    data->renderer->beginFrame();
-    Theme theme = data->renderer->getCurrentTheme();
-    data->renderer->clear(theme.windowBackground);
+  data->renderer->beginFrame();
+  Theme theme = data->renderer->getCurrentTheme();
+  data->renderer->clear(theme.windowBackground);
 
-    int margin = 20;
-    int y = margin;
+  int margin = 20;
+  int y = margin;
 
-    data->renderer->drawText(Translations::T("Start-offset:"), margin, y + 8, theme.textColor);
-    y += 28;
+  static DWORD lastBlinkTime = 0;
+  static bool cursorVisible = true;
+  DWORD currentTime = GetTickCount();
 
-    Rect startBox(margin, y, windowWidth - margin * 2, 30);
-    bool startActive = (data->activeTextBox == 0);
+  if (currentTime - lastBlinkTime > 500)
+  {
+    cursorVisible = !cursorVisible;
+    lastBlinkTime = currentTime;
+  }
 
-    Color startBg     = startActive ? Color(70,70,75) : Color(55,55,60);
-    Color startBorder = startActive ? Color(0,120,215) : Color(90,90,95);
+  data->renderer->drawText(Translations::T("Start-offset:"), margin, y + 8, theme.textColor);
+  y += 28;
 
-    data->renderer->drawRoundedRect(startBox, 4.0f, startBg, true);
-    data->renderer->drawRoundedRect(startBox, 4.0f, startBorder, false);
+  Rect startBox(margin, y, windowWidth - margin * 2, 30);
+  bool startActive = (data->activeTextBox == 0);
+
+  Color startBg = startActive ? Color(70, 70, 75) : Color(55, 55, 60);
+  Color startBorder = startActive ? Color(0, 120, 215) : Color(90, 90, 95);
+
+  data->renderer->drawRoundedRect(startBox, 4.0f, startBg, true);
+  data->renderer->drawRoundedRect(startBox, 4.0f, startBorder, false);
 
 #ifdef _WIN32
-    char startDisplay[256];
-    StringCopy(startDisplay, data->startOffsetText, 256);
-    if (startActive) StringAppend(startDisplay, '|', 256);
-    data->renderer->drawText(startDisplay, startBox.x + 8, startBox.y + 8, Color(240,240,240));
+  char startDisplay[256];
+  StringCopy(startDisplay, data->startOffsetText, 256);
+  if (startActive && cursorVisible)
+    StringAppend(startDisplay, '|', 256);
+  data->renderer->drawText(startDisplay, startBox.x + 8, startBox.y + 8, Color(240, 240, 240));
 #else
-    std::string startDisplay = data->startOffsetText + (startActive ? "|" : "");
-    data->renderer->drawText(startDisplay.c_str(), startBox.x + 8, startBox.y + 8, Color(240,240,240));
+  std::string startDisplay = data->startOffsetText;
+  if (startActive && cursorVisible)
+    startDisplay += "|";
+  data->renderer->drawText(startDisplay.c_str(), startBox.x + 8, startBox.y + 8, Color(240, 240, 240));
 #endif
 
-    y += 50;
-    WidgetState endRadio(Rect(margin, y + 2, 16, 16));
-    endRadio.hovered = (data->hoveredWidget == 10);
-    data->renderer->drawModernRadioButton(endRadio, theme, data->selectedMode == 0);
+  y += 50;
+  WidgetState endRadio(Rect(margin, y + 2, 16, 16));
+  endRadio.hovered = (data->hoveredWidget == 10);
+  data->renderer->drawModernRadioButton(endRadio, theme, data->selectedMode == 0);
 
-    data->renderer->drawText(Translations::T("End-offset:"), margin + 26, y, theme.textColor);
-    y += 30;
+  data->renderer->drawText(Translations::T("End-offset:"), margin + 26, y, theme.textColor);
+  y += 30;
 
-    Rect endBox(margin, y, windowWidth - margin * 2, 30);
-    bool endEnabled = (data->selectedMode == 0);
-    bool endActive  = (data->activeTextBox == 1 && endEnabled);
+  Rect endBox(margin, y, windowWidth - margin * 2, 30);
+  bool endEnabled = (data->selectedMode == 0);
+  bool endActive = (data->activeTextBox == 1 && endEnabled);
 
-    Color endBg     = endEnabled ? (endActive ? Color(70,70,75) : Color(55,55,60)) : Color(40,40,45);
-    Color endBorder = endEnabled ? (endActive ? Color(0,120,215) : Color(90,90,95)) : Color(60,60,65);
-    Color endText   = endEnabled ? Color(240,240,240) : Color(120,120,120);
+  Color endBg = endEnabled ? (endActive ? Color(70, 70, 75) : Color(55, 55, 60)) : Color(40, 40, 45);
+  Color endBorder = endEnabled ? (endActive ? Color(0, 120, 215) : Color(90, 90, 95)) : Color(60, 60, 65);
+  Color endText = endEnabled ? Color(240, 240, 240) : Color(120, 120, 120);
 
-    data->renderer->drawRoundedRect(endBox, 4.0f, endBg, true);
-    data->renderer->drawRoundedRect(endBox, 4.0f, endBorder, false);
+  data->renderer->drawRoundedRect(endBox, 4.0f, endBg, true);
+  data->renderer->drawRoundedRect(endBox, 4.0f, endBorder, false);
 
 #ifdef _WIN32
-    char endDisplay[256];
-    StringCopy(endDisplay, data->endOffsetText, 256);
-    if (endActive) StringAppend(endDisplay, '|', 256);
-    data->renderer->drawText(endDisplay, endBox.x + 8, endBox.y + 8, endText);
+  char endDisplay[256];
+  StringCopy(endDisplay, data->endOffsetText, 256);
+  if (endActive && cursorVisible)
+    StringAppend(endDisplay, '|', 256);
+  data->renderer->drawText(endDisplay, endBox.x + 8, endBox.y + 8, endText);
 #else
-    std::string endDisplay = data->endOffsetText + (endActive ? "|" : "");
-    data->renderer->drawText(endDisplay.c_str(), endBox.x + 8, endBox.y + 8, endText);
+  std::string endDisplay = data->endOffsetText;
+  if (endActive && cursorVisible)
+    endDisplay += "|";
+  data->renderer->drawText(endDisplay.c_str(), endBox.x + 8, endBox.y + 8, endText);
 #endif
 
-    y += 50;
-    WidgetState lengthRadio(Rect(margin, y + 2, 16, 16));
-    lengthRadio.hovered = (data->hoveredWidget == 11);
-    data->renderer->drawModernRadioButton(lengthRadio, theme, data->selectedMode == 1);
+  y += 50;
+  WidgetState lengthRadio(Rect(margin, y + 2, 16, 16));
+  lengthRadio.hovered = (data->hoveredWidget == 11);
+  data->renderer->drawModernRadioButton(lengthRadio, theme, data->selectedMode == 1);
 
-    data->renderer->drawText(Translations::T("Length:"), margin + 26, y, theme.textColor);
-    y += 30;
+  data->renderer->drawText(Translations::T("Length:"), margin + 26, y, theme.textColor);
+  y += 30;
 
-    Rect lengthBox(margin, y, windowWidth - margin * 2, 30);
-    bool lengthEnabled = (data->selectedMode == 1);
-    bool lengthActive  = (data->activeTextBox == 2 && lengthEnabled);
+  Rect lengthBox(margin, y, windowWidth - margin * 2, 30);
+  bool lengthEnabled = (data->selectedMode == 1);
+  bool lengthActive = (data->activeTextBox == 2 && lengthEnabled);
 
-    Color lengthBg     = lengthEnabled ? (lengthActive ? Color(70,70,75) : Color(55,55,60)) : Color(40,40,45);
-    Color lengthBorder = lengthEnabled ? (lengthActive ? Color(0,120,215) : Color(90,90,95)) : Color(60,60,65);
-    Color lengthText   = lengthEnabled ? Color(240,240,240) : Color(120,120,120);
+  Color lengthBg = lengthEnabled ? (lengthActive ? Color(70, 70, 75) : Color(55, 55, 60)) : Color(40, 40, 45);
+  Color lengthBorder = lengthEnabled ? (lengthActive ? Color(0, 120, 215) : Color(90, 90, 95)) : Color(60, 60, 65);
+  Color lengthText = lengthEnabled ? Color(240, 240, 240) : Color(120, 120, 120);
 
-    data->renderer->drawRoundedRect(lengthBox, 4.0f, lengthBg, true);
-    data->renderer->drawRoundedRect(lengthBox, 4.0f, lengthBorder, false);
+  data->renderer->drawRoundedRect(lengthBox, 4.0f, lengthBg, true);
+  data->renderer->drawRoundedRect(lengthBox, 4.0f, lengthBorder, false);
 
 #ifdef _WIN32
-    char lengthDisplay[256];
-    StringCopy(lengthDisplay, data->lengthText, 256);
-    if (lengthActive) StringAppend(lengthDisplay, '|', 256);
-    data->renderer->drawText(lengthDisplay, lengthBox.x + 8, lengthBox.y + 8, lengthText);
+  char lengthDisplay[256];
+  StringCopy(lengthDisplay, data->lengthText, 256);
+  if (lengthActive && cursorVisible)
+    StringAppend(lengthDisplay, '|', 256);
+  data->renderer->drawText(lengthDisplay, lengthBox.x + 8, lengthBox.y + 8, lengthText);
 #else
-    std::string lengthDisplay = data->lengthText + (lengthActive ? "|" : "");
-    data->renderer->drawText(lengthDisplay.c_str(), lengthBox.x + 8, lengthBox.y + 8, lengthText);
+  std::string lengthDisplay = data->lengthText;
+  if (lengthActive && cursorVisible)
+    lengthDisplay += "|";
+  data->renderer->drawText(lengthDisplay.c_str(), lengthBox.x + 8, lengthBox.y + 8, lengthText);
 #endif
 
-    y += 55;
-    int formatSpacing = 60;
-    int formatY = y;
+  y += 55;
+  int formatSpacing = 60;
+  int formatY = y;
 
-    WidgetState hexRadio(Rect(margin, formatY + 2, 16, 16));
-    hexRadio.hovered = (data->hoveredWidget == 20);
-    data->renderer->drawModernRadioButton(hexRadio, theme, data->selectedRadio == 0);
-    data->renderer->drawText("hex", margin + 26, formatY, theme.textColor);
+  WidgetState hexRadio(Rect(margin, formatY + 2, 16, 16));
+  hexRadio.hovered = (data->hoveredWidget == 20);
+  data->renderer->drawModernRadioButton(hexRadio, theme, data->selectedRadio == 0);
+  data->renderer->drawText("hex", margin + 26, formatY, theme.textColor);
 
-    WidgetState decRadio(Rect(margin + formatSpacing, formatY + 2, 16, 16));
-    decRadio.hovered = (data->hoveredWidget == 21);
-    data->renderer->drawModernRadioButton(decRadio, theme, data->selectedRadio == 1);
-    data->renderer->drawText("dec", margin + formatSpacing + 26, formatY, theme.textColor);
+  WidgetState decRadio(Rect(margin + formatSpacing, formatY + 2, 16, 16));
+  decRadio.hovered = (data->hoveredWidget == 21);
+  data->renderer->drawModernRadioButton(decRadio, theme, data->selectedRadio == 1);
+  data->renderer->drawText("dec", margin + formatSpacing + 26, formatY, theme.textColor);
 
-    WidgetState octRadio(Rect(margin + formatSpacing * 2, formatY + 2, 16, 16));
-    octRadio.hovered = (data->hoveredWidget == 22);
-    data->renderer->drawModernRadioButton(octRadio, theme, data->selectedRadio == 2);
-    data->renderer->drawText("oct", margin + formatSpacing * 2 + 26, formatY, theme.textColor);
+  WidgetState octRadio(Rect(margin + formatSpacing * 2, formatY + 2, 16, 16));
+  octRadio.hovered = (data->hoveredWidget == 22);
+  data->renderer->drawModernRadioButton(octRadio, theme, data->selectedRadio == 2);
+  data->renderer->drawText("oct", margin + formatSpacing * 2 + 26, formatY, theme.textColor);
 
-    y += 70;
-    int buttonY = windowHeight - margin - 25;
-    int buttonWidth = 90;
-    int buttonSpacing = 10;
+  y += 70;
+  int buttonY = windowHeight - margin - 25;
+  int buttonWidth = 90;
+  int buttonSpacing = 10;
 
-    Rect okButton(windowWidth - margin - buttonWidth * 2 - buttonSpacing, buttonY, buttonWidth, 30);
-    Rect cancelButton(windowWidth - margin - buttonWidth, buttonY, buttonWidth, 30);
+  Rect okButton(windowWidth - margin - buttonWidth * 2 - buttonSpacing, buttonY, buttonWidth, 30);
+  Rect cancelButton(windowWidth - margin - buttonWidth, buttonY, buttonWidth, 30);
 
-    WidgetState okState(okButton);
-    okState.hovered = (data->hoveredWidget == 0);
-    okState.pressed = (data->pressedWidget == 0);
-    okState.enabled = true;
-    data->renderer->drawModernButton(okState, theme, Translations::T("OK"));
+  WidgetState okState(okButton);
+  okState.hovered = (data->hoveredWidget == 0);
+  okState.pressed = (data->pressedWidget == 0);
+  okState.enabled = true;
+  data->renderer->drawModernButton(okState, theme, Translations::T("OK"));
 
-    WidgetState cancelState(cancelButton);
-    cancelState.hovered = (data->hoveredWidget == 1);
-    cancelState.pressed = (data->pressedWidget == 1);
-    cancelState.enabled = true;
-    data->renderer->drawModernButton(cancelState, theme, Translations::T("Cancel"));
+  WidgetState cancelState(cancelButton);
+  cancelState.hovered = (data->hoveredWidget == 1);
+  cancelState.pressed = (data->pressedWidget == 1);
+  cancelState.enabled = true;
+  data->renderer->drawModernButton(cancelState, theme, Translations::T("Cancel"));
 
 #ifdef _WIN32
-    data->renderer->endFrame(hdc);
-    ReleaseDC(data->platformWindow.hwnd, hdc);
+  data->renderer->endFrame(hdc);
+  ReleaseDC(data->platformWindow.hwnd, hdc);
 #else
-    data->renderer->endFrame(data->renderer->getDrawContext());
+  data->renderer->endFrame(data->renderer->getDrawContext());
 #endif
 }
 
@@ -354,6 +373,15 @@ LRESULT CALLBACK SelectBlockWindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARA
 
   switch (msg)
   {
+  case WM_TIMER:
+  {
+    if (wParam == 1)
+    {
+      InvalidateRect(hwnd, NULL, FALSE);
+    }
+    return 0;
+  }
+
   case WM_PAINT:
   {
     PAINTSTRUCT ps;
@@ -466,7 +494,9 @@ LRESULT CALLBACK SelectBlockWindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARA
 
 void ShowSelectBlockDialog(void* parentHandle, bool darkMode,
   void (*callback)(const char*, const char*, bool, int),
-  void* userData)
+  void* userData,
+  long long initialStart,
+  long long initialLength)
 {
   HWND parent = (HWND)parentHandle;
   const wchar_t* className = L"SelectBlockDialogClass";
@@ -485,14 +515,56 @@ void ShowSelectBlockDialog(void* parentHandle, bool darkMode,
   SelectBlockDialogData data = {};
   data.running = true;
   data.activeTextBox = 0;
-  data.selectedMode = 0;
   data.selectedRadio = 0;
-  data.startOffsetText[0] = 0;
-  data.endOffsetText[0] = 0;
-  data.lengthText[0] = '1';
-  data.lengthText[1] = 0;
   data.callback = callback;
   data.callbackUserData = userData;
+
+  if (initialStart >= 0)
+  {
+    char hexStart[32];
+    ItoaHex(initialStart, hexStart, 32);
+    StringCopy(data.startOffsetText, hexStart, 256);
+
+    if (initialLength > 0)
+    {
+      long long endOffset = initialStart + initialLength;
+
+      char hexEnd[32];
+      ItoaHex(endOffset, hexEnd, 32);
+      StringCopy(data.endOffsetText, hexEnd, 256);
+
+      char hexLength[32];
+      ItoaHex(initialLength, hexLength, 32);
+      StringCopy(data.lengthText, hexLength, 256);
+
+      data.selectedMode = 0;
+      data.activeTextBox = 1;
+    }
+    else
+    {
+      long long endOffset = initialStart + 1;
+
+      char hexEnd[32];
+      ItoaHex(endOffset, hexEnd, 32);
+      StringCopy(data.endOffsetText, hexEnd, 256);
+
+      data.lengthText[0] = '1';
+      data.lengthText[1] = 0;
+
+      data.selectedMode = 0;
+      data.activeTextBox = 1;
+    }
+
+  }
+  else
+  {
+    data.selectedMode = 0;
+    data.startOffsetText[0] = 0;
+    data.endOffsetText[0] = 0;
+    data.lengthText[0] = '1';
+    data.lengthText[1] = 0;
+  }
+
   g_selectBlockData = &data;
 
   int width = 250;
@@ -544,12 +616,16 @@ void ShowSelectBlockDialog(void* parentHandle, bool darkMode,
   ShowWindow(hwnd, SW_SHOW);
   UpdateWindow(hwnd);
 
+  SetTimer(hwnd, 1, 500, nullptr);
+
   MSG msg;
   while (data.running && GetMessage(&msg, NULL, 0, 0))
   {
     TranslateMessage(&msg);
     DispatchMessage(&msg);
   }
+
+  KillTimer(hwnd, 1);
 
   delete data.renderer;
   EnableWindow(parent, TRUE);
@@ -634,7 +710,9 @@ void ProcessSelectBlockEvent(SelectBlockDialogData* data, XEvent* event, int wid
 }
 
 void ShowSelectBlockDialog(void* parentHandle, bool darkMode,
-  std::function<void(const std::string&, const std::string&, bool, int)> callback)
+  std::function<void(const std::string&, const std::string&, bool, int)> callback,
+  long long initialStart,
+  long long initialLength)
 {
   Window parentWindow = (Window)(uintptr_t)parentHandle;
   Display* parentDisplay = XOpenDisplay(nullptr);
@@ -649,9 +727,46 @@ void ShowSelectBlockDialog(void* parentHandle, bool darkMode,
 
   SelectBlockDialogData data = {};
   data.callback = callback;
-  data.selectedMode = 0;
   data.selectedRadio = 0;
-  data.lengthText = "1";
+
+  if (initialStart >= 0)
+  {
+    char hexStart[32];
+    ItoaHex(initialStart, hexStart, 32);
+    data.startOffsetText = hexStart;
+
+    if (initialLength > 0)
+    {
+      long long endOffset = initialStart + initialLength;
+
+      char hexEnd[32];
+      ItoaHex(endOffset, hexEnd, 32);
+      data.endOffsetText = hexEnd;
+
+      char hexLength[32];
+      ItoaHex(initialLength, hexLength, 32);
+      data.lengthText = hexLength;
+
+      data.selectedMode = 0;
+      data.activeTextBox = 1;
+    }
+    else
+    {
+      data.selectedMode = 1;
+      data.activeTextBox = 2;
+      data.lengthText = "1";
+      data.endOffsetText = "";
+    }
+  }
+  else
+  {
+    data.selectedMode = 0;
+    data.activeTextBox = 0;
+    data.startOffsetText = "";
+    data.endOffsetText = "";
+    data.lengthText = "1";
+  }
+
   g_selectBlockData = &data;
 
   int width = 250;
