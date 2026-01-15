@@ -12,7 +12,6 @@ struct PluginManagerData {
     Vector<PluginInfo*> plugins;
     bool running;
     bool dialogResult;
-    
     int hoveredWidget;
     int pressedWidget;
     int hoveredPlugin;
@@ -33,6 +32,7 @@ struct PluginManagerData {
 
 class PluginManager {
 public:
+
     static bool Show(NativeWindow parent);
     
     static void LoadPluginsFromDirectory(PluginManagerData* data);

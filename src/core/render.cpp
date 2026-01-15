@@ -1174,10 +1174,10 @@ void RenderManager::drawProgressBar(const Rect &rect, float progress, const Them
 }
 
 void RenderManager::drawLeftPanel(
-    const LeftPanelState &state,
-    const Theme &theme,
-    int windowHeight,
-    const Rect &panelBounds)
+  const LeftPanelState& state,
+  const Theme& theme,
+  int windowHeight,
+  const Rect& panelBounds)
 {
   if (!state.visible)
     return;
@@ -1220,7 +1220,7 @@ void RenderManager::drawLeftPanel(
 
   drawRoundedRect(titleBar, 8.0f, titleBg, true);
 
-  const char *dockText = "";
+  const char* dockText = "";
   switch (state.dockPosition)
   {
   case PanelDockPosition::Left:
@@ -1263,40 +1263,42 @@ void RenderManager::drawLeftPanel(
   if (isDarkTheme)
   {
     faded = Color(
-        Clamp(theme.textColor.r - 40, 0, 255),
-        Clamp(theme.textColor.g - 40, 0, 255),
-        Clamp(theme.textColor.b - 40, 0, 255));
+      Clamp(theme.textColor.r - 40, 0, 255),
+      Clamp(theme.textColor.g - 40, 0, 255),
+      Clamp(theme.textColor.b - 40, 0, 255));
 
     halfText = Color(
-        theme.textColor.r / 2,
-        theme.textColor.g / 2,
-        theme.textColor.b / 2);
+      theme.textColor.r / 2,
+      theme.textColor.g / 2,
+      theme.textColor.b / 2);
 
     thirdText = Color(
-        theme.textColor.r / 3,
-        theme.textColor.g / 3,
-        theme.textColor.b / 3);
+      theme.textColor.r / 3,
+      theme.textColor.g / 3,
+      theme.textColor.b / 3);
   }
   else
   {
     faded = Color(
-        Clamp(theme.textColor.r + 60, 0, 255),
-        Clamp(theme.textColor.g + 60, 0, 255),
-        Clamp(theme.textColor.b + 60, 0, 255));
+      Clamp(theme.textColor.r + 60, 0, 255),
+      Clamp(theme.textColor.g + 60, 0, 255),
+      Clamp(theme.textColor.b + 60, 0, 255));
 
     halfText = Color(
-        Clamp(theme.textColor.r + 80, 0, 255),
-        Clamp(theme.textColor.g + 80, 0, 255),
-        Clamp(theme.textColor.b + 80, 0, 255));
+      Clamp(theme.textColor.r + 80, 0, 255),
+      Clamp(theme.textColor.g + 80, 0, 255),
+      Clamp(theme.textColor.b + 80, 0, 255));
 
     thirdText = Color(
-        Clamp(theme.textColor.r + 120, 0, 255),
-        Clamp(theme.textColor.g + 120, 0, 255),
-        Clamp(theme.textColor.b + 120, 0, 255));
+      Clamp(theme.textColor.r + 120, 0, 255),
+      Clamp(theme.textColor.g + 120, 0, 255),
+      Clamp(theme.textColor.b + 120, 0, 255));
   }
 
   drawText("File Information", contentX, currentY, theme.headerColor);
   currentY += headerHeight + sectionSpacing;
+
+  char buf[256];
 
   if (fileSize < 1024)
   {
@@ -1317,7 +1319,7 @@ void RenderManager::drawLeftPanel(
   drawText(buf, contentX + 85, currentY, theme.textColor);
   currentY += rowHeight + itemSpacing;
 
-  const char *typeStr = "Unknown";
+  const char* typeStr = "Unknown";
   if (fileSize >= 4)
   {
     uint8_t b0 = g_HexData.getByte(0);
@@ -1413,7 +1415,7 @@ void RenderManager::drawLeftPanel(
   {
     for (size_t i = 0; i < g_Bookmarks.bookmarks.size() && i < 5; i++)
     {
-      const Bookmark &bm = g_Bookmarks.bookmarks[i];
+      const Bookmark& bm = g_Bookmarks.bookmarks[i];
       bool selected = (g_Bookmarks.selectedIndex == (int)i);
 
       Rect colorBox(contentX, currentY + 3, 10, 10);
@@ -1460,17 +1462,17 @@ void RenderManager::drawLeftPanel(
 
   drawText("File Type:", contentX, currentY, faded);
   drawText(g_DIEState.fileType[0] ? g_DIEState.fileType : "Coming Soon",
-           contentX + 85, currentY, accentColor);
+    contentX + 85, currentY, accentColor);
   currentY += rowHeight + itemSpacing;
 
   drawText("Compiler:", contentX, currentY, faded);
   drawText(g_DIEState.compiler[0] ? g_DIEState.compiler : "Coming Soon",
-           contentX + 85, currentY, accentColor);
+    contentX + 85, currentY, accentColor);
   currentY += rowHeight + itemSpacing;
 
   drawText("Arch:", contentX, currentY, faded);
   drawText(g_DIEState.architecture[0] ? g_DIEState.architecture : "Coming Soon",
-           contentX + 85, currentY, accentColor);
+    contentX + 85, currentY, accentColor);
   currentY += rowHeight + itemSpacing;
 
   char diePath[260];
@@ -1496,12 +1498,73 @@ void RenderManager::drawLeftPanel(
     currentY += rowHeight + 10 + itemSpacing;
   }
 
+  currentY += 8;
+
+  drawText("Plugin Annotations", contentX, currentY, theme.headerColor);
+  currentY += headerHeight + sectionSpacing;
+
+  PluginBookmarkArray* pluginAnnotations = g_HexData.getPluginAnnotations();
+
+  if (!pluginAnnotations || pluginAnnotations->count == 0)
+  {
+    drawText("No annotations found", contentX, currentY, halfText);
+    currentY += rowHeight + itemSpacing;
+    drawText("Enable plugins to analyze", contentX, currentY, thirdText);
+    currentY += rowHeight + itemSpacing;
+  }
+  else
+  {
+    size_t maxDisplay = pluginAnnotations->count < 10 ? pluginAnnotations->count : 10;
+
+    for (size_t i = 0; i < maxDisplay; i++)
+    {
+      const PluginBookmark& annotation = pluginAnnotations->bookmarks[i];
+
+      StrCopy(buf, "0x");
+      ItoaHex(annotation.offset, buf + 2, 254);
+
+      Color pluginColor = isDarkTheme ? Color(150, 100, 200) : Color(120, 70, 170);
+      drawText(buf, contentX, currentY, pluginColor);
+
+      int labelX = contentX + 70;
+      drawText(annotation.label, labelX, currentY, theme.textColor);
+      currentY += rowHeight + itemSpacing;
+
+      if (annotation.description[0] != '\0')
+      {
+        drawText(annotation.description, contentX + 10, currentY, thirdText);
+        currentY += rowHeight + itemSpacing;
+      }
+    }
+
+    if (pluginAnnotations->count > 10)
+    {
+      char moreText[64];
+      StrCopy(moreText, "... ");
+      ItoaDec(pluginAnnotations->count - 10, buf, 256);
+      StrCat(moreText, buf);
+      StrCat(moreText, " more");
+      drawText(moreText, contentX, currentY, halfText);
+      currentY += rowHeight + itemSpacing;
+    }
+
+    currentY += 4;
+    Rect refreshButtonRect(contentX, currentY, contentWidth, rowHeight + 10);
+    WidgetState refreshWs;
+    refreshWs.rect = refreshButtonRect;
+    refreshWs.enabled = true;
+    refreshWs.hovered = false;
+    refreshWs.pressed = false;
+    drawModernButton(refreshWs, theme, "Re-analyze File");
+    currentY += rowHeight + 10 + itemSpacing;
+  }
+
   if (state.dockPosition == PanelDockPosition::Floating)
   {
     Rect resizeHandle(
-        panelBounds.x + panelBounds.width - 10,
-        panelBounds.y + panelBounds.height - 10,
-        10, 10);
+      panelBounds.x + panelBounds.width - 10,
+      panelBounds.y + panelBounds.height - 10,
+      10, 10);
     Color handleColor = theme.controlCheck;
     handleColor.a = state.resizing ? 150 : 30;
     drawRect(resizeHandle, handleColor, true);
@@ -1509,10 +1572,10 @@ void RenderManager::drawLeftPanel(
   else if (state.dockPosition == PanelDockPosition::Left)
   {
     Rect resizeHandle(
-        panelBounds.x + panelBounds.width - 3,
-        panelBounds.y + PANEL_TITLE_HEIGHT,
-        6,
-        panelBounds.height - PANEL_TITLE_HEIGHT);
+      panelBounds.x + panelBounds.width - 3,
+      panelBounds.y + PANEL_TITLE_HEIGHT,
+      6,
+      panelBounds.height - PANEL_TITLE_HEIGHT);
     Color handleColor = theme.controlCheck;
     handleColor.a = state.resizing ? 150 : 30;
     drawRect(resizeHandle, handleColor, true);
@@ -1520,10 +1583,10 @@ void RenderManager::drawLeftPanel(
   else if (state.dockPosition == PanelDockPosition::Right)
   {
     Rect resizeHandle(
-        panelBounds.x,
-        panelBounds.y + PANEL_TITLE_HEIGHT,
-        6,
-        panelBounds.height - PANEL_TITLE_HEIGHT);
+      panelBounds.x,
+      panelBounds.y + PANEL_TITLE_HEIGHT,
+      6,
+      panelBounds.height - PANEL_TITLE_HEIGHT);
     Color handleColor = theme.controlCheck;
     handleColor.a = state.resizing ? 150 : 30;
     drawRect(resizeHandle, handleColor, true);

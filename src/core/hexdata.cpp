@@ -164,6 +164,7 @@ HexData::HexData()
     la_init(&disassemblyLines);
     ss_init(&headerLine);
     pluginPath[0] = '\0';
+    pba_init(&pluginAnnotations);
 }
 
 HexData::~HexData()
@@ -173,6 +174,7 @@ HexData::~HexData()
     la_free(&hexLines);
     la_free(&disassemblyLines);
     ss_free(&headerLine);
+    pba_free(&pluginAnnotations);
 }
 
 void HexData::setDisassemblyPlugin(const char *path)
@@ -482,3 +484,50 @@ void HexData::convertDataToHex(int bytesPerLine)
         ss_free(&line);
     }
 }
+
+void HexData::executeBookmarkPlugins()
+{
+  clearPluginAnnotations();
+
+  if (bb_empty(&fileData))
+    return;
+
+  extern AppOptions g_Options;
+
+  for (int i = 0; i < g_Options.enabledPluginCount; i++)
+  {
+    char fullPath[512];
+    GetPluginDirectory(fullPath, 512);
+    int len = (int)StrLen(fullPath);
+#ifdef _WIN32
+    fullPath[len] = '\\';
+#else
+    fullPath[len] = '/';
+#endif
+    StrCopy(fullPath + len + 1, g_Options.enabledPlugins[i]);
+
+    if (CanPluginGenerateBookmarks(fullPath))
+    {
+      extern bool ExecutePluginBookmarks(
+        const char* pluginPath,
+        const uint8_t * data,
+        size_t dataSize,
+        PluginBookmarkArray * outBookmarks);
+
+      ExecutePluginBookmarks(
+        fullPath,
+        fileData.data,
+        fileData.size,
+        &pluginAnnotations);
+    }
+  }
+}
+
+void HexData::clearPluginAnnotations()
+{
+  pba_free(&pluginAnnotations);
+  pba_init(&pluginAnnotations);
+}
+
+
+

@@ -95,6 +95,7 @@ bool CheckPluginCapabilities(const char *pluginPath, PluginInfo *info)
     info->canDisassemble = false;
     info->canAnalyze = false;
     info->canTransform = false;
+    info->canGenerateBookmarks = false;
 
     if (!strEquals(info->language, "python"))
     {
@@ -110,8 +111,9 @@ bool CheckPluginCapabilities(const char *pluginPath, PluginInfo *info)
     info->canDisassemble = CanPluginDisassemble(pluginPath);
     info->canAnalyze = CanPluginAnalyze(pluginPath);
     info->canTransform = CanPluginTransform(pluginPath);
+    info->canGenerateBookmarks = CanPluginGenerateBookmarks(pluginPath);
 
-    bool hasCapability = (info->canDisassemble || info->canAnalyze || info->canTransform);
+    bool hasCapability = (info->canDisassemble || info->canAnalyze || info->canTransform || info->canGenerateBookmarks);
 
     if (!hasCapability)
     {
@@ -315,6 +317,10 @@ void PluginManager::ScanDirectory(const char *path, PluginManagerData *data)
                 {
                     StrCopy(info->description, "Data Transform Plugin");
                 }
+                else if (info->canGenerateBookmarks)
+                {
+                    StrCopy(info->description, "Bookmark Generator Plugin");
+								}
                 else
                 {
                     StrCopy(info->description, "Python Plugin");

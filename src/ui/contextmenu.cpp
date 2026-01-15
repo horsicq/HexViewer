@@ -12,6 +12,11 @@
 #endif
 
 extern HexData g_HexData;
+extern ScrollbarState g_MainScrollbar;
+extern SelectionState g_Selection;
+extern RenderManager g_Renderer;
+extern LeftPanelState g_LeftPanel;
+extern MenuBar g_MenuBar;
 extern int g_ScrollY;
 extern int g_LinesPerPage;
 extern int g_TotalLines;
@@ -637,12 +642,30 @@ static void GoToOffsetCallback(int offset)
     cursorNibblePos = 0;
 
     int bytesPerLine = g_HexData.getCurrentBytesPerLine();
-    int targetRow = offset / bytesPerLine;
-    g_ScrollY = Clamp(targetRow - 5, 0, maxScrolls);
+    long long targetLine = offset / bytesPerLine;
+
+    int maxScroll = g_TotalLines - g_LinesPerPage;
+    if (maxScroll < 0)
+      maxScroll = 0;
+
+    g_ScrollY = (int)(targetLine - g_LinesPerPage / 2);
+    if (g_ScrollY < 0)
+      g_ScrollY = 0;
+    if (g_ScrollY > maxScroll)
+      g_ScrollY = maxScroll;
+
+    if (maxScroll > 0)
+      g_MainScrollbar.position = (float)g_ScrollY / (float)maxScroll;
+    else
+      g_MainScrollbar.position = 0.0f;
+
+    int leftPanelWidth = g_LeftPanel.visible ? g_LeftPanel.width : 0;
+    g_Renderer.UpdateHexMetrics(leftPanelWidth, g_MenuBar.getHeight());
 
     InvalidateWindow();
   }
 }
+
 
 long long ParseNumber(const char *text, int numberFormat)
 {
@@ -1041,7 +1064,15 @@ void AppContextMenu::executeAction(int actionId)
   {
     long long initialStart = -1;
     long long initialLength = -1;
-    
+
+    char debugMsg[256];
+    char temp[64];
+
+
+   
+
+   
+
     if (selectionLength > 0)
     {
       long long selStart = cursorBytePos - (selectionLength - 1);

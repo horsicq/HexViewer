@@ -315,6 +315,7 @@ void ApplyEnabledPlugins()
 			}
 		}
 	}
+	g_HexData.executeBookmarkPlugins();
 }
 
 void OnNew()
@@ -665,33 +666,131 @@ void OnFindReplace()
 	LinuxRedraw();
 #endif
 }
+
 void OnGoTo()
 {
 #if defined(_WIN32)
+	static int resultOffset = -1;
+	resultOffset = -1;
+
 	SearchDialogs::ShowGoToDialog(
 		g_Hwnd,
 		g_Options.darkMode,
-		[](int line)
+		[](int offset)
 		{
-			char num[32];
-			IntToString(line, num, sizeof(num));
-
-			char buf[128];
-			CopyString(buf, "Go to line: ", sizeof(buf));
-			CopyString(buf + StrLen(buf), num, sizeof(buf) - StrLen(buf));
-
-			MessageBoxA(g_Hwnd, buf, "Go To", MB_OK);
+			resultOffset = offset;
 		},
 		nullptr);
+
+	if (resultOffset >= 0 && resultOffset < (long long)g_HexData.getFileSize())
+	{
+		cursorBytePos = resultOffset;
+		cursorNibblePos = 0;
+
+		RECT rect;
+		GetClientRect(g_Hwnd, &rect);
+		int windowHeight = rect.bottom - rect.top;
+		int effectiveWindowHeight = windowHeight;
+
+		if (g_BottomPanel.visible && g_BottomPanel.dockPosition == PanelDockPosition::Bottom)
+			effectiveWindowHeight -= g_BottomPanel.height;
+
+		int menuBarHeight = g_MenuBar.getHeight();
+		g_LinesPerPage = (effectiveWindowHeight - menuBarHeight - 40) / 16;
+		if (g_LinesPerPage < 1)
+			g_LinesPerPage = 1;
+
+		long long targetLine = resultOffset / 16;
+
+		g_ScrollY = (int)(targetLine - g_LinesPerPage / 2);
+		if (g_ScrollY < 0)
+			g_ScrollY = 0;
+
+		int maxScroll = g_TotalLines - g_LinesPerPage;
+		if (maxScroll < 0)
+			maxScroll = 0;
+
+		if (g_ScrollY > maxScroll)
+			g_ScrollY = maxScroll;
+
+		if (maxScroll > 0)
+		{
+			g_MainScrollbar.position = (float)g_ScrollY / (float)maxScroll;
+			if (g_MainScrollbar.position < 0.0f) g_MainScrollbar.position = 0.0f;
+			if (g_MainScrollbar.position > 1.0f) g_MainScrollbar.position = 1.0f;
+		}
+		else
+		{
+			g_MainScrollbar.position = 0.0f;
+		}
+
+		g_Selection.clear();
+		caretVisible = true;
+
+		int leftPanelWidth = g_LeftPanel.visible ? g_LeftPanel.width : 0;
+		g_Renderer.UpdateHexMetrics(leftPanelWidth, g_MenuBar.getHeight());
+
+		InvalidateRect(g_Hwnd, NULL, TRUE);
+		UpdateWindow(g_Hwnd);
+	}
+	else if (resultOffset >= (long long)g_HexData.getFileSize())
+	{
+		MessageBoxA(g_Hwnd, "Offset out of range.", "Error", MB_OK | MB_ICONERROR);
+	}
 #else
+	static int resultOffset = -1;
+	resultOffset = -1;
+
 	SearchDialogs::ShowGoToDialog(
 		g_Hwnd,
 		g_Options.darkMode,
-		[](int line)
+		[](int offset)
 		{
-			printf("Go to line: %d\n", line);
+			resultOffset = offset;
 		});
-	LinuxRedraw();
+
+	if (resultOffset >= 0 && resultOffset < (long long)g_HexData.getFileSize())
+	{
+		cursorBytePos = resultOffset;
+		cursorNibblePos = 0;
+
+		long long targetLine = resultOffset / 16;
+
+		g_ScrollY = (int)(targetLine - g_LinesPerPage / 2);
+		if (g_ScrollY < 0)
+			g_ScrollY = 0;
+
+		int maxScroll = g_TotalLines - g_LinesPerPage;
+		if (maxScroll < 0)
+			maxScroll = 0;
+
+		if (g_ScrollY > maxScroll)
+			g_ScrollY = maxScroll;
+
+		if (maxScroll > 0)
+		{
+			g_MainScrollbar.position = (float)g_ScrollY / (float)maxScroll;
+			if (g_MainScrollbar.position < 0.0f) g_MainScrollbar.position = 0.0f;
+			if (g_MainScrollbar.position > 1.0f) g_MainScrollbar.position = 1.0f;
+		}
+		else
+		{
+			g_MainScrollbar.position = 0.0f;
+		}
+
+		g_Selection.clear();
+		caretVisible = true;
+
+		int leftPanelWidth = g_LeftPanel.visible ? g_LeftPanel.width : 0;
+		g_Renderer.UpdateHexMetrics(leftPanelWidth, g_MenuBar.getHeight());
+
+		LinuxRedraw();
+	}
+	else if (resultOffset >= (long long)g_HexData.getFileSize())
+	{
+		printf("Offset out of range: 0x%X\n", resultOffset);
+	}
+
 #endif
 }
 
@@ -1061,6 +1160,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 				{
 					g_Selection.endByte = hoverInfo.Index;
 					cursorBytePos = hoverInfo.Index;
+					cursorNibblePos = 2;
 
 					long long cursorLine = hoverInfo.Index / 16;
 					if (cursorLine < g_ScrollY)

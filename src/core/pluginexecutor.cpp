@@ -365,101 +365,327 @@ static void ExtractModuleName(const char *pluginPath, char *moduleName, int maxL
     moduleName[i] = '\0';
 }
 
-bool CanPluginDisassemble(const char *pluginPath)
+bool CanPluginDisassemble(const char* pluginPath)
 {
-    if (!pythonInitialized)
+  if (!pythonInitialized)
+  {
+    if (!InitializePythonRuntime())
+      return false;
+  }
+
+  char moduleName[256];
+  ExtractModuleName(pluginPath, moduleName, 256);
+
+  void* pModule = PyImport_ImportModule(moduleName);
+  if (!pModule)
+  {
+    if (PyErr_Occurred && PyErr_Occurred())
     {
-        if (!InitializePythonRuntime())
-            return false;
+      if (PyErr_Print)
+        PyErr_Print();
+      if (PyErr_Clear)
+        PyErr_Clear();
     }
 
-    char moduleName[256];
-    ExtractModuleName(pluginPath, moduleName, 256);
+    return false;
+  }
 
-    void *pModule = PyImport_ImportModule(moduleName);
-    if (!pModule)
+  void* pFunc = PyObject_GetAttrString(pModule, "disassemble");
+  bool canDisasm = (pFunc != nullptr);
+
+  if (!pFunc && PyErr_Clear)
+  {
+    PyErr_Clear();
+  }
+
+  if (pFunc)
+    Py_DecRef(pFunc);
+
+  Py_DecRef(pModule);
+  return canDisasm;
+}
+
+bool CanPluginAnalyze(const char* pluginPath)
+{
+  if (!pythonInitialized)
+  {
+    if (!InitializePythonRuntime())
+      return false;
+  }
+
+  char moduleName[256];
+  ExtractModuleName(pluginPath, moduleName, 256);
+
+  void* pModule = PyImport_ImportModule(moduleName);
+  if (!pModule)
+  {
+    if (PyErr_Clear)
+      PyErr_Clear();
+    return false;
+  }
+
+  void* pFunc = PyObject_GetAttrString(pModule, "analyze");
+  bool canAnalyze = (pFunc != nullptr);
+
+  if (!pFunc && PyErr_Clear)
+  {
+    PyErr_Clear();
+  }
+
+  if (pFunc)
+    Py_DecRef(pFunc);
+  Py_DecRef(pModule);
+
+  return canAnalyze;
+}
+
+bool CanPluginTransform(const char* pluginPath)
+{
+  if (!pythonInitialized)
+  {
+    if (!InitializePythonRuntime())
+      return false;
+  }
+
+  char moduleName[256];
+  ExtractModuleName(pluginPath, moduleName, 256);
+
+  void* pModule = PyImport_ImportModule(moduleName);
+  if (!pModule)
+  {
+    if (PyErr_Clear)
+      PyErr_Clear();
+    return false;
+  }
+
+  void* pFunc = PyObject_GetAttrString(pModule, "transform");
+  bool canTransform = (pFunc != nullptr);
+
+  if (!pFunc && PyErr_Clear)
+  {
+    PyErr_Clear();
+  }
+
+  if (pFunc)
+    Py_DecRef(pFunc);
+  Py_DecRef(pModule);
+
+  return canTransform;
+}
+
+void pba_init(PluginBookmarkArray* arr) {
+  arr->bookmarks = nullptr;
+  arr->count = 0;
+  arr->capacity = 0;
+}
+
+void pba_push_back(PluginBookmarkArray* arr, const PluginBookmark* bookmark) {
+  if (arr->count >= arr->capacity) {
+    size_t newCapacity = arr->capacity == 0 ? 8 : arr->capacity * 2;
+    PluginBookmark* newBookmarks = (PluginBookmark*)PlatformAlloc(
+      newCapacity * sizeof(PluginBookmark));
+
+    if (arr->bookmarks) {
+      memcpy(newBookmarks, arr->bookmarks, arr->count * sizeof(PluginBookmark));
+      PlatformFree(arr->bookmarks);
+    }
+
+    arr->bookmarks = newBookmarks;
+    arr->capacity = newCapacity;
+  }
+
+  arr->bookmarks[arr->count] = *bookmark;
+  arr->count++;
+}
+
+void pba_free(PluginBookmarkArray* arr) {
+  if (arr->bookmarks) {
+    PlatformFree(arr->bookmarks);
+    arr->bookmarks = nullptr;
+  }
+  arr->count = 0;
+  arr->capacity = 0;
+}
+
+
+static void GetPythonErrorString(char* outBuffer, int maxLen)
+{
+  if (!outBuffer || maxLen <= 0)
+    return;
+
+  outBuffer[0] = '\0';
+
+  if (!PyErr_Occurred || !PyErr_Occurred())
+    return;
+
+  typedef void* (*PyErrFetchFunc)(void**, void**, void**);
+  typedef void* (*PyObjectStrFunc)(void*);
+
+#ifdef _WIN32
+  PyErrFetchFunc PyErr_Fetch = (PyErrFetchFunc)GetProcAddress(pythonDLL, "PyErr_Fetch");
+  PyObjectStrFunc PyObject_Str = (PyObjectStrFunc)GetProcAddress(pythonDLL, "PyObject_Str");
+#else
+  PyErrFetchFunc PyErr_Fetch = (PyErrFetchFunc)dlsym(pythonLib, "PyErr_Fetch");
+  PyObjectStrFunc PyObject_Str = (PyObjectStrFunc)dlsym(pythonLib, "PyObject_Str");
+#endif
+
+  if (!PyErr_Fetch || !PyObject_Str)
+    return;
+
+  void* pType = nullptr;
+  void* pValue = nullptr;
+  void* pTraceback = nullptr;
+
+  PyErr_Fetch(&pType, &pValue, &pTraceback);
+
+  if (pValue)
+  {
+    void* pStr = PyObject_Str(pValue);
+    if (pStr && PyUnicode_AsUTF8)
     {
-        if (PyErr_Occurred && PyErr_Occurred())
+      char* errorMsg = PyUnicode_AsUTF8(pStr);
+      if (errorMsg)
+      {
+        int i = 0;
+        while (errorMsg[i] && i < maxLen - 1)
         {
-            if (PyErr_Print)
-                PyErr_Print();
-            if (PyErr_Clear)
-                PyErr_Clear();
+          outBuffer[i] = errorMsg[i];
+          i++;
+        }
+        outBuffer[i] = '\0';
+      }
+      Py_DecRef(pStr);
+    }
+  }
+
+  if (pType) Py_DecRef(pType);
+  if (pValue) Py_DecRef(pValue);
+  if (pTraceback) Py_DecRef(pTraceback);
+}
+
+bool CanPluginGenerateBookmarks(const char* pluginPath) {
+  if (!pythonInitialized) {
+    if (!InitializePythonRuntime())
+      return false;
+  }
+
+  char moduleName[256];
+  ExtractModuleName(pluginPath, moduleName, 256);
+
+  void* pModule = PyImport_ImportModule(moduleName);
+  if (!pModule) {
+    if (PyErr_Clear)
+      PyErr_Clear();
+    return false;
+  }
+
+  void* pFunc = PyObject_GetAttrString(pModule, "generate_bookmarks");
+  bool canGenerate = (pFunc != nullptr);
+
+  if (!pFunc && PyErr_Clear)
+  {
+    PyErr_Clear();
+  }
+
+  if (pFunc)
+    Py_DecRef(pFunc);
+  Py_DecRef(pModule);
+
+  return canGenerate;
+}
+
+bool ExecutePluginBookmarks(
+  const char* pluginPath,
+  const uint8_t* data,
+  size_t dataSize,
+  PluginBookmarkArray* outBookmarks)
+{
+  if (!pythonInitialized) {
+    if (!InitializePythonRuntime())
+      return false;
+  }
+
+  char moduleName[256];
+  ExtractModuleName(pluginPath, moduleName, 256);
+
+  void* pModule = PyImport_ImportModule(moduleName);
+  if (!pModule) {
+    if (PyErr_Clear)
+      PyErr_Clear();
+    return false;
+  }
+
+  void* pFunc = PyObject_GetAttrString(pModule, "generate_bookmarks");
+  if (!pFunc) {
+    Py_DecRef(pModule);
+    return false;
+  }
+
+  void* pArgs = PyTuple_New(2);
+
+  void* pData = PyBytes_FromStringAndSize((const char*)data, (long long)dataSize);
+  PyTuple_SetItem(pArgs, 0, pData);
+
+  void* pSize = PyLong_FromLongLong((long long)dataSize);
+  PyTuple_SetItem(pArgs, 1, pSize);
+
+  void* pResult = PyObject_CallObject(pFunc, pArgs);
+
+  if (pResult && PyList_Size) {
+    long long listSize = PyList_Size(pResult);
+
+    for (long long i = 0; i < listSize; i++) {
+      void* pItem = PyList_GetItem(pResult, i);
+
+      void* pOffset = PyDict_GetItemString(pItem, "offset");
+      void* pLabel = PyDict_GetItemString(pItem, "label");
+      void* pDesc = PyDict_GetItemString(pItem, "description");
+
+      if (pOffset && pLabel) {
+        PluginBookmark bookmark;
+        memSet(&bookmark, 0, sizeof(PluginBookmark));
+
+        if (PyLong_FromLongLong) {
+          typedef long long (*PyLongAsLongLongFunc)(void*);
+#ifdef _WIN32
+          PyLongAsLongLongFunc PyLong_AsLongLong =
+            (PyLongAsLongLongFunc)GetProcAddress(pythonDLL, "PyLong_AsLongLong");
+#else
+          PyLongAsLongLongFunc PyLong_AsLongLong =
+            (PyLongAsLongLongFunc)dlsym(pythonLib, "PyLong_AsLongLong");
+#endif
+
+          if (PyLong_AsLongLong) {
+            bookmark.offset = (uint64_t)PyLong_AsLongLong(pOffset);
+          }
         }
 
-        return false;
+        if (PyUnicode_AsUTF8) {
+          char* label = PyUnicode_AsUTF8(pLabel);
+          if (label)
+            StrCopy(bookmark.label, label);
+        }
+
+        if (pDesc && PyUnicode_AsUTF8) {
+          char* desc = PyUnicode_AsUTF8(pDesc);
+          if (desc)
+            StrCopy(bookmark.description, desc);
+        }
+
+        StrCopy(bookmark.pluginSource, moduleName);
+
+        pba_push_back(outBookmarks, &bookmark);
+      }
     }
 
-    void *pFunc = PyObject_GetAttrString(pModule, "disassemble");
-    bool canDisasm = (pFunc != nullptr);
+    Py_DecRef(pResult);
+  }
 
-    if (!canDisasm)
-    {
-    }
+  Py_DecRef(pArgs);
+  Py_DecRef(pFunc);
+  Py_DecRef(pModule);
 
-    if (pFunc)
-        Py_DecRef(pFunc);
-
-    Py_DecRef(pModule);
-    return canDisasm;
-}
-
-bool CanPluginAnalyze(const char *pluginPath)
-{
-    if (!pythonInitialized)
-    {
-        if (!InitializePythonRuntime())
-            return false;
-    }
-
-    char moduleName[256];
-    ExtractModuleName(pluginPath, moduleName, 256);
-
-    void *pModule = PyImport_ImportModule(moduleName);
-    if (!pModule)
-    {
-        if (PyErr_Clear)
-            PyErr_Clear();
-        return false;
-    }
-
-    void *pFunc = PyObject_GetAttrString(pModule, "analyze");
-    bool canAnalyze = (pFunc != nullptr);
-
-    if (pFunc)
-        Py_DecRef(pFunc);
-    Py_DecRef(pModule);
-
-    return canAnalyze;
-}
-
-bool CanPluginTransform(const char *pluginPath)
-{
-    if (!pythonInitialized)
-    {
-        if (!InitializePythonRuntime())
-            return false;
-    }
-
-    char moduleName[256];
-    ExtractModuleName(pluginPath, moduleName, 256);
-
-    void *pModule = PyImport_ImportModule(moduleName);
-    if (!pModule)
-    {
-        if (PyErr_Clear)
-            PyErr_Clear();
-        return false;
-    }
-
-    void *pFunc = PyObject_GetAttrString(pModule, "transform");
-    bool canTransform = (pFunc != nullptr);
-
-    if (pFunc)
-        Py_DecRef(pFunc);
-    Py_DecRef(pModule);
-
-    return canTransform;
+  return outBookmarks->count > 0;
 }
 
 bool ExecutePythonDisassembly(

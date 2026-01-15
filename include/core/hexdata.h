@@ -4,6 +4,8 @@
 #include <stdint.h>
 #include <stddef.h>
 #include "global.h"
+#include "pluginexecutor.h"
+#include "options.h"
 
 class HexData
 {
@@ -51,6 +53,11 @@ public:
 
     void setArchitecture(int arch, int mode);
 
+    PluginBookmarkArray* getPluginAnnotations() { return &pluginAnnotations; }
+    const PluginBookmarkArray* getPluginAnnotations() const { return &pluginAnnotations; }
+    void clearPluginAnnotations();
+    void executeBookmarkPlugins();
+
 private:
     char pluginPath[512];
     bool usePlugin;
@@ -76,6 +83,8 @@ private:
     int currentArch;
     int currentMode;
     size_t csHandle;
+
+    PluginBookmarkArray pluginAnnotations;
 };
 
 #endif

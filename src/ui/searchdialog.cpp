@@ -263,36 +263,88 @@ data->renderer->drawText(offsetDisplay.c_str(),
     }
 
     void HandleGoToClick(GoToDialogData *data, int x, int y, int windowWidth, int windowHeight)
-    {
-        int margin = 20;
-        int lineBoxY = margin;
-        int buttonY = lineBoxY + 30 + 30;
-        int buttonWidth = 90;
-        int buttonSpacing = 10;
+{
+	int margin = 20;
+	int lineBoxY = margin;
+	int buttonY = lineBoxY + 30 + 30;
+	int buttonWidth = 90;
+	int buttonSpacing = 10;
 
-        Rect okButton(windowWidth - margin - buttonWidth * 2 - buttonSpacing, buttonY, buttonWidth, 30);
-        Rect cancelButton(windowWidth - margin - buttonWidth, buttonY, buttonWidth, 30);
+	Rect okButton(windowWidth - margin - buttonWidth * 2 - buttonSpacing, buttonY, buttonWidth, 30);
+	Rect cancelButton(windowWidth - margin - buttonWidth, buttonY, buttonWidth, 30);
 
-        if (IsPointInRect(x, y, okButton))
-        {
-            data->dialogResult = true;
-            data->running = false;
-            if (data->callback)
-            {
+	if (IsPointInRect(x, y, okButton))
+	{
+		data->dialogResult = true;
+		data->running = false;
+		if (data->callback)
+		{
 #ifdef _WIN32
-                int line = StringToInt(data->lineNumberText);
+			const char* str = data->lineNumberText;
+			int offset = 0;
+			bool isHex = false;
+			
+			while (*str == ' ') str++;
+			
+			if (str[0] == '0' && (str[1] == 'x' || str[1] == 'X'))
+			{
+				isHex = true;
+				str += 2;
+			}
+			else if (str[0] == 'x' || str[0] == 'X')
+			{
+				isHex = true;
+				str += 1;
+			}
+			else
+			{
+				const char* check = str;
+				while (*check)
+				{
+					char c = *check;
+					if ((c >= 'A' && c <= 'F') || (c >= 'a' && c <= 'f'))
+					{
+						isHex = true;
+						break;
+					}
+					check++;
+				}
+			}
+			
+			if (isHex)
+			{
+				while (*str)
+				{
+					char c = *str;
+					if (c >= '0' && c <= '9')
+						offset = offset * 16 + (c - '0');
+					else if (c >= 'A' && c <= 'F')
+						offset = offset * 16 + (c - 'A' + 10);
+					else if (c >= 'a' && c <= 'f')
+						offset = offset * 16 + (c - 'a' + 10);
+					else if (c != ' ')
+						break;
+					str++;
+				}
+			}
+			else
+			{
+				offset = StringToInt(data->lineNumberText);
+			}
+			
+			data->callback(offset);
 #else
-                int line = StrToInt(data->lineNumberText.c_str());
+			int offset = StrToInt(data->lineNumberText.c_str());
+			data->callback(offset);
 #endif
-                data->callback(line);
-            }
-        }
-        else if (IsPointInRect(x, y, cancelButton))
-        {
-            data->dialogResult = false;
-            data->running = false;
-        }
-    }
+		}
+	}
+	else if (IsPointInRect(x, y, cancelButton))
+	{
+		data->dialogResult = false;
+		data->running = false;
+	}
+}
 
     void HandleFindReplaceChar(FindReplaceDialogData *data, char ch, int windowWidth, int windowHeight)
     {

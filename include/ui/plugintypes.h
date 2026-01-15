@@ -12,7 +12,9 @@ struct PluginInfo {
     bool loaded;
     bool canDisassemble; 
     bool canAnalyze;      
-    bool canTransform;    
+    bool canTransform;
+    bool canGenerateBookmarks;
+
 };
 
 #endif
