@@ -444,6 +444,24 @@ void RenderManager::drawText(const char *text, int x, int y, const Color &color)
 #endif
 }
 
+int RenderManager::measureTextWidth(const char* text)
+{
+#ifdef _WIN32
+  if (!memDC || !text)
+    return 0;
+
+  SIZE size;
+  if (GetTextExtentPoint32A(memDC, text, (int)StrLen(text), &size))
+    return size.cx;
+
+  return 0;
+#else
+  if (!text) return 0;
+  return (int)StrLen(text) * _charWidth;
+#endif
+}
+
+
 void RenderManager::drawRoundedRect(const Rect &rect, float radius, const Color &color, bool filled)
 {
 #ifdef _WIN32
@@ -1417,20 +1435,35 @@ void RenderManager::drawLeftPanel(
     {
       const Bookmark& bm = g_Bookmarks.bookmarks[i];
       bool selected = (g_Bookmarks.selectedIndex == (int)i);
+      bool hovered = (g_Bookmarks.hoveredIndex == (int)i);
 
-      Rect colorBox(contentX, currentY + 3, 10, 10);
-      drawRect(colorBox, bm.color, true);
+      Rect bookmarkRect(contentX, currentY, contentWidth, rowHeight);
 
-      if (selected)
+      if (hovered)
+      {
+        Color hoverBg = theme.controlCheck;
+        hoverBg.a = 60;
+        drawRect(bookmarkRect, hoverBg, true);
+      }
+      else if (selected)
       {
         Color selBg = theme.controlCheck;
         selBg.a = 40;
-        Rect selRect(contentX, currentY, contentWidth, rowHeight);
-        drawRect(selRect, selBg, true);
+        drawRect(bookmarkRect, selBg, true);
       }
 
-      int textX = contentX + 15;
+      if (!selected && !hovered)
+      {
+        Color borderColor = isDarkTheme ? Color(255, 255, 255, 10) : Color(0, 0, 0, 10);
+        drawRect(bookmarkRect, borderColor, false);
+      }
+
+      Rect colorBox(contentX + 2, currentY + 3, 10, 10);
+      drawRect(colorBox, bm.color, true);
+
+      int textX = contentX + 17;
       drawText(bm.name, textX, currentY, theme.textColor);
+
       currentY += rowHeight + itemSpacing;
     }
   }

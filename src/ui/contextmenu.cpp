@@ -495,7 +495,7 @@ void AppContextMenu::show(int x, int y)
   {
     ContextMenuItem item;
     item.text = AllocString("Select Block...");
-    item.shortcut = AllocString("Ctrl+Shift+B");
+    item.shortcut = AllocString("Ctrl+B");
     item.enabled = hasData;
     item.checked = false;
     item.separator = false;
@@ -1017,46 +1017,109 @@ void AppContextMenu::executeAction(int actionId)
   {
     if (cursorBytePos != -1)
     {
-      Bookmark newBookmark;
-      newBookmark.byteOffset = cursorBytePos;
-
-      char bookmarkName[64];
-      StrCopy(bookmarkName, "Bookmark_");
+      char defaultName[64];
+      StrCopy(defaultName, "Offset 0x");
       char offsetStr[32];
       ItoaHex(cursorBytePos, offsetStr, 32);
-      StrCat(bookmarkName, offsetStr);
-      StrCopy(newBookmark.name, bookmarkName);
-
-      Color colors[] = {
-          Color(255, 100, 100),
-          Color(100, 255, 100),
-          Color(100, 100, 255),
-          Color(255, 255, 100),
-          Color(255, 100, 255),
-          Color(100, 255, 255)};
-      int colorIndex = g_Bookmarks.bookmarks.size() % 6;
-      newBookmark.color = colors[colorIndex];
-
-      g_Bookmarks.bookmarks.push_back(newBookmark);
-      g_Bookmarks.selectedIndex = g_Bookmarks.bookmarks.size() - 1;
-
-      char msg[128];
-      StrCopy(msg, "Bookmark added at offset: 0x");
-      StrCat(msg, offsetStr);
+      StrCat(defaultName, offsetStr);
 
 #ifdef _WIN32
-      MessageBoxA(g_Hwnd, msg, "Bookmark", MB_OK | MB_ICONINFORMATION);
-#elif __APPLE__
-      @autoreleasepool
-      {
-        NSAlert *alert = [[NSAlert alloc] init];
-        [alert setMessageText:@"Bookmark"];
-        [alert setInformativeText:[NSString stringWithUTF8String:msg]];
-        [alert runModal];
-      }
-#endif
+      SearchDialogs::ShowInputDialog(
+        g_Hwnd,
+        "Add Bookmark",
+        "Enter bookmark name:",
+        defaultName,
+        g_Options.darkMode,
+        [](const char* bookmarkName)
+        {
+          if (bookmarkName && bookmarkName[0] != '\0')
+          {
+            Bookmark newBookmark;
+            newBookmark.byteOffset = cursorBytePos;
+            StrCopy(newBookmark.name, bookmarkName);
 
-      InvalidateWindow();
+            Color colors[] = {
+                Color(255, 100, 100),
+                Color(100, 255, 100),
+                Color(100, 100, 255),
+                Color(255, 255, 100),
+                Color(255, 100, 255),
+                Color(100, 255, 255) };
+            int colorIndex = g_Bookmarks.bookmarks.size() % 6;
+            newBookmark.color = colors[colorIndex];
+
+            g_Bookmarks.bookmarks.push_back(newBookmark);
+            g_Bookmarks.selectedIndex = g_Bookmarks.bookmarks.size() - 1;
+
+            InvalidateWindow();
+          }
+        },
+        nullptr);
+
+#elif defined(__APPLE__)
+      SearchDialogs::ShowInputDialog(
+        (NativeWindow)g_nsWindow,
+        "Add Bookmark",
+        "Enter bookmark name:",
+        defaultName,
+        g_Options.darkMode,
+        [](const std::string& bookmarkName)
+        {
+          if (!bookmarkName.empty())
+          {
+            Bookmark newBookmark;
+            newBookmark.byteOffset = cursorBytePos;
+            StrCopy(newBookmark.name, bookmarkName.c_str());
+
+            Color colors[] = {
+                Color(255, 100, 100),
+                Color(100, 255, 100),
+                Color(100, 100, 255),
+                Color(255, 255, 100),
+                Color(255, 100, 255),
+                Color(100, 255, 255) };
+            int colorIndex = g_Bookmarks.bookmarks.size() % 6;
+            newBookmark.color = colors[colorIndex];
+
+            g_Bookmarks.bookmarks.push_back(newBookmark);
+            g_Bookmarks.selectedIndex = g_Bookmarks.bookmarks.size() - 1;
+
+            InvalidateWindow();
+          }
+        });
+
+#else
+      SearchDialogs::ShowInputDialog(
+        (void*)g_window,
+        "Add Bookmark",
+        "Enter bookmark name:",
+        defaultName,
+        g_Options.darkMode,
+        [](const std::string& bookmarkName)
+        {
+          if (!bookmarkName.empty())
+          {
+            Bookmark newBookmark;
+            newBookmark.byteOffset = cursorBytePos;
+            StrCopy(newBookmark.name, bookmarkName.c_str());
+
+            Color colors[] = {
+                Color(255, 100, 100),
+                Color(100, 255, 100),
+                Color(100, 100, 255),
+                Color(255, 255, 100),
+                Color(255, 100, 255),
+                Color(100, 255, 255) };
+            int colorIndex = g_Bookmarks.bookmarks.size() % 6;
+            newBookmark.color = colors[colorIndex];
+
+            g_Bookmarks.bookmarks.push_back(newBookmark);
+            g_Bookmarks.selectedIndex = g_Bookmarks.bookmarks.size() - 1;
+
+            InvalidateWindow();
+          }
+        });
+#endif
     }
     break;
   }
@@ -1067,11 +1130,6 @@ void AppContextMenu::executeAction(int actionId)
 
     char debugMsg[256];
     char temp[64];
-
-
-   
-
-   
 
     if (selectionLength > 0)
     {

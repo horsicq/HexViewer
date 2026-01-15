@@ -16,7 +16,7 @@ extern char g_CurrentFilePath[260];
 extern char g_DIEExecutablePath[260];
 const int PANEL_TITLE_HEIGHT = 28;
 extern HexData g_HexData;
-BookmarksState g_Bookmarks = {{}, -1};
+BookmarksState g_Bookmarks = { {}, -1, -1 }; 
 ByteStatistics g_ByteStats = {{0}, 0, 0, 0, 0, 0, 0.0, false};
 DetectItEasyState g_DIEState = {false, "", "", ""};
 
@@ -368,6 +368,42 @@ void ByteStats_Clear()
     g_ByteStats.computed = false;
 }
 
+
+
+Rect GetBookmarkRect(int bookmarkIndex, const Rect& panelBounds)
+{
+  int contentX = panelBounds.x + 15;
+  int currentY = panelBounds.y + PANEL_TITLE_HEIGHT + 15;
+  int contentWidth = panelBounds.width - 30;
+
+  int rowHeight = 16;
+  int headerHeight = 18;
+  int itemSpacing = 4;
+  int sectionSpacing = 10;
+
+  currentY += headerHeight + sectionSpacing;
+  currentY += (rowHeight + itemSpacing) * 2;
+  currentY += 8;
+
+  currentY += headerHeight + sectionSpacing;
+  if (cursorBytePos >= 0 && cursorBytePos < (long long)g_HexData.getFileSize())
+  {
+    currentY += (rowHeight + itemSpacing) * 5;
+    currentY += 8;
+  }
+  else
+  {
+    currentY += rowHeight + itemSpacing;
+    currentY += 8;
+  }
+
+  currentY += headerHeight + sectionSpacing;
+
+  currentY += bookmarkIndex * (rowHeight + itemSpacing);
+
+  return Rect(contentX, currentY, contentWidth, rowHeight + itemSpacing);
+}
+
 void DIE_Analyze()
 {
     g_DIEState.analyzed = true;
@@ -639,26 +675,18 @@ bool HandleLeftPanelContentClick(int x, int y, int windowWidth, int windowHeight
 
     currentY += headerHeight + sectionSpacing;
 
-    if (g_Bookmarks.bookmarks.empty())
+    if (!g_Bookmarks.bookmarks.empty())
     {
-        currentY += (rowHeight + itemSpacing) * 2;
-    }
-    else
-    {
-        for (size_t i = 0; i < g_Bookmarks.bookmarks.size() && i < 5; i++)
+      for (size_t i = 0; i < g_Bookmarks.bookmarks.size() && i < 5; i++)
+      {
+        Rect bookmarkRect = GetBookmarkRect((int)i, panelBounds);
+
+        if (bookmarkRect.contains(x, y))
         {
-            Rect bookmarkRect(contentX, currentY, contentWidth, rowHeight);
-
-            if (x >= bookmarkRect.x && x <= bookmarkRect.x + bookmarkRect.width &&
-                y >= bookmarkRect.y && y <= bookmarkRect.y + bookmarkRect.height)
-            {
-                cursorBytePos = g_Bookmarks.bookmarks[i].byteOffset;
-                g_Bookmarks.selectedIndex = (int)i;
-                return true;
-            }
-
-            currentY += rowHeight + itemSpacing;
+          Bookmarks_JumpTo((int)i);
+          return true;
         }
+      }
     }
 
     currentY += 8;
@@ -754,3 +782,5 @@ bool HandleLeftPanelContentClick(int x, int y, int windowWidth, int windowHeight
 
     return false;
 }
+
+

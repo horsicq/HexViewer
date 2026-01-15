@@ -30,6 +30,7 @@ namespace SearchDialogs
 
     static FindReplaceDialogData *g_findReplaceData = nullptr;
     static GoToDialogData *g_goToData = nullptr;
+    static InputDialogData* g_inputData = nullptr;
 
     inline bool IsPointInRect(int x, int y, const Rect &rect)
     {
@@ -66,9 +67,22 @@ namespace SearchDialogs
 #ifdef _WIN32
         char findDisplay[512];
         StringCopy(findDisplay, data->findText, 512);
-        if (data->activeTextBox == 0)
-            StringAppend(findDisplay, '|', 512);
-        data->renderer->drawText(findDisplay, findBox.x + 8, findBox.y + 8, Color(240, 240, 240));
+
+        data->renderer->drawText(findDisplay,
+          findBox.x + 8,
+          findBox.y + 8,
+          Color(240, 240, 240));
+
+        if (data->activeTextBox == 0 && data->caretVisible)
+        {
+          int textWidth = data->renderer->measureTextWidth(findDisplay);
+          int caretX = findBox.x + 8 + textWidth;
+          int caretY1 = findBox.y + 6;
+          int caretY2 = findBox.y + findBox.height - 6;
+
+          data->renderer->drawLine(caretX, caretY1, caretX, caretY2, Color(240, 240, 240));
+        }
+
 #else
         std::string findDisplay = data->findText + (data->activeTextBox == 0 ? "|" : "");
         data->renderer->drawText(findDisplay.c_str(), findBox.x + 8, findBox.y + 8, Color(240, 240, 240));
@@ -89,9 +103,22 @@ namespace SearchDialogs
 #ifdef _WIN32
         char replaceDisplay[512];
         StringCopy(replaceDisplay, data->replaceText, 512);
-        if (data->activeTextBox == 1)
-            StringAppend(replaceDisplay, '|', 512);
-        data->renderer->drawText(replaceDisplay, replaceBox.x + 8, replaceBox.y + 8, Color(240, 240, 240));
+
+        data->renderer->drawText(replaceDisplay,
+          replaceBox.x + 8,
+          replaceBox.y + 8,
+          Color(240, 240, 240));
+
+        if (data->activeTextBox == 1 && data->caretVisible)
+        {
+          int textWidth = data->renderer->measureTextWidth(replaceDisplay);
+          int caretX = replaceBox.x + 8 + textWidth;
+          int caretY1 = replaceBox.y + 6;
+          int caretY2 = replaceBox.y + replaceBox.height - 6;
+
+          data->renderer->drawLine(caretX, caretY1, caretX, caretY2, Color(240, 240, 240));
+        }
+
 
 #else
         std::string replaceDisplay = data->replaceText + (data->activeTextBox == 1 ? "|" : "");
@@ -124,71 +151,89 @@ namespace SearchDialogs
 #endif
     }
 
-    void RenderGoToDialog(GoToDialogData *data, int windowWidth, int windowHeight)
+    void RenderGoToDialog(GoToDialogData* data, int windowWidth, int windowHeight)
     {
-        if (!data || !data->renderer)
-            return;
+      if (!data || !data->renderer)
+        return;
 
 #ifdef _WIN32
-        HDC hdc = GetDC(data->platformWindow.hwnd);
+      HDC hdc = GetDC(data->platformWindow.hwnd);
 #endif
 
-        data->renderer->beginFrame();
-        Theme theme = data->renderer->getCurrentTheme();
-        data->renderer->clear(theme.windowBackground);
+      data->renderer->beginFrame();
+      Theme theme = data->renderer->getCurrentTheme();
+      data->renderer->clear(theme.windowBackground);
 
-        int margin = 20;
-        int y = margin;
+      int margin = 20;
+      int y = margin;
 
-        data->renderer->drawText(Translations::T("Offset:"), margin, y + 8, theme.textColor);
+      const char* label = Translations::T("Offset:");
+      data->renderer->drawText(label, margin, y + 8, theme.textColor);
 
-        Rect offsetBox(80, y, windowWidth - 100, 30);
-        Color offsetBg = (data->activeTextBox == 0) ? Color(70, 70, 75) : Color(55, 55, 60);
-        Color offsetBorder = (data->activeTextBox == 0) ? Color(0, 120, 215) : Color(90, 90, 95);
+      int labelWidth = data->renderer->measureTextWidth(label);
+      int gap = 12;
 
-        data->renderer->drawRoundedRect(offsetBox, 4.0f, offsetBg, true);
-        data->renderer->drawRoundedRect(offsetBox, 4.0f, offsetBorder, false);
+      int boxX = margin + labelWidth + gap;
+      int boxWidth = windowWidth - boxX - margin;
+      Rect offsetBox(boxX, y, boxWidth, 30);
+
+      Color offsetBg = (data->activeTextBox == 0) ? Color(70, 70, 75) : Color(55, 55, 60);
+      Color offsetBorder = (data->activeTextBox == 0) ? Color(0, 120, 215) : Color(90, 90, 95);
+
+      data->renderer->drawRoundedRect(offsetBox, 4.0f, offsetBg, true);
+      data->renderer->drawRoundedRect(offsetBox, 4.0f, offsetBorder, false);
 
 #ifdef _WIN32
-        char offsetDisplay[256];
-        StringCopy(offsetDisplay, data->lineNumberText, 256);
-        if (data->activeTextBox == 0)
-            StringAppend(offsetDisplay, '|', 256);
-        data->renderer->drawText(offsetDisplay, offsetBox.x + 8, offsetBox.y + 8, Color(240, 240, 240));
+      char offsetDisplay[256];
+      StringCopy(offsetDisplay, data->lineNumberText, 256);
+
+      data->renderer->drawText(offsetDisplay,
+        offsetBox.x + 8,
+        offsetBox.y + 8,
+        Color(240, 240, 240));
+
+      if (data->activeTextBox == 0 && data->caretVisible)
+      {
+        int textWidth = data->renderer->measureTextWidth(offsetDisplay);
+        int caretX = offsetBox.x + 8 + textWidth;
+        int caretY1 = offsetBox.y + 6;
+        int caretY2 = offsetBox.y + offsetBox.height - 6;
+
+        data->renderer->drawLine(caretX, caretY1, caretX, caretY2, Color(240, 240, 240));
+      }
 
 #else
-std::string offsetDisplay =
-    data->lineNumberText + (data->activeTextBox == 0 ? "|" : "");
+      std::string offsetDisplay =
+        data->lineNumberText + (data->activeTextBox == 0 ? "|" : "");
 
-data->renderer->drawText(offsetDisplay.c_str(),
-                         offsetBox.x + 8,
-                         offsetBox.y + 8,
-                         Color(240, 240, 240));
-
+      data->renderer->drawText(offsetDisplay.c_str(),
+        offsetBox.x + 8,
+        offsetBox.y + 8,
+        Color(240, 240, 240));
 #endif
 
-        int buttonY = offsetBox.y + offsetBox.height + 30;
-        int buttonWidth = 90;
-        int buttonSpacing = 10;
+      int buttonY = offsetBox.y + offsetBox.height + 30;
+      int buttonWidth = 90;
+      int buttonSpacing = 10;
 
-        Rect okButton(windowWidth - margin - buttonWidth * 2 - buttonSpacing, buttonY, buttonWidth, 30);
-        Rect cancelButton(windowWidth - margin - buttonWidth, buttonY, buttonWidth, 30);
+      Rect okButton(windowWidth - margin - buttonWidth * 2 - buttonSpacing, buttonY, buttonWidth, 30);
+      Rect cancelButton(windowWidth - margin - buttonWidth, buttonY, buttonWidth, 30);
 
-        WidgetState okState(okButton);
-        okState.hovered = (data->hoveredWidget == 0);
-        okState.pressed = (data->pressedWidget == 0);
-        data->renderer->drawModernButton(okState, theme, Translations::T("Go"));
+      WidgetState okState(okButton);
+      okState.hovered = (data->hoveredWidget == 0);
+      okState.pressed = (data->pressedWidget == 0);
+      data->renderer->drawModernButton(okState, theme, Translations::T("Go"));
 
-        WidgetState cancelState(cancelButton);
-        cancelState.hovered = (data->hoveredWidget == 1);
-        cancelState.pressed = (data->pressedWidget == 1);
-        data->renderer->drawModernButton(cancelState, theme, Translations::T("Cancel"));
+      WidgetState cancelState(cancelButton);
+      cancelState.hovered = (data->hoveredWidget == 1);
+      cancelState.pressed = (data->pressedWidget == 1);
+      data->renderer->drawModernButton(cancelState, theme, Translations::T("Cancel"));
 
 #ifdef _WIN32
-        data->renderer->endFrame(hdc);
-        ReleaseDC(data->platformWindow.hwnd, hdc);
+      data->renderer->endFrame(hdc);
+      ReleaseDC(data->platformWindow.hwnd, hdc);
 #else
-        data->renderer->endFrame(data->renderer->getDrawContext());
+      data->renderer->endFrame(data->renderer->getDrawContext());
 #endif
     }
 
@@ -451,6 +496,26 @@ data->renderer->drawText(offsetDisplay.c_str(),
 
         switch (msg)
         {
+        case WM_CREATE:
+        {
+          SetTimer(hwnd, 1, 500, NULL);
+
+          if (data)
+            data->caretVisible = true;
+
+          return 0;
+        }
+
+        case WM_TIMER:
+        {
+          if (data)
+          {
+            data->caretVisible = !data->caretVisible;
+            InvalidateRect(hwnd, NULL, FALSE);
+          }
+          return 0;
+        }
+
         case WM_PAINT:
         {
             PAINTSTRUCT ps;
@@ -581,6 +646,25 @@ data->renderer->drawText(offsetDisplay.c_str(),
 
         switch (msg)
         {
+        case WM_CREATE:
+        {
+          SetTimer(hwnd, 1, 500, NULL);
+
+          if (data)
+            data->caretVisible = true;
+
+          return 0;
+        }
+
+        case WM_TIMER:
+        {
+          if (data)
+          {
+            data->caretVisible = !data->caretVisible;
+            InvalidateRect(hwnd, NULL, FALSE);
+          }
+          return 0;
+        }
         case WM_PAINT:
         {
             PAINTSTRUCT ps;
@@ -1309,4 +1393,575 @@ data->renderer->drawText(offsetDisplay.c_str(),
 #endif
     }
 
+    
+    void RenderInputDialog(InputDialogData* data, int windowWidth, int windowHeight, const char* prompt)
+    {
+      if (!data || !data->renderer)
+        return;
+
+#ifdef _WIN32
+      HDC hdc = GetDC(data->platformWindow.hwnd);
+#endif
+
+      data->renderer->beginFrame();
+      Theme theme = data->renderer->getCurrentTheme();
+      data->renderer->clear(theme.windowBackground);
+
+      int margin = 20;
+      int y = margin;
+
+      data->renderer->drawText(prompt, margin, y + 8, theme.textColor);
+
+      Rect inputBox(margin, y + 30, windowWidth - margin * 2, 30);
+      Color inputBg = (data->activeTextBox == 0) ? Color(70, 70, 75) : Color(55, 55, 60);
+      Color inputBorder = (data->activeTextBox == 0) ? Color(0, 120, 215) : Color(90, 90, 95);
+
+      data->renderer->drawRoundedRect(inputBox, 4.0f, inputBg, true);
+      data->renderer->drawRoundedRect(inputBox, 4.0f, inputBorder, false);
+
+#ifdef _WIN32
+      char inputDisplay[512];
+      StringCopy(inputDisplay, data->inputText, 512);
+
+      data->renderer->drawText(inputDisplay,
+        inputBox.x + 8,
+        inputBox.y + 8,
+        Color(240, 240, 240));
+
+      if (data->activeTextBox == 0 && data->caretVisible)
+      {
+        int textWidth = data->renderer->measureTextWidth(inputDisplay);
+        int caretX = inputBox.x + 8 + textWidth;
+        int caretY1 = inputBox.y + 6;
+        int caretY2 = inputBox.y + inputBox.height - 6;
+
+        data->renderer->drawLine(caretX, caretY1, caretX, caretY2, Color(240, 240, 240));
+      }
+
+#else
+      std::string inputDisplay = data->inputText;
+      if (data->activeTextBox == 0 && data->caretVisible)
+        inputDisplay += "|";
+
+      data->renderer->drawText(inputDisplay.c_str(), inputBox.x + 8, inputBox.y + 8, Color(240, 240, 240));
+#endif
+
+      int buttonY = inputBox.y + inputBox.height + 30;
+      int buttonWidth = 90;
+      int buttonSpacing = 10;
+
+      Rect okButton(windowWidth - margin - buttonWidth * 2 - buttonSpacing, buttonY, buttonWidth, 30);
+      Rect cancelButton(windowWidth - margin - buttonWidth, buttonY, buttonWidth, 30);
+
+      WidgetState okState(okButton);
+      okState.hovered = (data->hoveredWidget == 0);
+      okState.pressed = (data->pressedWidget == 0);
+      data->renderer->drawModernButton(okState, theme, "OK");
+
+      WidgetState cancelState(cancelButton);
+      cancelState.hovered = (data->hoveredWidget == 1);
+      cancelState.pressed = (data->pressedWidget == 1);
+      data->renderer->drawModernButton(cancelState, theme, "Cancel");
+
+#ifdef _WIN32
+      data->renderer->endFrame(hdc);
+      ReleaseDC(data->platformWindow.hwnd, hdc);
+#else
+      data->renderer->endFrame(data->renderer->getDrawContext());
+#endif
+    }
+
+
+
+    void UpdateInputHover(InputDialogData* data, int x, int y, int windowWidth, int windowHeight)
+    {
+      int margin = 20;
+      int inputBoxY = margin + 30;
+      int buttonY = inputBoxY + 30 + 30;
+      int buttonWidth = 90;
+      int buttonSpacing = 10;
+
+      Rect okButton(windowWidth - margin - buttonWidth * 2 - buttonSpacing, buttonY, buttonWidth, 30);
+      Rect cancelButton(windowWidth - margin - buttonWidth, buttonY, buttonWidth, 30);
+
+      data->hoveredWidget = -1;
+      if (IsPointInRect(x, y, okButton))
+        data->hoveredWidget = 0;
+      else if (IsPointInRect(x, y, cancelButton))
+        data->hoveredWidget = 1;
+    }
+
+    void HandleInputClick(InputDialogData* data, int x, int y, int windowWidth, int windowHeight)
+    {
+      if (data->hoveredWidget == 0)
+      {
+        data->dialogResult = true;
+        data->running = false;
+        if (data->callback)
+        {
+#ifdef _WIN32
+          data->callback(data->inputText);
+#else
+          data->callback(data->inputText);
+#endif
+        }
+      }
+      else if (data->hoveredWidget == 1)
+      {
+        data->dialogResult = false;
+        data->running = false;
+      }
+    }
+
+    void HandleInputChar(InputDialogData* data, char ch, int windowWidth, int windowHeight)
+    {
+      if (ch == '\b' || ch == 8)
+      {
+#ifdef _WIN32
+        if (!StringIsEmpty(data->inputText))
+        {
+          StringRemoveLast(data->inputText);
+        }
+#else
+        if (!data->inputText.empty())
+        {
+          data->inputText.pop_back();
+        }
+#endif
+      }
+      else if (ch == '\r' || ch == '\n')
+      {
+        data->hoveredWidget = 0;
+        HandleInputClick(data, 0, 0, windowWidth, windowHeight);
+      }
+      else if (ch == 27)
+      {
+        data->dialogResult = false;
+        data->running = false;
+      }
+      else if (ch >= 32 && ch < 127)
+      {
+#ifdef _WIN32
+        StringAppend(data->inputText, ch, 256);
+#else
+        data->inputText += ch;
+#endif
+      }
+    }
+
+#ifdef _WIN32
+    LRESULT CALLBACK InputWindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
+    {
+      InputDialogData* data = SearchDialogs::g_inputData;
+      static const char* s_prompt = "";
+
+      switch (msg)
+      {
+      case WM_TIMER:
+        if (data) {
+          data->caretVisible = !data->caretVisible;
+          InvalidateRect(hwnd, NULL, FALSE);
+        }
+        return 0;
+
+      case WM_CREATE:
+      {
+        SetTimer(hwnd, 1, 500, NULL);
+        CREATESTRUCT* cs = (CREATESTRUCT*)lParam;
+        s_prompt = (const char*)cs->lpCreateParams;
+
+        if (data) {
+          data->caretVisible = true;
+        }
+
+        return 0;
+      }
+
+
+      case WM_PAINT:
+      {
+        PAINTSTRUCT ps;
+        BeginPaint(hwnd, &ps);
+        if (data && data->renderer)
+        {
+          RECT rect;
+          GetClientRect(hwnd, &rect);
+          RenderInputDialog(data, rect.right, rect.bottom, s_prompt);
+        }
+        EndPaint(hwnd, &ps);
+        return 0;
+      }
+
+      case WM_CHAR:
+      {
+        if (data)
+        {
+          RECT rect;
+          GetClientRect(hwnd, &rect);
+          HandleInputChar(data, (char)wParam, rect.right, rect.bottom);
+          InvalidateRect(hwnd, NULL, FALSE);
+        }
+        return 0;
+      }
+
+      case WM_MOUSEMOVE:
+      {
+        if (data)
+        {
+          RECT rect;
+          GetClientRect(hwnd, &rect);
+          int x = LOWORD(lParam);
+          int y = HIWORD(lParam);
+          UpdateInputHover(data, x, y, rect.right, rect.bottom);
+          InvalidateRect(hwnd, NULL, FALSE);
+        }
+        return 0;
+      }
+
+      case WM_LBUTTONDOWN:
+      {
+        if (data)
+        {
+          data->pressedWidget = data->hoveredWidget;
+          data->activeTextBox = 0;
+          InvalidateRect(hwnd, NULL, FALSE);
+        }
+        return 0;
+      }
+
+      case WM_LBUTTONUP:
+      {
+        if (data)
+        {
+          RECT rect;
+          GetClientRect(hwnd, &rect);
+          int x = LOWORD(lParam);
+          int y = HIWORD(lParam);
+
+          if (data->pressedWidget == data->hoveredWidget && data->hoveredWidget != -1)
+          {
+            HandleInputClick(data, x, y, rect.right, rect.bottom);
+          }
+
+          data->pressedWidget = -1;
+          InvalidateRect(hwnd, NULL, FALSE);
+        }
+        return 0;
+      }
+
+      case WM_CLOSE:
+        if (data)
+        {
+          data->dialogResult = false;
+          data->running = false;
+        }
+        return 0;
+
+      case WM_SIZE:
+      {
+        if (data && data->renderer)
+        {
+          RECT rect;
+          GetClientRect(hwnd, &rect);
+          if (rect.right > 0 && rect.bottom > 0)
+          {
+            data->renderer->resize(rect.right, rect.bottom);
+            InvalidateRect(hwnd, NULL, FALSE);
+          }
+        }
+        return 0;
+      }
+      }
+
+      return DefWindowProcW(hwnd, msg, wParam, lParam);
+    }
+
+    void ShowInputDialog(void* parentHandle, const char* title, const char* prompt,
+      const char* defaultText, bool darkMode,
+      void (*callback)(const char*), void* userData)
+    {
+      HWND parent = (HWND)parentHandle;
+      const wchar_t* className = L"InputDialogClass";
+
+      WNDCLASSEXW wc = {};
+      wc.cbSize = sizeof(WNDCLASSEXW);
+      wc.lpfnWndProc = InputWindowProc;
+      wc.hInstance = GetModuleHandleW(NULL);
+      wc.lpszClassName = className;
+      wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
+      wc.hbrBackground = nullptr;
+
+      UnregisterClassW(className, wc.hInstance);
+      RegisterClassExW(&wc);
+
+      InputDialogData data = {};
+      data.running = true;
+      data.activeTextBox = 0;
+      StringCopy(data.inputText, defaultText, 256);
+      data.callback = callback;
+      data.callbackUserData = userData;
+      SearchDialogs::g_inputData = &data;
+
+      int width = 400;
+      int height = 180;
+
+      RECT parentRect;
+      GetWindowRect(parent, &parentRect);
+      int x = parentRect.left + (parentRect.right - parentRect.left - width) / 2;
+      int y = parentRect.top + (parentRect.bottom - parentRect.top - height) / 2;
+
+      wchar_t wTitle[256];
+      MultiByteToWideChar(CP_UTF8, 0, title, -1, wTitle, 256);
+
+      HWND hwnd = CreateWindowExW(
+        WS_EX_DLGMODALFRAME | WS_EX_TOPMOST,
+        className, wTitle,
+        WS_POPUP | WS_CAPTION | WS_SYSMENU,
+        x, y, width, height,
+        parent, nullptr, GetModuleHandleW(NULL), (void*)prompt);
+
+      if (!hwnd)
+      {
+        SearchDialogs::g_inputData = nullptr;
+        return;
+      }
+
+      if (darkMode)
+      {
+        BOOL dark = TRUE;
+        DwmSetWindowAttribute(hwnd, 20, &dark, sizeof(dark));
+      }
+
+      data.renderer = new RenderManager();
+      if (!data.renderer->initialize(hwnd))
+      {
+        delete data.renderer;
+        DestroyWindow(hwnd);
+        SearchDialogs::g_inputData = nullptr;
+        return;
+      }
+
+      data.platformWindow.hwnd = hwnd;
+
+      RECT clientRect;
+      GetClientRect(hwnd, &clientRect);
+      if (clientRect.right > 0 && clientRect.bottom > 0)
+      {
+        data.renderer->resize(clientRect.right, clientRect.bottom);
+      }
+
+      EnableWindow(parent, FALSE);
+      ShowWindow(hwnd, SW_SHOW);
+      UpdateWindow(hwnd);
+
+      MSG msg;
+      while (data.running && GetMessage(&msg, NULL, 0, 0))
+      {
+        TranslateMessage(&msg);
+        DispatchMessage(&msg);
+      }
+
+      delete data.renderer;
+      EnableWindow(parent, TRUE);
+      SetForegroundWindow(parent);
+      DestroyWindow(hwnd);
+      UnregisterClassW(className, GetModuleHandleW(NULL));
+      SearchDialogs::g_inputData = nullptr;
+    }
+
+#elif defined(__linux__)
+
+    void ProcessInputEvent(InputDialogData* data, XEvent* event, int width, int height, const char* prompt)
+    {
+      switch (event->type)
+      {
+      case Expose:
+        RenderInputDialog(data, width, height, prompt);
+        break;
+
+      case KeyPress:
+      {
+        char buf[32];
+        KeySym keysym;
+        int len = XLookupString(&event->xkey, buf, sizeof(buf), &keysym, nullptr);
+
+        if (len > 0)
+        {
+          HandleInputChar(data, buf[0], width, height);
+          RenderInputDialog(data, width, height, prompt);
+        }
+        break;
+      }
+
+      case MotionNotify:
+      {
+        UpdateInputHover(data, event->xmotion.x, event->xmotion.y, width, height);
+        RenderInputDialog(data, width, height, prompt);
+        break;
+      }
+
+      case ButtonPress:
+        if (event->xbutton.button == Button1)
+        {
+          data->pressedWidget = data->hoveredWidget;
+          data->activeTextBox = 0;
+          RenderInputDialog(data, width, height, prompt);
+        }
+        break;
+
+      case ButtonRelease:
+        if (event->xbutton.button == Button1)
+        {
+          if (data->pressedWidget == data->hoveredWidget && data->hoveredWidget != -1)
+          {
+            HandleInputClick(data, event->xbutton.x, event->xbutton.y, width, height);
+          }
+          data->pressedWidget = -1;
+          RenderInputDialog(data, width, height, prompt);
+        }
+        break;
+
+      case ClientMessage:
+        if ((Atom)event->xclient.data.l[0] == data->platformWindow.wmDeleteWindow)
+        {
+          data->dialogResult = false;
+          data->running = false;
+        }
+        break;
+
+      case ConfigureNotify:
+        if (event->xconfigure.width != width || event->xconfigure.height != height)
+        {
+          data->renderer->resize(event->xconfigure.width, event->xconfigure.height);
+          RenderInputDialog(data, event->xconfigure.width, event->xconfigure.height, prompt);
+        }
+        break;
+      }
+    }
+
+    void ShowInputDialog(void* parentHandle, const char* title, const char* prompt,
+      const char* defaultText, bool darkMode,
+      std::function<void(const std::string&)> callback)
+    {
+      Window parentWindow = (Window)(uintptr_t)parentHandle;
+      Display* parentDisplay = XOpenDisplay(nullptr);
+      if (!parentDisplay)
+      {
+        fprintf(stderr, "Failed to open display\n");
+        return;
+      }
+
+      int screen = DefaultScreen(parentDisplay);
+      Window rootWindow = RootWindow(parentDisplay, screen);
+
+      InputDialogData data = {};
+      data.inputText = defaultText;
+      data.callback = callback;
+      g_inputData = &data;
+
+      int width = 400;
+      int height = 180;
+
+      Window window = XCreateSimpleWindow(parentDisplay, rootWindow,
+        100, 100, width, height, 1,
+        BlackPixel(parentDisplay, screen),
+        WhitePixel(parentDisplay, screen));
+
+      XSizeHints* sizeHints = XAllocSizeHints();
+      sizeHints->flags = PPosition | PSize | PMinSize | PMaxSize;
+      sizeHints->x = 100;
+      sizeHints->y = 100;
+      sizeHints->width = width;
+      sizeHints->height = height;
+      sizeHints->min_width = width;
+      sizeHints->min_height = height;
+      sizeHints->max_width = width;
+      sizeHints->max_height = height;
+      XSetWMNormalHints(parentDisplay, window, sizeHints);
+      XFree(sizeHints);
+
+      XSelectInput(parentDisplay, window,
+        ExposureMask | KeyPressMask | ButtonPressMask | ButtonReleaseMask |
+        PointerMotionMask | StructureNotifyMask);
+
+      Atom wmDelete = XInternAtom(parentDisplay, "WM_DELETE_WINDOW", False);
+      XSetWMProtocols(parentDisplay, window, &wmDelete, 1);
+      XStoreName(parentDisplay, window, title);
+
+      if (parentWindow != 0)
+      {
+        XSetTransientForHint(parentDisplay, window, parentWindow);
+      }
+
+      XMapWindow(parentDisplay, window);
+      XFlush(parentDisplay);
+
+      ApplyDarkTitleBar(parentDisplay, window, darkMode);
+
+      data.platformWindow.display = parentDisplay;
+      data.platformWindow.window = window;
+      data.platformWindow.wmDeleteWindow = wmDelete;
+
+      data.renderer = new RenderManager();
+      if (!data.renderer->initialize((NativeWindow)(uintptr_t)window))
+      {
+        delete data.renderer;
+        XDestroyWindow(parentDisplay, window);
+        XCloseDisplay(parentDisplay);
+        g_inputData = nullptr;
+        return;
+      }
+
+      data.renderer->resize(width, height);
+
+      XEvent event;
+      while (data.running)
+      {
+        while (XPending(parentDisplay))
+        {
+          XNextEvent(parentDisplay, &event);
+          ProcessInputEvent(&data, &event, width, height, prompt);
+        }
+        usleep(1000);
+      }
+
+      delete data.renderer;
+      XDestroyWindow(parentDisplay, window);
+      XCloseDisplay(parentDisplay);
+      g_inputData = nullptr;
+    }
+
+#elif defined(__APPLE__)
+
+    void ShowInputDialog(void* parentHandle, const char* title, const char* prompt,
+      const char* defaultText, bool darkMode,
+      std::function<void(const std::string&)> callback)
+    {
+      @autoreleasepool
+      {
+          NSAlert * alert = [[NSAlert alloc]init];
+          [alert setMessageText:[NSString stringWithUTF8String:title] ] ;
+          [alert setInformativeText : [NSString stringWithUTF8String : prompt] ] ;
+          [alert addButtonWithTitle : @"OK"] ;
+          [alert addButtonWithTitle : @"Cancel"] ;
+
+          NSTextField* input = [[NSTextField alloc]initWithFrame:NSMakeRect(0, 0, 300, 24)];
+          [input setStringValue:[NSString stringWithUTF8String:defaultText] ] ;
+          [alert setAccessoryView : input] ;
+
+          [[alert window]makeFirstResponder:input];
+
+          NSInteger button = [alert runModal];
+          if (button == NSAlertFirstButtonReturn)
+          {
+              std::string result = [[input stringValue]UTF8String];
+              if (!result.empty())
+              {
+                  callback(result);
+              }
+          }
+      }
+    }
+
+#endif
 }

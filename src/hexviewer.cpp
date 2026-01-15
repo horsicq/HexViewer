@@ -148,6 +148,7 @@ BottomPanelState g_BottomPanel;
 ChecksumResults g_Checksums;
 size_t editingOffset = (size_t)-1;
 
+const int PANEL_TITLE_HEIGHT = 28;
 int g_SearchCaretX = 0;
 int g_SearchCaretY = 0;
 int g_SearchBoxXStart = 0;
@@ -953,6 +954,25 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 
 		static bool g_DebugScrollbarMsgShown = false;
 
+		g_Bookmarks.hoveredIndex = -1;
+		if (g_LeftPanel.visible && !g_Bookmarks.bookmarks.empty())
+		{
+			Rect leftBounds = GetLeftPanelBounds(g_LeftPanel, windowWidth, windowHeight, g_MenuBar.getHeight());
+
+			if (leftBounds.contains(x, y))
+			{
+				for (size_t i = 0; i < g_Bookmarks.bookmarks.size() && i < 5; i++)
+				{
+					Rect bookmarkRect = GetBookmarkRect((int)i, leftBounds);
+					if (bookmarkRect.contains(x, y))
+					{
+						g_Bookmarks.hoveredIndex = (int)i;
+						break;
+					}
+				}
+			}
+		}
+
 		if (g_MainScrollbar.pressed)
 		{
 			int maxScroll = g_TotalLines - g_LinesPerPage;
@@ -1146,6 +1166,8 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 			}
 			return 0;
 		}
+
+
 
 		if (g_Selection.dragging)
 		{

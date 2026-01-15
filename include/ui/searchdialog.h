@@ -36,6 +36,7 @@ struct FindReplaceDialogData {
   std::string findText;
   std::string replaceText;
 #endif
+  bool caretVisible;
   int activeTextBox = 0;
   int hoveredWidget = -1;
   int pressedWidget = -1;
@@ -57,6 +58,7 @@ struct GoToDialogData {
 #else
   std::string lineNumberText;
 #endif
+  bool caretVisible;
   int activeTextBox = 0;
   int hoveredWidget = -1;
   int pressedWidget = -1;
@@ -96,4 +98,39 @@ void ShowGoToDialog(
     std::function<void(int)> callback);
 #endif
 
+#ifdef _WIN32
+  void ShowInputDialog(void* parentHandle, const char* title, const char* prompt,
+    const char* defaultText, bool darkMode,
+    void (*callback)(const char*), void* userData);
+#else
+  void ShowInputDialog(void* parentHandle, const char* title, const char* prompt,
+    const char* defaultText, bool darkMode,
+    std::function<void(const std::string&)> callback);
+#endif
+
 }
+
+struct InputDialogData
+{
+  bool caretVisible;
+  uint64_t lastCaretToggleTime;
+
+#ifdef _WIN32
+  struct { HWND hwnd; } platformWindow;
+  char inputText[256];
+  void (*callback)(const char*);
+  void* callbackUserData;
+#else
+  struct { Display* display; Window window; Atom wmDeleteWindow; } platformWindow;
+  std::string inputText;
+  std::function<void(const std::string&)> callback;
+#endif
+
+  RenderManager* renderer = nullptr;
+  bool running = false;
+  bool dialogResult = false;
+  int hoveredWidget = -1;
+  int pressedWidget = -1;
+  int activeTextBox = 0;
+};
+

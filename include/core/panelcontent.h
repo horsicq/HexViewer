@@ -77,6 +77,7 @@ struct Bookmark {
 struct BookmarksState {
     Vector<Bookmark> bookmarks;
     int selectedIndex;
+    int hoveredIndex;
 };
 
 struct ByteStatistics {
@@ -105,6 +106,8 @@ extern CompareState       g_Compare;
 extern BookmarksState     g_Bookmarks;
 extern ByteStatistics     g_ByteStats;
 
+Rect GetBookmarkRect(int bookmarkIndex, const Rect& panelBounds);
+bool ShowInputDialog(HWND hwndParent, const char* title, const char* prompt, char* outText, int maxLen);
 void PatternSearch_SetFocus();
 void PatternSearch_Run();
 void PatternSearch_FindNext();

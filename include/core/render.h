@@ -537,6 +537,7 @@ public:
   bool initialize(NativeWindow window);
   void cleanup();
   void resize(int width, int height);
+  int measureTextWidth(const char* text);
 
   void beginFrame();
   void endFrame(NativeDrawContext ctx);

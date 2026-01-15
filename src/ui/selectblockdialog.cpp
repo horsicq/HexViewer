@@ -838,3 +838,4 @@ void ShowSelectBlockDialog(void* parentHandle, bool darkMode,
   g_selectBlockData = nullptr;
 }
 #endif
+

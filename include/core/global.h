@@ -644,7 +644,6 @@ inline int StrCompare(const char *a, const char *b)
     return (int)((unsigned char)*a) - (int)((unsigned char)*b);
 }
 
-
 inline void ItoaDec(long long value, char *out, int max)
 {
     char buf[32];
@@ -668,35 +667,33 @@ inline void ItoaDec(long long value, char *out, int max)
     out[j] = 0;
 }
 
-inline void ItoaHex(unsigned long long value, char *out, int max)
+inline void ItoaHex(unsigned long long value, char* out, int max)
 {
-    static const char *hex = "0123456789ABCDEF";
+  static const char* hex = "0123456789ABCDEF";
 
-    if (max < 3)
+  if (max < 2)
+  {
+    if (max > 0)
+      out[0] = 0;
+    return;
+  }
+
+  int pos = 0;
+  bool started = false;
+
+  for (int i = 60; i >= 0; i -= 4)
+  {
+    unsigned digit = (value >> i) & 0xF;
+    if (digit || started || i == 0)
     {
-        if (max > 0)
-            out[0] = 0;
-        return;
+      if (pos < max - 1)
+        out[pos++] = hex[digit];
+      started = true;
     }
+  }
 
-    out[0] = '0';
-    out[1] = 'x';
-    int pos = 2;
-
-    bool started = false;
-    for (int i = 60; i >= 0; i -= 4)
-    {
-        unsigned digit = (value >> i) & 0xF;
-        if (digit || started || i == 0)
-        {
-            if (pos < max - 1)
-                out[pos++] = hex[digit];
-            started = true;
-        }
-    }
-    out[pos] = 0;
+  out[pos] = 0;
 }
-
 
 template <typename T>
 class Vector
