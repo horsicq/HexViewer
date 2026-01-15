@@ -199,218 +199,228 @@ void CreateDirectoriesForPath(const wchar_t *path)
 }
 #endif
 
-void SaveOptionsToFile(const AppOptions &options)
+void SaveOptionsToFile(const AppOptions& options)
 {
-    char configPath[512];
-    GetConfigPath(configPath, 512);
+  char configPath[512];
+  GetConfigPath(configPath, 512);
 
-    char buf[256];
-    
+  char buf[256];
+
 #ifdef _WIN32
-    wchar_t wpath[512];
-    MultiByteToWideChar(CP_UTF8, 0, configPath, -1, wpath, 512);
-    CreateDirectoriesForPath(wpath);
-    
-    HANDLE hFile = CreateFileW(wpath, GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS,
-                               FILE_ATTRIBUTE_NORMAL, nullptr);
-    if (hFile == INVALID_HANDLE_VALUE)
-        return;
+  wchar_t wpath[512];
+  MultiByteToWideChar(CP_UTF8, 0, configPath, -1, wpath, 512);
+  CreateDirectoriesForPath(wpath);
 
-    DWORD written;
+  HANDLE hFile = CreateFileW(wpath, GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS,
+    FILE_ATTRIBUTE_NORMAL, nullptr);
+  if (hFile == INVALID_HANDLE_VALUE)
+    return;
 
-    StrCopy(buf, "[Options]\n");
-    WriteFile(hFile, buf, (DWORD)StrLen(buf), &written, nullptr);
+  DWORD written;
 
-    StrCopy(buf, "darkMode=");
-    StrCopy(buf + 9, options.darkMode ? "1" : "0");
-    StrCopy(buf + 10, "\n");
-    WriteFile(hFile, buf, (DWORD)StrLen(buf), &written, nullptr);
+  StrCopy(buf, "[Options]\n");
+  WriteFile(hFile, buf, (DWORD)StrLen(buf), &written, nullptr);
 
-    StrCopy(buf, "bytesPerLine=");
-    IntToStr(options.defaultBytesPerLine, buf + 13, 243);
-    int len = (int)StrLen(buf);
-    StrCopy(buf + len, "\n");
-    WriteFile(hFile, buf, (DWORD)StrLen(buf), &written, nullptr);
+  StrCopy(buf, "darkMode=");
+  StrCopy(buf + 9, options.darkMode ? "1" : "0");
+  StrCopy(buf + 10, "\n");
+  WriteFile(hFile, buf, (DWORD)StrLen(buf), &written, nullptr);
 
-    StrCopy(buf, "autoReload=");
-    StrCopy(buf + 11, options.autoReload ? "1" : "0");
-    StrCopy(buf + 12, "\n");
-    WriteFile(hFile, buf, (DWORD)StrLen(buf), &written, nullptr);
+  StrCopy(buf, "bookmarkHighlights=");
+  StrCopy(buf + 19, options.bookmarkHighlights ? "1" : "0");
+  StrCopy(buf + 20, "\n");
+  WriteFile(hFile, buf, (DWORD)StrLen(buf), &written, nullptr);
 
-    StrCopy(buf, "language=");
-    StrCopy(buf + 9, options.language);
-    len = (int)StrLen(buf);
-    StrCopy(buf + len, "\n");
-    WriteFile(hFile, buf, (DWORD)StrLen(buf), &written, nullptr);
+  StrCopy(buf, "bytesPerLine=");
+  IntToStr(options.defaultBytesPerLine, buf + 13, 243);
+  int len = (int)StrLen(buf);
+  StrCopy(buf + len, "\n");
+  WriteFile(hFile, buf, (DWORD)StrLen(buf), &written, nullptr);
 
-    StrCopy(buf, "fontSize=");
-    IntToStr(options.fontSize, buf + 9, 247);
-    len = (int)StrLen(buf);
-    StrCopy(buf + len, "\n");
-    WriteFile(hFile, buf, (DWORD)StrLen(buf), &written, nullptr);
+  StrCopy(buf, "autoReload=");
+  StrCopy(buf + 11, options.autoReload ? "1" : "0");
+  StrCopy(buf + 12, "\n");
+  WriteFile(hFile, buf, (DWORD)StrLen(buf), &written, nullptr);
 
-    StrCopy(buf, "\n[RecentFiles]\n");
-    WriteFile(hFile, buf, (DWORD)StrLen(buf), &written, nullptr);
+  StrCopy(buf, "language=");
+  StrCopy(buf + 9, options.language);
+  len = (int)StrLen(buf);
+  StrCopy(buf + len, "\n");
+  WriteFile(hFile, buf, (DWORD)StrLen(buf), &written, nullptr);
 
-    for (int i = 0; i < g_RecentFileCount; i++)
+  StrCopy(buf, "fontSize=");
+  IntToStr(options.fontSize, buf + 9, 247);
+  len = (int)StrLen(buf);
+  StrCopy(buf + len, "\n");
+  WriteFile(hFile, buf, (DWORD)StrLen(buf), &written, nullptr);
+
+  StrCopy(buf, "\n[RecentFiles]\n");
+  WriteFile(hFile, buf, (DWORD)StrLen(buf), &written, nullptr);
+
+  for (int i = 0; i < g_RecentFileCount; i++)
+  {
+    StrCopy(buf, "File");
+
+    char numStr[4];
+    int num = i;
+    int numLen = 0;
+    if (num == 0)
     {
-        StrCopy(buf, "File");
-        
-        char numStr[4];
-        int num = i;
-        int numLen = 0;
-        if (num == 0)
-        {
-            numStr[numLen++] = '0';
-        }
-        else
-        {
-            int temp = num;
-            int digits = 0;
-            while (temp > 0)
-            {
-                temp /= 10;
-                digits++;
-            }
-            for (int j = digits - 1; j >= 0; j--)
-            {
-                numStr[j] = '0' + (num % 10);
-                num /= 10;
-            }
-            numLen = digits;
-        }
-        numStr[numLen] = '\0';
-
-        StrCopy(buf + 4, numStr);
-        int pos = 4 + numLen;
-        buf[pos++] = '=';
-        
-        StrCopy(buf + pos, g_RecentFiles[i]);
-        len = (int)StrLen(buf);
-        buf[len++] = '\n';
-        buf[len] = '\0';
-        
-        WriteFile(hFile, buf, (DWORD)StrLen(buf), &written, nullptr);
+      numStr[numLen++] = '0';
     }
-
-    StrCopy(buf, "\n[Plugins]\n");
-    WriteFile(hFile, buf, (DWORD)StrLen(buf), &written, nullptr);
-
-    for (int i = 0; i < options.enabledPluginCount; i++)
+    else
     {
-        StrCopy(buf, "enabled=");
-        StrCopy(buf + 8, options.enabledPlugins[i]);
-        len = (int)StrLen(buf);
-        buf[len++] = '\n';
-        buf[len] = '\0';
-        
-        WriteFile(hFile, buf, (DWORD)StrLen(buf), &written, nullptr);
+      int temp = num;
+      int digits = 0;
+      while (temp > 0)
+      {
+        temp /= 10;
+        digits++;
+      }
+      for (int j = digits - 1; j >= 0; j--)
+      {
+        numStr[j] = '0' + (num % 10);
+        num /= 10;
+      }
+      numLen = digits;
     }
+    numStr[numLen] = '\0';
 
-    CloseHandle(hFile);
+    StrCopy(buf + 4, numStr);
+    int pos = 4 + numLen;
+    buf[pos++] = '=';
+
+    StrCopy(buf + pos, g_RecentFiles[i]);
+    len = (int)StrLen(buf);
+    buf[len++] = '\n';
+    buf[len] = '\0';
+
+    WriteFile(hFile, buf, (DWORD)StrLen(buf), &written, nullptr);
+  }
+
+  StrCopy(buf, "\n[Plugins]\n");
+  WriteFile(hFile, buf, (DWORD)StrLen(buf), &written, nullptr);
+
+  for (int i = 0; i < options.enabledPluginCount; i++)
+  {
+    StrCopy(buf, "enabled=");
+    StrCopy(buf + 8, options.enabledPlugins[i]);
+    len = (int)StrLen(buf);
+    buf[len++] = '\n';
+    buf[len] = '\0';
+
+    WriteFile(hFile, buf, (DWORD)StrLen(buf), &written, nullptr);
+  }
+
+  CloseHandle(hFile);
 
 #else
-    char dirPath[512];
-    StrCopy(dirPath, configPath);
-    for (int i = (int)StrLen(dirPath) - 1; i >= 0; i--)
+  char dirPath[512];
+  StrCopy(dirPath, configPath);
+  for (int i = (int)StrLen(dirPath) - 1; i >= 0; i--)
+  {
+    if (dirPath[i] == '/')
     {
-        if (dirPath[i] == '/')
-        {
-            dirPath[i] = 0;
-            mkdir(dirPath, 0755);
-            break;
-        }
+      dirPath[i] = 0;
+      mkdir(dirPath, 0755);
+      break;
     }
+  }
 
-    int fd = open(configPath, O_WRONLY | O_CREAT | O_TRUNC, 0644);
-    if (fd < 0)
-        return;
+  int fd = open(configPath, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+  if (fd < 0)
+    return;
 
-    StrCopy(buf, "[Options]\n");
-    write(fd, buf, StrLen(buf));
+  StrCopy(buf, "[Options]\n");
+  write(fd, buf, StrLen(buf));
 
-    StrCopy(buf, "darkMode=");
-    StrCopy(buf + 9, options.darkMode ? "1\n" : "0\n");
-    write(fd, buf, StrLen(buf));
+  StrCopy(buf, "darkMode=");
+  StrCopy(buf + 9, options.darkMode ? "1\n" : "0\n");
+  write(fd, buf, StrLen(buf));
 
-    StrCopy(buf, "bytesPerLine=");
-    IntToStr(options.defaultBytesPerLine, buf + 13, 243);
-    int len = (int)StrLen(buf);
-    StrCopy(buf + len, "\n");
-    write(fd, buf, StrLen(buf));
+  StrCopy(buf, "bookmarkHighlights=");
+  StrCopy(buf + 19, options.bookmarkHighlights ? "1\n" : "0\n");
+  write(fd, buf, StrLen(buf));
 
-    StrCopy(buf, "autoReload=");
-    StrCopy(buf + 11, options.autoReload ? "1\n" : "0\n");
-    write(fd, buf, StrLen(buf));
+  StrCopy(buf, "bytesPerLine=");
+  IntToStr(options.defaultBytesPerLine, buf + 13, 243);
+  int len = (int)StrLen(buf);
+  StrCopy(buf + len, "\n");
+  write(fd, buf, StrLen(buf));
 
-    StrCopy(buf, "language=");
-    StrCopy(buf + 9, options.language);
+  StrCopy(buf, "autoReload=");
+  StrCopy(buf + 11, options.autoReload ? "1\n" : "0\n");
+  write(fd, buf, StrLen(buf));
+
+  StrCopy(buf, "language=");
+  StrCopy(buf + 9, options.language);
+  len = (int)StrLen(buf);
+  StrCopy(buf + len, "\n");
+  write(fd, buf, StrLen(buf));
+
+  StrCopy(buf, "\n[RecentFiles]\n");
+  write(fd, buf, StrLen(buf));
+
+  for (int i = 0; i < g_RecentFileCount; i++)
+  {
+    StrCopy(buf, "File");
+
+    char numStr[4];
+    int num = i;
+    int numLen = 0;
+    if (num == 0)
+    {
+      numStr[numLen++] = '0';
+    }
+    else
+    {
+      int temp = num;
+      int digits = 0;
+      while (temp > 0)
+      {
+        temp /= 10;
+        digits++;
+      }
+      for (int j = digits - 1; j >= 0; j--)
+      {
+        numStr[j] = '0' + (num % 10);
+        num /= 10;
+      }
+      numLen = digits;
+    }
+    numStr[numLen] = '\0';
+
+    StrCopy(buf + 4, numStr);
+    int pos = 4 + numLen;
+    buf[pos++] = '=';
+    StrCopy(buf + pos, g_RecentFiles[i]);
     len = (int)StrLen(buf);
-    StrCopy(buf + len, "\n");
+    buf[len++] = '\n';
+    buf[len] = '\0';
+
     write(fd, buf, StrLen(buf));
+  }
 
-    StrCopy(buf, "\n[RecentFiles]\n");
+  StrCopy(buf, "\n[Plugins]\n");
+  write(fd, buf, StrLen(buf));
+
+  for (int i = 0; i < options.enabledPluginCount; i++)
+  {
+    StrCopy(buf, "enabled=");
+    StrCopy(buf + 8, options.enabledPlugins[i]);
+    len = (int)StrLen(buf);
+    buf[len++] = '\n';
+    buf[len] = '\0';
+
     write(fd, buf, StrLen(buf));
+  }
 
-    for (int i = 0; i < g_RecentFileCount; i++)
-    {
-        StrCopy(buf, "File");
-        
-        char numStr[4];
-        int num = i;
-        int numLen = 0;
-        if (num == 0)
-        {
-            numStr[numLen++] = '0';
-        }
-        else
-        {
-            int temp = num;
-            int digits = 0;
-            while (temp > 0)
-            {
-                temp /= 10;
-                digits++;
-            }
-            for (int j = digits - 1; j >= 0; j--)
-            {
-                numStr[j] = '0' + (num % 10);
-                num /= 10;
-            }
-            numLen = digits;
-        }
-        numStr[numLen] = '\0';
-
-        StrCopy(buf + 4, numStr);
-        int pos = 4 + numLen;
-        buf[pos++] = '=';
-        StrCopy(buf + pos, g_RecentFiles[i]);
-        len = (int)StrLen(buf);
-        buf[len++] = '\n';
-        buf[len] = '\0';
-        
-        write(fd, buf, StrLen(buf));
-    }
-
-    StrCopy(buf, "\n[Plugins]\n");
-    write(fd, buf, StrLen(buf));
-
-    for (int i = 0; i < options.enabledPluginCount; i++)
-    {
-        StrCopy(buf, "enabled=");
-        StrCopy(buf + 8, options.enabledPlugins[i]);
-        len = (int)StrLen(buf);
-        buf[len++] = '\n';
-        buf[len] = '\0';
-        
-        write(fd, buf, StrLen(buf));
-    }
-
-    close(fd);
+  close(fd);
 #endif
 }
 
-void LoadOptionsFromFile(AppOptions &options)
+
+void LoadOptionsFromFile(AppOptions& options)
 {
   char configPath[512];
   GetConfigPath(configPath, 512);
@@ -418,7 +428,7 @@ void LoadOptionsFromFile(AppOptions &options)
   wchar_t wpath[512];
   MultiByteToWideChar(CP_UTF8, 0, configPath, -1, wpath, 512);
   HANDLE hFile = CreateFileW(wpath, GENERIC_READ, FILE_SHARE_READ, nullptr,
-                             OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+    OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
   if (hFile == INVALID_HANDLE_VALUE)
     return;
   char buf[8192];
@@ -442,7 +452,7 @@ void LoadOptionsFromFile(AppOptions &options)
   bool inPluginsSection = false;
   g_RecentFileCount = 0;
   options.enabledPluginCount = 0;
-  
+
   int lineStart = 0;
   for (int i = 0; i <= (int)read; i++)
   {
@@ -452,18 +462,18 @@ void LoadOptionsFromFile(AppOptions &options)
       {
         char originalChar = buf[i];
         buf[i] = 0;
-        char *line = buf + lineStart;
-        
+        char* line = buf + lineStart;
+
         while (*line == ' ' || *line == '\t')
           line++;
-        
+
         if (*line == 0)
         {
           lineStart = i + 1;
           buf[i] = originalChar;
           continue;
         }
-        
+
         if (line[0] == '[')
         {
           if (strEquals(line, "[Options]"))
@@ -485,7 +495,7 @@ void LoadOptionsFromFile(AppOptions &options)
           buf[i] = originalChar;
           continue;
         }
-        
+
         int eq = -1;
         for (int j = 0; line[j]; j++)
         {
@@ -495,13 +505,13 @@ void LoadOptionsFromFile(AppOptions &options)
             break;
           }
         }
-        
+
         if (eq > 0)
         {
           line[eq] = 0;
-          char *key = line;
-          char *val = line + eq + 1;
-          
+          char* key = line;
+          char* val = line + eq + 1;
+
           if (inPluginsSection)
           {
             if (strEquals(key, "enabled") && val[0] != 0)
@@ -518,7 +528,7 @@ void LoadOptionsFromFile(AppOptions &options)
             if (key[0] == 'F' && key[1] == 'i' && key[2] == 'l' && key[3] == 'e')
             {
               int fileIndex = StrToInt(key + 4);
-              
+
               if (fileIndex >= 0 && fileIndex < 10 && val[0] != 0)
               {
                 StrCopy(g_RecentFiles[fileIndex], val);
@@ -533,6 +543,10 @@ void LoadOptionsFromFile(AppOptions &options)
           {
             if (strEquals(key, "darkMode"))
               options.darkMode = strEquals(val, "1");
+
+            else if (strEquals(key, "bookmarkHighlights"))
+              options.bookmarkHighlights = strEquals(val, "1");
+
             else if (strEquals(key, "bytesPerLine"))
               options.defaultBytesPerLine = StrToInt(val);
             else if (strEquals(key, "autoReload"))
@@ -543,13 +557,14 @@ void LoadOptionsFromFile(AppOptions &options)
               options.fontSize = StrToInt(val);
           }
         }
-        
+
         buf[i] = originalChar;
       }
       lineStart = i + 1;
     }
   }
 }
+
 
 
 bool IsPointInRect(int x, int y, const Rect &rect)
@@ -598,6 +613,17 @@ void RenderOptionsDialog(OptionsDialogData* data, int windowWidth, int windowHei
   {
     Rect r(margin, y, 18, 18);
     WidgetState ws(r);
+    ws.hovered = (data->hoveredWidget == 9);
+    ws.pressed = (data->pressedWidget == 9);
+
+    data->renderer->drawModernCheckbox(ws, theme, data->tempOptions.bookmarkHighlights);
+    data->renderer->drawText(Translations::T("Highlight bookmarks"), margin + 28, y + 2, theme.textColor);
+    NEXT_Y(controlSpacing);
+  }
+
+  {
+    Rect r(margin, y, 18, 18);
+    WidgetState ws(r);
     ws.hovered = (data->hoveredWidget == 1);
     ws.pressed = (data->pressedWidget == 1);
 
@@ -605,6 +631,7 @@ void RenderOptionsDialog(OptionsDialogData* data, int windowWidth, int windowHei
     data->renderer->drawText(Translations::T("Auto-reload modified file"), margin + 28, y + 2, theme.textColor);
     NEXT_Y(controlSpacing);
   }
+
 
   if (!GetIsNativeFlag())
   {
@@ -797,9 +824,16 @@ void UpdateHoverState(OptionsDialogData* data, int x, int y, int windowWidth, in
 
   {
     Rect r(margin, startY, 18, 18);
+    if (IsPointInRect(x, y, r)) { data->hoveredWidget = 9; return; }
+    NEXT_Y(controlSpacing);
+  }
+
+  {
+    Rect r(margin, startY, 18, 18);
     if (IsPointInRect(x, y, r)) { data->hoveredWidget = 1; return; }
     NEXT_Y(controlSpacing);
   }
+
 
   if (!GetIsNativeFlag())
   {
@@ -970,21 +1004,30 @@ void HandleMouseClick(OptionsDialogData* data, int x, int y, int windowWidth, in
   case 0:
     data->tempOptions.darkMode = !data->tempOptions.darkMode;
     break;
+
+  case 9:
+    data->tempOptions.bookmarkHighlights = !data->tempOptions.bookmarkHighlights;
+    break;
+
   case 1:
     data->tempOptions.autoReload = !data->tempOptions.autoReload;
     break;
+
   case 2:
     if (!GetIsNativeFlag())
     {
       data->tempOptions.contextMenu = !data->tempOptions.contextMenu;
     }
     break;
+
   case 3:
     data->tempOptions.defaultBytesPerLine = 8;
     break;
+
   case 4:
     data->tempOptions.defaultBytesPerLine = 16;
     break;
+
   case 5:
   {
 #ifdef _WIN32
@@ -1020,10 +1063,12 @@ void HandleMouseClick(OptionsDialogData* data, int x, int y, int windowWidth, in
     data->running = false;
     break;
   }
+
   case 6:
     data->dialogResult = false;
     data->running = false;
     break;
+
   case 7:
     data->dropdownOpen = !data->dropdownOpen;
     if (!data->dropdownOpen)
@@ -1250,6 +1295,7 @@ bool OptionsDialog::Show(HWND parent, AppOptions& options)
     return false;
   OptionsDialogData data = {};
   data.tempOptions = options;
+  data.tempOptions.bookmarkHighlights = options.bookmarkHighlights;
   if (!GetIsNativeFlag())
   {
     data.tempOptions.contextMenu = ContextMenuRegistry::IsRegistered(UserRole::CurrentUser);
@@ -1506,6 +1552,7 @@ bool OptionsDialog::Show(NativeWindow parent, AppOptions &options)
 
   OptionsDialogData data = {};
   data.tempOptions = options;
+  data.tempOptions.bookmarkHighlights = options.bookmarkHighlights;
   data.tempOptions.contextMenu = false;
   data.originalOptions = &options;
   data.dialogResult = false;

@@ -496,6 +496,18 @@ inline void MemCopy(void *dest, const void *src, size_t n)
     }
 }
 
+inline bool StartsWith(const char* s, const char* prefix)
+{
+  while (*prefix)
+  {
+    if (*s != *prefix)
+      return false;
+    s++;
+    prefix++;
+  }
+  return true;
+}
+
 inline void ByteToHex(uint8_t b, char out[2])
 {
     const char *hex = "0123456789ABCDEF";

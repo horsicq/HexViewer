@@ -666,7 +666,6 @@ static void GoToOffsetCallback(int offset)
   }
 }
 
-
 long long ParseNumber(const char *text, int numberFormat)
 {
   if (!text)

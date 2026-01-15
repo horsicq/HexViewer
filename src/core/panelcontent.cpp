@@ -231,21 +231,30 @@ static int ParseHexPattern(const char *text, uint8_t *out, int maxOut)
     return count;
 }
 
-void Bookmarks_Add(long long byteOffset, const char *name, Color color)
+void Bookmarks_Add(long long byteOffset, const char* name, Color color)
 {
-    if (Bookmarks_FindAtOffset(byteOffset) >= 0)
-    {
-        return;
-    }
+  if (Bookmarks_FindAtOffset(byteOffset) >= 0)
+  {
+    return;
+  }
 
-    Bookmark bm;
-    bm.byteOffset = byteOffset;
-    StrCopy(bm.name, name);
-    bm.color = color;
-    bm.description[0] = '\0';
+  Bookmark bm;
+  bm.byteOffset = byteOffset;
+  StrCopy(bm.name, name);
+  bm.color = color;
+  bm.description[0] = '\0';
 
-    g_Bookmarks.bookmarks.push_back(bm);
-    InvalidateWindow();
+  if (byteOffset >= 0 && byteOffset < (long long)g_HexData.getFileSize())
+  {
+    bm.byteValue = g_HexData.getByte((size_t)byteOffset);
+  }
+  else
+  {
+    bm.byteValue = 0;
+  }
+
+  g_Bookmarks.bookmarks.push_back(bm);
+  InvalidateWindow();
 }
 
 void Bookmarks_Remove(int index)
@@ -296,6 +305,18 @@ void Bookmarks_Clear()
     InvalidateWindow();
 }
 
+void Bookmarks_UpdateValues()
+{
+  for (size_t i = 0; i < g_Bookmarks.bookmarks.size(); i++)
+  {
+    Bookmark& bm = g_Bookmarks.bookmarks[i];
+    if (bm.byteOffset >= 0 && bm.byteOffset < (long long)g_HexData.getFileSize())
+    {
+      bm.byteValue = g_HexData.getByte((size_t)bm.byteOffset);
+    }
+  }
+}
+
 int Bookmarks_FindAtOffset(long long byteOffset)
 {
     for (int i = 0; i < (int)g_Bookmarks.bookmarks.size(); i++)
@@ -306,6 +327,18 @@ int Bookmarks_FindAtOffset(long long byteOffset)
         }
     }
     return -1;
+}
+
+const Bookmark* Bookmarks_GetAtOffset(long long byteOffset)
+{
+  for (int i = 0; i < (int)g_Bookmarks.bookmarks.size(); i++)
+  {
+    if (g_Bookmarks.bookmarks[i].byteOffset == byteOffset)
+    {
+      return &g_Bookmarks.bookmarks[i];
+    }
+  }
+  return nullptr;
 }
 
 void ByteStats_Compute(HexData &hexData)
@@ -368,6 +401,30 @@ void ByteStats_Clear()
     g_ByteStats.computed = false;
 }
 
+Rect GetDIEButtonRect(const Rect& panelBounds)
+{
+  int contentX = panelBounds.x + 15;
+  int currentY = panelBounds.y + PANEL_TITLE_HEIGHT + 10;
+
+  int rowHeight = 16;
+  int headerHeight = 18;
+  int itemSpacing = 4;
+  int sectionSpacing = 10;
+
+  long long fileSize = (long long)g_HexData.getFileSize();
+
+  currentY += headerHeight + sectionSpacing;
+
+  currentY += rowHeight + itemSpacing;
+  currentY += rowHeight + itemSpacing;
+  currentY += rowHeight + itemSpacing;
+
+  currentY += 4;
+  currentY += itemSpacing;
+
+  int contentWidth = panelBounds.width - 30;
+  return Rect(contentX, currentY, contentWidth, rowHeight + 10);
+}
 
 
 Rect GetBookmarkRect(int bookmarkIndex, const Rect& panelBounds)
@@ -634,153 +691,159 @@ bool HandleBottomPanelContentClick(int x, int y, int windowWidth, int windowHeig
 
 bool HandleLeftPanelContentClick(int x, int y, int windowWidth, int windowHeight)
 {
-    if (!g_LeftPanel.visible)
-        return false;
+  if (!g_LeftPanel.visible)
+    return false;
 
-    int menuBarHeight = 24;
-    Rect panelBounds = GetLeftPanelBounds(g_LeftPanel, windowWidth, windowHeight, menuBarHeight);
+  int menuBarHeight = 24;
+  Rect panelBounds = GetLeftPanelBounds(g_LeftPanel, windowWidth, windowHeight, menuBarHeight);
 
-    if (x < panelBounds.x || x > panelBounds.x + panelBounds.width ||
-        y < panelBounds.y || y > panelBounds.y + panelBounds.height)
-        return false;
+  if (x < panelBounds.x || x > panelBounds.x + panelBounds.width ||
+    y < panelBounds.y || y > panelBounds.y + panelBounds.height)
+    return false;
 
-    if (y < panelBounds.y + PANEL_TITLE_HEIGHT)
-        return false;
+  if (y < panelBounds.y + PANEL_TITLE_HEIGHT)
+    return false;
 
-    int contentX = panelBounds.x + 15;
-    int currentY = panelBounds.y + PANEL_TITLE_HEIGHT + 10;
-    int contentWidth = panelBounds.width - 30;
+  int contentX = panelBounds.x + 15;
+  int currentY = panelBounds.y + PANEL_TITLE_HEIGHT + 15;
+  int contentWidth = panelBounds.width - 30;
 
-    int rowHeight = 16;
-    int headerHeight = 18;
-    int itemSpacing = 4;
-    int sectionSpacing = 10;
+  int rowHeight = 16;
+  int headerHeight = 18;
+  int itemSpacing = 4;
+  int sectionSpacing = 10;
 
-    long long fileSize = (long long)g_HexData.getFileSize();
+  long long fileSize = (long long)g_HexData.getFileSize();
 
-    currentY += headerHeight + sectionSpacing;
-    currentY += (rowHeight + itemSpacing) * 2;
+  currentY += headerHeight + sectionSpacing;
+  currentY += (rowHeight + itemSpacing) * 2;
+  currentY += 8;
+
+  currentY += headerHeight + sectionSpacing;
+  if (cursorBytePos >= 0 && cursorBytePos < fileSize)
+  {
+    currentY += (rowHeight + itemSpacing) * 5;
     currentY += 8;
+  }
+  else
+  {
+    currentY += rowHeight + itemSpacing;
+    currentY += 8;
+  }
 
-    currentY += headerHeight + sectionSpacing;
-    if (cursorBytePos >= 0 && cursorBytePos < fileSize)
-    {
-        currentY += (rowHeight + itemSpacing) * 5;
-        currentY += 8;
-    }
-    else
-    {
-        currentY += rowHeight + itemSpacing;
-    }
+  currentY += headerHeight + sectionSpacing;
 
-    currentY += headerHeight + sectionSpacing;
-
-    if (!g_Bookmarks.bookmarks.empty())
+  if (!g_Bookmarks.bookmarks.empty())
+  {
+    for (size_t i = 0; i < g_Bookmarks.bookmarks.size() && i < 5; i++)
     {
-      for (size_t i = 0; i < g_Bookmarks.bookmarks.size() && i < 5; i++)
+      Rect bookmarkRect = GetBookmarkRect((int)i, panelBounds);
+
+      if (bookmarkRect.contains(x, y))
       {
-        Rect bookmarkRect = GetBookmarkRect((int)i, panelBounds);
-
-        if (bookmarkRect.contains(x, y))
-        {
-          Bookmarks_JumpTo((int)i);
-          return true;
-        }
+        Bookmarks_JumpTo((int)i);
+        return true;
       }
     }
+    size_t displayCount = g_Bookmarks.bookmarks.size() < 5 ? g_Bookmarks.bookmarks.size() : 5;
+    currentY += (rowHeight + itemSpacing) * displayCount;
+  }
+  else
+  {
+    currentY += (rowHeight + itemSpacing) * 2;
+  }
 
-    currentY += 8;
+  currentY += 8;
 
-    currentY += headerHeight + sectionSpacing;
+  currentY += headerHeight + sectionSpacing;
 
-    if (!g_ByteStats.computed)
+  if (!g_ByteStats.computed)
+  {
+    Rect computeRect(contentX, currentY, contentWidth, rowHeight);
+
+    if (x >= computeRect.x && x <= computeRect.x + computeRect.width &&
+      y >= computeRect.y && y <= computeRect.y + computeRect.height)
     {
-        Rect computeRect(contentX, currentY, contentWidth, rowHeight);
+      g_ByteStats.computed = true;
 
-        if (x >= computeRect.x && x <= computeRect.x + computeRect.width &&
-            y >= computeRect.y && y <= computeRect.y + computeRect.height)
+      for (int i = 0; i < 256; i++)
+        g_ByteStats.histogram[i] = 0;
+
+      for (size_t i = 0; i < g_HexData.getFileSize(); i++)
+      {
+        uint8_t byte = g_HexData.getByte(i);
+        g_ByteStats.histogram[byte]++;
+      }
+
+      g_ByteStats.mostCommonByte = 0;
+      g_ByteStats.mostCommonCount = g_ByteStats.histogram[0];
+      g_ByteStats.leastCommonByte = 0;
+      g_ByteStats.leastCommonCount = g_ByteStats.histogram[0];
+
+      for (int i = 1; i < 256; i++)
+      {
+        if (g_ByteStats.histogram[i] > g_ByteStats.mostCommonCount)
         {
-            g_ByteStats.computed = true;
-
-            for (int i = 0; i < 256; i++)
-                g_ByteStats.histogram[i] = 0;
-
-            for (size_t i = 0; i < g_HexData.getFileSize(); i++)
-            {
-                uint8_t byte = g_HexData.getByte(i);
-                g_ByteStats.histogram[byte]++;
-            }
-
-            g_ByteStats.mostCommonByte = 0;
-            g_ByteStats.mostCommonCount = g_ByteStats.histogram[0];
-            g_ByteStats.leastCommonByte = 0;
-            g_ByteStats.leastCommonCount = g_ByteStats.histogram[0];
-
-            for (int i = 1; i < 256; i++)
-            {
-                if (g_ByteStats.histogram[i] > g_ByteStats.mostCommonCount)
-                {
-                    g_ByteStats.mostCommonByte = (uint8_t)i;
-                    g_ByteStats.mostCommonCount = g_ByteStats.histogram[i];
-                }
-                if (g_ByteStats.histogram[i] < g_ByteStats.leastCommonCount)
-                {
-                    g_ByteStats.leastCommonByte = (uint8_t)i;
-                    g_ByteStats.leastCommonCount = g_ByteStats.histogram[i];
-                }
-            }
-
-            g_ByteStats.nullByteCount = g_ByteStats.histogram[0];
-
-            g_ByteStats.entropy = 0.0;
-            long long total = (long long)g_HexData.getFileSize();
-
-            if (total > 0)
-            {
-                for (int i = 0; i < 256; i++)
-                {
-                    if (g_ByteStats.histogram[i] > 0)
-                    {
-                        double p = (double)g_ByteStats.histogram[i] / (double)total;
-                        g_ByteStats.entropy -= p * fast_log2(p);
-                    }
-                }
-            }
-
-            return true;
+          g_ByteStats.mostCommonByte = (uint8_t)i;
+          g_ByteStats.mostCommonCount = g_ByteStats.histogram[i];
         }
-
-        currentY += rowHeight + itemSpacing;
-    }
-    else
-    {
-        currentY += rowHeight + itemSpacing;
-    }
-
-    currentY += 8;
-
-    currentY += headerHeight + sectionSpacing;
-    currentY += (rowHeight + itemSpacing) * 3;
-
-    char diePath[260];
-    bool dieFound = FindDIEPath(diePath, sizeof(diePath));
-
-    if (dieFound)
-    {
-        currentY += 4;
-        currentY += itemSpacing;
-
-        Rect buttonRect(contentX, currentY, contentWidth, rowHeight + 10);
-
-        if (x >= buttonRect.x && x <= buttonRect.x + buttonRect.width &&
-            y >= buttonRect.y && y <= buttonRect.y + buttonRect.height)
+        if (g_ByteStats.histogram[i] < g_ByteStats.leastCommonCount)
         {
-            DIE_OpenInApplication();
-            return true;
+          g_ByteStats.leastCommonByte = (uint8_t)i;
+          g_ByteStats.leastCommonCount = g_ByteStats.histogram[i];
         }
+      }
+
+      g_ByteStats.nullByteCount = g_ByteStats.histogram[0];
+
+      g_ByteStats.entropy = 0.0;
+      long long total = (long long)g_HexData.getFileSize();
+
+      if (total > 0)
+      {
+        for (int i = 0; i < 256; i++)
+        {
+          if (g_ByteStats.histogram[i] > 0)
+          {
+            double p = (double)g_ByteStats.histogram[i] / (double)total;
+            g_ByteStats.entropy -= p * fast_log2(p);
+          }
+        }
+      }
+
+      return true;
     }
 
-    return false;
+    currentY += rowHeight + itemSpacing;
+  }
+  else
+  {
+    currentY += rowHeight + itemSpacing;
+  }
+
+  currentY += 8;
+
+  currentY += headerHeight + sectionSpacing;
+  currentY += (rowHeight + itemSpacing) * 3;
+
+  char diePath[260];
+  bool dieFound = FindDIEPath(diePath, sizeof(diePath));
+
+  if (dieFound)
+  {
+    currentY += 4;
+    currentY += itemSpacing;
+
+    Rect buttonRect(contentX, currentY, contentWidth, rowHeight + 10);
+
+    if (x >= buttonRect.x && x <= buttonRect.x + buttonRect.width &&
+      y >= buttonRect.y && y <= buttonRect.y + buttonRect.height)
+    {
+      DIE_OpenInApplication();
+      return true;
+    }
+  }
+
+  return false;
 }
-
 

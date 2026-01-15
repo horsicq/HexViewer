@@ -47,6 +47,8 @@ enum ContextMenuAction
   ID_SELECT_BLOCK = 115
 };
 
+long long ParseNumber(const char* text, int numberFormat);
+
 class AppContextMenu
 {
 public:
@@ -65,6 +67,7 @@ public:
   int handleClick(int x, int y, RenderManager *renderer);
 
   void executeAction(int actionId);
+
 
 private:
   ContextMenuState state;

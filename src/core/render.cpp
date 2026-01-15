@@ -1431,6 +1431,15 @@ void RenderManager::drawLeftPanel(
   }
   else
   {
+    for (size_t i = 0; i < g_Bookmarks.bookmarks.size(); i++)
+    {
+      Bookmark& bm = g_Bookmarks.bookmarks[i];
+      if (bm.byteOffset >= 0 && bm.byteOffset < fileSize)
+      {
+        bm.byteValue = g_HexData.getByte((size_t)bm.byteOffset);
+      }
+    }
+
     for (size_t i = 0; i < g_Bookmarks.bookmarks.size() && i < 5; i++)
     {
       const Bookmark& bm = g_Bookmarks.bookmarks[i];
@@ -1461,8 +1470,18 @@ void RenderManager::drawLeftPanel(
       Rect colorBox(contentX + 2, currentY + 3, 10, 10);
       drawRect(colorBox, bm.color, true);
 
+      char displayText[128];
+      StrCopy(displayText, bm.name);
+      StrCat(displayText, " [0x");
+
+      char hexByte[3];
+      ByteToHex(bm.byteValue, hexByte);
+      hexByte[2] = '\0';
+      StrCat(displayText, hexByte);
+      StrCat(displayText, "]");
+
       int textX = contentX + 17;
-      drawText(bm.name, textX, currentY, theme.textColor);
+      drawText(displayText, textX, currentY, theme.textColor);
 
       currentY += rowHeight + itemSpacing;
     }
@@ -1553,14 +1572,16 @@ void RenderManager::drawLeftPanel(
     {
       const PluginBookmark& annotation = pluginAnnotations->bookmarks[i];
 
+      drawText(annotation.label, contentX, currentY, theme.textColor);
+
       StrCopy(buf, "0x");
       ItoaHex(annotation.offset, buf + 2, 254);
 
       Color pluginColor = isDarkTheme ? Color(150, 100, 200) : Color(120, 70, 170);
-      drawText(buf, contentX, currentY, pluginColor);
 
-      int labelX = contentX + 70;
-      drawText(annotation.label, labelX, currentY, theme.textColor);
+      int offsetX = contentX + 140;
+      drawText(buf, offsetX, currentY, pluginColor);
+
       currentY += rowHeight + itemSpacing;
 
       if (annotation.description[0] != '\0')
@@ -1580,16 +1601,6 @@ void RenderManager::drawLeftPanel(
       drawText(moreText, contentX, currentY, halfText);
       currentY += rowHeight + itemSpacing;
     }
-
-    currentY += 4;
-    Rect refreshButtonRect(contentX, currentY, contentWidth, rowHeight + 10);
-    WidgetState refreshWs;
-    refreshWs.rect = refreshButtonRect;
-    refreshWs.enabled = true;
-    refreshWs.hovered = false;
-    refreshWs.pressed = false;
-    drawModernButton(refreshWs, theme, "Re-analyze File");
-    currentY += rowHeight + 10 + itemSpacing;
   }
 
   if (state.dockPosition == PanelDockPosition::Floating)
@@ -2696,23 +2707,23 @@ void RenderManager::drawByteStatsContent(
 }
 
 void RenderManager::renderHexViewer(
-    const Vector<char *> &hexLines,
-    const char *headerLine,
-    int scrollPos,
-    int maxScrollPos,
-    bool scrollbarHovered,
-    bool scrollbarPressed,
-    const Rect &scrollbarRect,
-    const Rect &thumbRect,
-    bool darkMode,
-    int editingRow,
-    int editingCol,
-    const char *editBuffer,
-    long long cursorBytePos,
-    int cursorNibblePos,
-    long long totalBytes,
-    int leftPanelWidth,
-    int effectiveWindowHeight)
+  const Vector<char*>& hexLines,
+  const char* headerLine,
+  int scrollPos,
+  int maxScrollPos,
+  bool scrollbarHovered,
+  bool scrollbarPressed,
+  const Rect& scrollbarRect,
+  const Rect& thumbRect,
+  bool darkMode,
+  int editingRow,
+  int editingCol,
+  const char* editBuffer,
+  long long cursorBytePos,
+  int cursorNibblePos,
+  long long totalBytes,
+  int leftPanelWidth,
+  int effectiveWindowHeight)
 {
   currentTheme = darkMode ? Theme::Dark() : Theme::Light();
   LayoutMetrics layout;
@@ -2772,8 +2783,8 @@ void RenderManager::renderHexViewer(
   int menuBarHeight = 24;
 
   Rect contentArea(leftPanelWidth, menuBarHeight,
-                   windowWidth - leftPanelWidth,
-                   workingHeight - menuBarHeight);
+    windowWidth - leftPanelWidth,
+    workingHeight - menuBarHeight);
   drawRect(contentArea, currentTheme.windowBackground, true);
 
   int disasmColumnWidth = 300;
@@ -2781,29 +2792,29 @@ void RenderManager::renderHexViewer(
   if (headerLine && headerLine[0])
   {
     drawText(headerLine,
-             leftPanelWidth + (int)layout.margin,
-             menuBarHeight + (int)layout.margin,
-             currentTheme.headerColor);
+      leftPanelWidth + (int)layout.margin,
+      menuBarHeight + (int)layout.margin,
+      currentTheme.headerColor);
 
     int disasmX = windowWidth - (int)layout.scrollbarWidth - disasmColumnWidth + 10;
     drawText("Disassembly",
-             disasmX,
-             menuBarHeight + (int)layout.margin,
-             currentTheme.disassemblyColor);
+      disasmX,
+      menuBarHeight + (int)layout.margin,
+      currentTheme.disassemblyColor);
 
     drawLine(leftPanelWidth + (int)layout.margin,
-             menuBarHeight + (int)(layout.margin + layout.headerHeight),
-             windowWidth - (int)layout.scrollbarWidth,
-             menuBarHeight + (int)(layout.margin + layout.headerHeight),
-             currentTheme.separator);
+      menuBarHeight + (int)(layout.margin + layout.headerHeight),
+      windowWidth - (int)layout.scrollbarWidth,
+      menuBarHeight + (int)(layout.margin + layout.headerHeight),
+      currentTheme.separator);
   }
 
   int separatorX = windowWidth - (int)layout.scrollbarWidth - disasmColumnWidth;
   drawLine(separatorX,
-           menuBarHeight + (int)(layout.margin + layout.headerHeight),
-           separatorX,
-           workingHeight - (int)layout.margin,
-           currentTheme.separator);
+    menuBarHeight + (int)(layout.margin + layout.headerHeight),
+    separatorX,
+    workingHeight - (int)layout.margin,
+    currentTheme.separator);
 
   int contentY = _hexAreaY;
   int contentHeight = workingHeight - contentY - (int)layout.margin;
@@ -2817,7 +2828,7 @@ void RenderManager::renderHexViewer(
   size_t endLine = Clamp(startLine + maxVisibleLines, (size_t)0, hexLines.size());
 
   extern HexData g_HexData;
-  const LineArray &disasmLines = g_HexData.getDisassemblyLines();
+  const LineArray& disasmLines = g_HexData.getDisassemblyLines();
 
   extern SelectionState g_Selection;
   if (g_Selection.active)
@@ -2865,15 +2876,47 @@ void RenderManager::renderHexViewer(
     }
   }
 
+  if (g_Options.bookmarkHighlights && !g_Bookmarks.bookmarks.empty())
+  {
+    for (size_t i = 0; i < g_Bookmarks.bookmarks.size(); i++)
+    {
+      const Bookmark& bm = g_Bookmarks.bookmarks[i];
+      long long bmLine = bm.byteOffset / _bytesPerLine;
+
+      if (bmLine < (long long)startLine || bmLine >= (long long)endLine)
+        continue;
+
+      int displayLine = (int)(bmLine - startLine);
+      int yPos = contentY + displayLine * _charHeight;
+
+      int col = (int)(bm.byteOffset % _bytesPerLine);
+
+      int xStart = _hexAreaX + (col * 3 * _charWidth);
+      int xEnd = xStart + (2 * _charWidth);
+
+      Color highlightColor = bm.color;
+      highlightColor.a = 80;
+
+      Rect hexHighlight(xStart, yPos, xEnd - xStart, _charHeight);
+      drawRect(hexHighlight, highlightColor, true);
+
+      int asciiAreaX = _hexAreaX + (16 * 3 * _charWidth) + (1 * _charWidth);
+      int asciiX = asciiAreaX + (col * _charWidth);
+
+      Rect asciiHighlight(asciiX, yPos, _charWidth, _charHeight);
+      drawRect(asciiHighlight, highlightColor, true);
+    }
+  }
+
   for (size_t i = startLine; i < endLine; i++)
   {
     int y = contentY + (int)((i - startLine) * layout.lineHeight);
-    const char *line = hexLines[i];
+    const char* line = hexLines[i];
 
     drawText(line,
-             leftPanelWidth + (int)layout.margin,
-             y,
-             currentTheme.textColor);
+      leftPanelWidth + (int)layout.margin,
+      y,
+      currentTheme.textColor);
 
     if (i < disasmLines.count && disasmLines.lines[i].data != nullptr)
     {
@@ -2886,7 +2929,7 @@ void RenderManager::renderHexViewer(
   }
 
   if (_bytePos >= _startByte &&
-      _bytePos < _startByte + (_bytesPerLine * _visibleLines))
+    _bytePos < _startByte + (_bytesPerLine * _visibleLines))
   {
     DrawCaret();
   }
@@ -2922,11 +2965,11 @@ void RenderManager::renderHexViewer(
     int scrollbarHeight = contentHeight;
 
     updateScrollbarMetrics(
-        g_MainScrollbar,
-        scrollbarX, scrollbarY,
-        scrollbarWidth, scrollbarHeight,
-        (float)totalContentHeight, (float)viewportHeight,
-        true);
+      g_MainScrollbar,
+      scrollbarX, scrollbarY,
+      scrollbarWidth, scrollbarHeight,
+      (float)totalContentHeight, (float)viewportHeight,
+      true);
 
     drawModernScrollbar(g_MainScrollbar, currentTheme, true);
   }

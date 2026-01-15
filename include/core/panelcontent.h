@@ -67,11 +67,13 @@ struct FileInfoValues {
     bool md5Computed;
 };
 
+
 struct Bookmark {
     long long byteOffset;
     char name[64];
     Color color;
     char description[128];
+    uint8_t byteValue;
 };
 
 struct BookmarksState {
@@ -107,6 +109,7 @@ extern BookmarksState     g_Bookmarks;
 extern ByteStatistics     g_ByteStats;
 
 Rect GetBookmarkRect(int bookmarkIndex, const Rect& panelBounds);
+void Bookmarks_UpdateValues();
 bool ShowInputDialog(HWND hwndParent, const char* title, const char* prompt, char* outText, int maxLen);
 void PatternSearch_SetFocus();
 void PatternSearch_Run();
@@ -134,6 +137,7 @@ void Bookmarks_Remove(int index);
 void Bookmarks_JumpTo(int index);
 void Bookmarks_Clear();
 int Bookmarks_FindAtOffset(long long byteOffset);
+const Bookmark* Bookmarks_GetAtOffset(long long byteOffset);
 
 void ByteStats_Compute(HexData& hexData);
 void ByteStats_Clear();

@@ -11,95 +11,100 @@ static bool g_DIEPathDebug = false;
 #include <stdlib.h>
 #endif
 
-inline bool FindDIEPath(char *outPath, int outSize)
+
+inline bool FindDIEPath(char* outPath, int outSize)
 {
 #ifdef _WIN32
+
+  {
+    const char* regPath = "Software\\Classes\\*\\shell\\Detect It Easy\\command";
+    HKEY roots[] = { HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE };
+    char buf[512];
+    DWORD sz;
+
+    for (int r = 0; r < 2; r++)
     {
-        const char *regPath = "Software\\Classes\\*\\shell\\Detect It Easy\\command";
-        HKEY roots[] = { HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE };
-        char buf[512];
-        DWORD sz;
-
-        for (int r = 0; r < 2; r++)
+      HKEY h;
+      if (RegOpenKeyExA(roots[r], regPath, 0, KEY_READ, &h) == ERROR_SUCCESS)
+      {
+        sz = sizeof(buf);
+        if (RegQueryValueExA(h, NULL, NULL, NULL, (LPBYTE)buf, &sz) == ERROR_SUCCESS)
         {
-            HKEY h;
-            if (RegOpenKeyExA(roots[r], regPath, 0, KEY_READ, &h) == ERROR_SUCCESS)
+          RegCloseKey(h);
+
+          int s = -1, e = -1;
+          for (DWORD i = 0; i < sz; i++)
+          {
+            if (buf[i] == '"')
             {
-                sz = sizeof(buf);
-                if (RegQueryValueExA(h, NULL, NULL, NULL, (LPBYTE)buf, &sz) == ERROR_SUCCESS)
-                {
-                    RegCloseKey(h);
-
-                    int s = -1, e = -1;
-                    for (DWORD i = 0; i < sz; i++)
-                    {
-                        if (buf[i] == '"')
-                        {
-                            if (s == -1) s = i + 1;
-                            else { e = i; break; }
-                        }
-                    }
-
-                    if (s != -1 && e != -1)
-                    {
-                        int j = 0;
-                        for (int i = s; i < e && j < outSize - 1; i++)
-                            outPath[j++] = buf[i];
-                        outPath[j] = 0;
-                        return true;
-                    }
-                }
-                RegCloseKey(h);
+              if (s == -1) s = i + 1;
+              else { e = i; break; }
             }
+          }
+
+          if (s != -1 && e != -1)
+          {
+            int j = 0;
+            for (int i = s; i < e && j < outSize - 1; i++)
+              outPath[j++] = buf[i];
+            outPath[j] = 0;
+
+            return true;
+          }
         }
+
+        RegCloseKey(h);
+      }
     }
+  }
 
+  {
+    HKEY h;
+    if (RegOpenKeyExA(
+      HKEY_CURRENT_USER,
+      "Software\\Classes\\Local Settings\\Software\\Microsoft\\Windows\\CurrentVersion\\AppModel\\Repository\\Packages",
+      0, KEY_READ, &h) == ERROR_SUCCESS)
     {
-        HKEY h;
-        if (RegOpenKeyExA(
-                HKEY_CURRENT_USER,
-                "Software\\Classes\\Local Settings\\Software\\Microsoft\\Windows\\CurrentVersion\\AppModel\\Repository\\Packages",
-                0, KEY_READ, &h) == ERROR_SUCCESS)
+      char name[256];
+      DWORD len = sizeof(name);
+      DWORD idx = 0;
+
+      while (RegEnumKeyExA(h, idx, name, &len, NULL, NULL, NULL, NULL) == ERROR_SUCCESS)
+      {
+        len = sizeof(name);
+        idx++;
+
+        if (StartsWith(name, "Die_") ||
+          StartsWith(name, "DevX-Cipher.Detect-It-Easy_"))
         {
-            char name[256];
-            DWORD len = sizeof(name);
-            DWORD idx = 0;
+          char path[512];
+          StrCopy(path, "C:\\Program Files\\WindowsApps\\");
+          StrCat(path, name);
+          StrCat(path, "\\Die\\Die.exe");
 
-            while (RegEnumKeyExA(h, idx, name, &len, NULL, NULL, NULL, NULL) == ERROR_SUCCESS)
-            {
-                len = sizeof(name);
-                idx++;
+          HANDLE f = CreateFileA(path, GENERIC_READ, FILE_SHARE_READ,
+            NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
 
-                if (name[0]=='D' && name[1]=='i' && name[2]=='e' && name[3]=='_')
-                {
-                    char path[512];
-                    StrCopy(path, "C:\\Program Files\\WindowsApps\\");
-                    StrCat(path, name);
-                    StrCat(path, "\\Die\\Die.exe");
+          if (f != INVALID_HANDLE_VALUE)
+          {
+            CloseHandle(f);
 
-                    HANDLE f = CreateFileA(path, GENERIC_READ, FILE_SHARE_READ,
-                                           NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-
-                    if (f != INVALID_HANDLE_VALUE)
-                    {
-                        CloseHandle(f);
-
-                        int j = 0;
-                        while (path[j] && j < outSize - 1)
-                            outPath[j] = path[j], j++;
-                        outPath[j] = 0;
-
-                        RegCloseKey(h);
-                        return true;
-                    }
-                }
-            }
+            int j = 0;
+            while (path[j] && j < outSize - 1)
+              outPath[j] = path[j], j++;
+            outPath[j] = 0;
 
             RegCloseKey(h);
+            return true;
+          }
         }
-    }
+      }
 
-    return false;
+      RegCloseKey(h);
+    }
+  }
+
+  return false;
 #elif __APPLE__
     const char *macPaths[] = {
         "/Applications/Detect It Easy.app/Contents/MacOS/die",

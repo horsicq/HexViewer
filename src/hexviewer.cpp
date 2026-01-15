@@ -1232,6 +1232,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 		if (g_Selection.dragging)
 		{
 			g_Selection.dragging = false;
+			g_Selection.active = true;
 			ReleaseCapture();
 
 			if (g_Selection.startByte == g_Selection.endByte)
@@ -1788,6 +1789,321 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 		bool shift = (GetKeyState(VK_SHIFT) & 0x8000) != 0;
 		bool alt = (GetKeyState(VK_MENU) & 0x8000) != 0;
 
+		if (ctrl && !shift && !alt)
+		{
+			switch (wParam)
+			{
+			case 'N':
+				OnNew();
+				return 0;
+
+			case 'O':
+				OnFileOpen();
+				return 0;
+
+			case 'S':
+				OnFileSave();
+				return 0;
+
+			case 'F':
+				OnFindReplace();
+				return 0;
+
+			case 'G':
+				OnGoTo();
+				return 0;
+
+			case 'P':
+				OnPluginsDialog();
+				return 0;
+
+			case VK_OEM_COMMA:
+				OnOptionsDialog();
+				return 0;
+
+			case 'A':
+				if (g_HexData.getFileSize() > 0)
+				{
+					g_Selection.active = true;
+					g_Selection.startByte = 0;
+					g_Selection.endByte = (long long)g_HexData.getFileSize() - 1;
+					InvalidateRect(hwnd, NULL, FALSE);
+				}
+				return 0;
+
+			case 'C':
+				if (g_Selection.active)
+				{
+					long long minByte, maxByte;
+					g_Selection.getRange(minByte, maxByte);
+					long long length = maxByte - minByte + 1;
+
+					if (length > 0 && length <= 10000000)
+					{
+						size_t bufferSize = (size_t)(length * 3 + 1);
+						char* hexString = (char*)HeapAlloc(GetProcessHeap(), 0, bufferSize);
+
+						if (hexString)
+						{
+							size_t pos = 0;
+							for (long long i = minByte; i <= maxByte; i++)
+							{
+								uint8_t byte = g_HexData.getByte((size_t)i);
+								static const char hex[] = "0123456789ABCDEF";
+								hexString[pos++] = hex[byte >> 4];
+								hexString[pos++] = hex[byte & 0x0F];
+								hexString[pos++] = ' ';
+							}
+							hexString[pos] = '\0';
+
+							if (OpenClipboard(hwnd))
+							{
+								EmptyClipboard();
+								HGLOBAL hMem = GlobalAlloc(GMEM_MOVEABLE, pos + 1);
+								if (hMem)
+								{
+									char* pMem = (char*)GlobalLock(hMem);
+									if (pMem)
+									{
+										memcpy(pMem, hexString, pos + 1);
+										GlobalUnlock(hMem);
+										SetClipboardData(CF_TEXT, hMem);
+									}
+								}
+								CloseClipboard();
+							}
+
+							HeapFree(GetProcessHeap(), 0, hexString);
+						}
+					}
+					else if (length > 10000000)
+					{
+						MessageBoxA(hwnd, "Selection too large to copy (max 10MB)",
+							"Copy Error", MB_OK | MB_ICONWARNING);
+					}
+				}
+				return 0;
+
+			case 'X':
+				if (g_Selection.active)
+				{
+					long long minByte, maxByte;
+					g_Selection.getRange(minByte, maxByte);
+					long long length = maxByte - minByte + 1;
+
+					if (length > 0 && length <= 10000000)
+					{
+						size_t bufferSize = (size_t)(length * 3 + 1);
+						char* hexString = (char*)HeapAlloc(GetProcessHeap(), 0, bufferSize);
+
+						if (hexString)
+						{
+							size_t pos = 0;
+							for (long long i = minByte; i <= maxByte; i++)
+							{
+								uint8_t byte = g_HexData.getByte((size_t)i);
+								static const char hex[] = "0123456789ABCDEF";
+								hexString[pos++] = hex[byte >> 4];
+								hexString[pos++] = hex[byte & 0x0F];
+								hexString[pos++] = ' ';
+							}
+							hexString[pos] = '\0';
+
+							if (OpenClipboard(hwnd))
+							{
+								EmptyClipboard();
+								HGLOBAL hMem = GlobalAlloc(GMEM_MOVEABLE, pos + 1);
+								if (hMem)
+								{
+									char* pMem = (char*)GlobalLock(hMem);
+									if (pMem)
+									{
+										memcpy(pMem, hexString, pos + 1);
+										GlobalUnlock(hMem);
+										SetClipboardData(CF_TEXT, hMem);
+									}
+								}
+								CloseClipboard();
+							}
+
+							HeapFree(GetProcessHeap(), 0, hexString);
+						}
+
+						for (long long i = minByte; i <= maxByte; i++)
+						{
+							g_HexData.editByte((size_t)i, 0x00);
+						}
+
+						g_Selection.clear();
+						InvalidateRect(hwnd, NULL, FALSE);
+					}
+				}
+				return 0;
+
+			case 'V':
+				if (g_HexData.getFileSize() > 0)
+				{
+					if (OpenClipboard(hwnd))
+					{
+						HANDLE hData = GetClipboardData(CF_TEXT);
+						if (hData)
+						{
+							char* pszText = (char*)GlobalLock(hData);
+							if (pszText)
+							{
+								long long pastePos = cursorBytePos >= 0 ? cursorBytePos : 0;
+
+								const char* p = pszText;
+								while (*p && pastePos < (long long)g_HexData.getFileSize())
+								{
+									while (*p == ' ' || *p == '\t' || *p == '\n' || *p == '\r')
+										p++;
+
+									if (!*p) break;
+
+									int highNibble = -1, lowNibble = -1;
+
+									if (*p >= '0' && *p <= '9')
+										highNibble = *p - '0';
+									else if (*p >= 'A' && *p <= 'F')
+										highNibble = *p - 'A' + 10;
+									else if (*p >= 'a' && *p <= 'f')
+										highNibble = *p - 'a' + 10;
+
+									if (highNibble >= 0)
+									{
+										p++;
+										if (*p >= '0' && *p <= '9')
+											lowNibble = *p - '0';
+										else if (*p >= 'A' && *p <= 'F')
+											lowNibble = *p - 'A' + 10;
+										else if (*p >= 'a' && *p <= 'f')
+											lowNibble = *p - 'a' + 10;
+
+										if (lowNibble >= 0)
+										{
+											uint8_t byte = (uint8_t)((highNibble << 4) | lowNibble);
+											g_HexData.editByte((size_t)pastePos, byte);
+											pastePos++;
+											p++;
+										}
+									}
+									else
+									{
+										p++;
+									}
+								}
+
+								GlobalUnlock(hData);
+								InvalidateRect(hwnd, NULL, FALSE);
+							}
+						}
+						CloseClipboard();
+					}
+				}
+				return 0;
+
+			case 'Z':
+				MessageBoxA(hwnd, "Undo functionality not yet implemented",
+					"Info", MB_OK | MB_ICONINFORMATION);
+				return 0;
+
+			case 'Y':
+				MessageBoxA(hwnd, "Redo functionality not yet implemented",
+					"Info", MB_OK | MB_ICONINFORMATION);
+				return 0;
+
+			case 'B':
+			{
+				long long initialStart = -1;
+				long long initialLength = 0;
+
+				if (g_Selection.active)
+				{
+					long long maxByte;
+					g_Selection.getRange(initialStart, maxByte);
+					initialLength = maxByte - initialStart + 1;
+				}
+				else if (cursorBytePos >= 0)
+				{
+					initialStart = cursorBytePos;
+					initialLength = 0;
+				}
+
+				ShowSelectBlockDialog(
+					g_Hwnd,
+					g_Options.darkMode,
+					[](const char* startStr,
+						const char* endOrLengthStr,
+						bool useLength,
+						int numberFormat)
+					{
+						long long start = ParseNumber(startStr, numberFormat);
+						long long value = ParseNumber(endOrLengthStr, numberFormat);
+						long long length = useLength ? value : (value - start);
+
+						if (start >= 0 &&
+							length > 0 &&
+							start < (long long)g_HexData.getFileSize())
+						{
+							long long end = start + length;
+							long long maxEnd = (long long)g_HexData.getFileSize();
+							if (end > maxEnd)
+								end = maxEnd;
+
+							g_Selection.active = true;
+							g_Selection.startByte = start;
+							g_Selection.endByte = end - 1;
+
+							cursorBytePos = start;
+							cursorNibblePos = 0;
+
+							int bytesPerLine = g_HexData.getCurrentBytesPerLine();
+							int targetRow = (int)(start / bytesPerLine);
+
+							int centerRow = targetRow - g_LinesPerPage / 2;
+							if (centerRow < 0) centerRow = 0;
+
+							int maxScroll = g_TotalLines - g_LinesPerPage;
+							if (maxScroll < 0) maxScroll = 0;
+							if (centerRow > maxScroll) centerRow = maxScroll;
+
+							g_ScrollY = centerRow;
+
+							if (maxScroll > 0)
+							{
+								g_MainScrollbar.position = (float)g_ScrollY / (float)maxScroll;
+							}
+							else
+							{
+								g_MainScrollbar.position = 0.0f;
+							}
+
+							InvalidateRect(g_Hwnd, NULL, FALSE);
+						}
+					},
+					nullptr,
+					initialStart,
+					initialLength);
+
+				return 0;
+			}
+			}
+		}
+
+		if (ctrl && shift && !alt)
+		{
+			switch (wParam)
+			{
+			case 'S':
+				OnFileSaveAs();
+				return 0;
+
+			case 'F':
+				return 0;
+			}
+		}
+
 		if (g_MenuBar.handleKeyPress((int)wParam, ctrl, shift, alt))
 		{
 			InvalidateRect(hwnd, NULL, FALSE);
@@ -2046,6 +2362,181 @@ void HandleLinuxKeyPress(XKeyEvent *event)
 	bool ctrl = (event->state & ControlMask) != 0;
 	bool shift = (event->state & ShiftMask) != 0;
 	bool alt = (event->state & Mod1Mask) != 0;
+
+	if (ctrl && !shift && !alt)
+	{
+		switch (keysym)
+		{
+		case XK_n:
+			OnNew();
+			LinuxRedraw();
+			return;
+
+		case XK_o:
+			OnFileOpen();
+			return;
+
+		case XK_s:
+			OnFileSave();
+			return;
+
+		case XK_f:
+			OnFindReplace();
+			return;
+
+		case XK_g:
+			OnGoTo();
+			return;
+
+		case XK_p:
+			OnPluginsDialog();
+			return;
+
+		case XK_comma:
+			OnOptionsDialog();
+			return;
+
+		case XK_a:
+			if (g_HexData.getFileSize() > 0)
+			{
+				g_Selection.active = true;
+				g_Selection.startByte = 0;
+				g_Selection.endByte = (long long)g_HexData.getFileSize() - 1;
+				LinuxRedraw();
+			}
+			return;
+
+		case XK_c:
+			if (g_Selection.active)
+			{
+				long long minByte, maxByte;
+				g_Selection.getRange(minByte, maxByte);
+				long long length = maxByte - minByte + 1;
+
+				if (length > 0 && length <= 10000000)
+				{
+					size_t bufferSize = (size_t)(length * 3 + 1);
+					char* hexString = (char*)malloc(bufferSize);
+
+					if (hexString)
+					{
+						size_t pos = 0;
+						for (long long i = minByte; i <= maxByte; i++)
+						{
+							uint8_t byte = g_HexData.getByte((size_t)i);
+							static const char hex[] = "0123456789ABCDEF";
+							hexString[pos++] = hex[byte >> 4];
+							hexString[pos++] = hex[byte & 0x0F];
+							hexString[pos++] = ' ';
+						}
+						hexString[pos] = '\0';
+
+						XStoreBuffer(g_display, hexString, (int)pos, 0);
+
+						free(hexString);
+					}
+				}
+			}
+			return;
+
+		case XK_x:
+			if (g_Selection.active)
+			{
+				long long minByte, maxByte;
+				g_Selection.getRange(minByte, maxByte);
+				long long length = maxByte - minByte + 1;
+
+				if (length > 0 && length <= 10000000)
+				{
+					size_t bufferSize = (size_t)(length * 3 + 1);
+					char* hexString = (char*)malloc(bufferSize);
+
+					if (hexString)
+					{
+						size_t pos = 0;
+						for (long long i = minByte; i <= maxByte; i++)
+						{
+							uint8_t byte = g_HexData.getByte((size_t)i);
+							static const char hex[] = "0123456789ABCDEF";
+							hexString[pos++] = hex[byte >> 4];
+							hexString[pos++] = hex[byte & 0x0F];
+							hexString[pos++] = ' ';
+						}
+						hexString[pos] = '\0';
+
+						XStoreBuffer(g_display, hexString, (int)pos, 0);
+						free(hexString);
+					}
+
+					for (long long i = minByte; i <= maxByte; i++)
+					{
+						g_HexData.editByte((size_t)i, 0x00);
+					}
+
+					g_Selection.clear();
+					LinuxRedraw();
+				}
+			}
+			return;
+
+		case XK_v:
+			if (g_HexData.getFileSize() > 0)
+			{
+				int length;
+				char* pszText = XFetchBuffer(g_display, &length, 0);
+
+				if (pszText && length > 0)
+				{
+					long long pastePos = cursorBytePos >= 0 ? cursorBytePos : 0;
+					const char* p = pszText;
+
+					while (*p && pastePos < (long long)g_HexData.getFileSize())
+					{
+						while (*p == ' ' || *p == '\t' || *p == '\n' || *p == '\r')
+							p++;
+
+						if (!*p) break;
+
+						int highNibble = -1, lowNibble = -1;
+
+						if (*p >= '0' && *p <= '9')
+							highNibble = *p - '0';
+						else if (*p >= 'A' && *p <= 'F')
+							highNibble = *p - 'A' + 10;
+						else if (*p >= 'a' && *p <= 'f')
+							highNibble = *p - 'a' + 10;
+
+						if (highNibble >= 0)
+						{
+							p++;
+							if (*p >= '0' && *p <= '9')
+								lowNibble = *p - '0';
+							else if (*p >= 'A' && *p <= 'F')
+								lowNibble = *p - 'A' + 10;
+							else if (*p >= 'a' && *p <= 'f')
+								lowNibble = *p - 'a' + 10;
+
+							if (lowNibble >= 0)
+							{
+								uint8_t byte = (uint8_t)((highNibble << 4) | lowNibble);
+								g_HexData.editByte((size_t)pastePos, byte);
+								pastePos++;
+								p++;
+							}
+						}
+						else
+						{
+							p++;
+						}
+					}
+
+					XFree(pszText);
+					LinuxRedraw();
+				}
+			}
+			return;
+		}
+	}
 
 	int vk = 0;
 	switch (keysym)

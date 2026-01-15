@@ -8,6 +8,7 @@
 
 struct AppOptions {
   bool darkMode;
+  bool bookmarkHighlights;
   int defaultBytesPerLine;
   bool autoReload;
   bool contextMenu;
@@ -18,6 +19,7 @@ struct AppOptions {
 
   AppOptions()
     : darkMode(true),
+		bookmarkHighlights(false),
     defaultBytesPerLine(16),
     autoReload(true),
     contextMenu(false),
@@ -48,6 +50,7 @@ struct AppOptions {
 
   AppOptions(const AppOptions& other)
     : darkMode(other.darkMode),
+    bookmarkHighlights(other.bookmarkHighlights),
     defaultBytesPerLine(other.defaultBytesPerLine),
     autoReload(other.autoReload),
     contextMenu(other.contextMenu),
@@ -61,6 +64,7 @@ struct AppOptions {
   AppOptions& operator=(const AppOptions& other) {
     if (this != &other) {
       darkMode = other.darkMode;
+      bookmarkHighlights = other.bookmarkHighlights;
       defaultBytesPerLine = other.defaultBytesPerLine;
       autoReload = other.autoReload;
       contextMenu = other.contextMenu;
