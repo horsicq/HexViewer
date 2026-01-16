@@ -28,18 +28,10 @@ void RenderSelectBlockDialog(SelectBlockDialogData* data, int windowWidth, int w
   Theme theme = data->renderer->getCurrentTheme();
   data->renderer->clear(theme.windowBackground);
 
+  extern bool caretVisible;
+
   int margin = 20;
   int y = margin;
-
-  static DWORD lastBlinkTime = 0;
-  static bool cursorVisible = true;
-  DWORD currentTime = GetTickCount();
-
-  if (currentTime - lastBlinkTime > 500)
-  {
-    cursorVisible = !cursorVisible;
-    lastBlinkTime = currentTime;
-  }
 
   data->renderer->drawText(Translations::T("Start-offset:"), margin, y + 8, theme.textColor);
   y += 28;
@@ -56,17 +48,18 @@ void RenderSelectBlockDialog(SelectBlockDialogData* data, int windowWidth, int w
 #ifdef _WIN32
   char startDisplay[256];
   StringCopy(startDisplay, data->startOffsetText, 256);
-  if (startActive && cursorVisible)
+  if (startActive && caretVisible)
     StringAppend(startDisplay, '|', 256);
   data->renderer->drawText(startDisplay, startBox.x + 8, startBox.y + 8, Color(240, 240, 240));
 #else
   std::string startDisplay = data->startOffsetText;
-  if (startActive && cursorVisible)
+  if (startActive && caretVisible)
     startDisplay += "|";
   data->renderer->drawText(startDisplay.c_str(), startBox.x + 8, startBox.y + 8, Color(240, 240, 240));
 #endif
 
   y += 50;
+
   WidgetState endRadio(Rect(margin, y + 2, 16, 16));
   endRadio.hovered = (data->hoveredWidget == 10);
   data->renderer->drawModernRadioButton(endRadio, theme, data->selectedMode == 0);
@@ -88,17 +81,18 @@ void RenderSelectBlockDialog(SelectBlockDialogData* data, int windowWidth, int w
 #ifdef _WIN32
   char endDisplay[256];
   StringCopy(endDisplay, data->endOffsetText, 256);
-  if (endActive && cursorVisible)
+  if (endActive && caretVisible)
     StringAppend(endDisplay, '|', 256);
   data->renderer->drawText(endDisplay, endBox.x + 8, endBox.y + 8, endText);
 #else
   std::string endDisplay = data->endOffsetText;
-  if (endActive && cursorVisible)
+  if (endActive && caretVisible)
     endDisplay += "|";
   data->renderer->drawText(endDisplay.c_str(), endBox.x + 8, endBox.y + 8, endText);
 #endif
 
   y += 50;
+
   WidgetState lengthRadio(Rect(margin, y + 2, 16, 16));
   lengthRadio.hovered = (data->hoveredWidget == 11);
   data->renderer->drawModernRadioButton(lengthRadio, theme, data->selectedMode == 1);
@@ -120,12 +114,12 @@ void RenderSelectBlockDialog(SelectBlockDialogData* data, int windowWidth, int w
 #ifdef _WIN32
   char lengthDisplay[256];
   StringCopy(lengthDisplay, data->lengthText, 256);
-  if (lengthActive && cursorVisible)
+  if (lengthActive && caretVisible)
     StringAppend(lengthDisplay, '|', 256);
   data->renderer->drawText(lengthDisplay, lengthBox.x + 8, lengthBox.y + 8, lengthText);
 #else
   std::string lengthDisplay = data->lengthText;
-  if (lengthActive && cursorVisible)
+  if (lengthActive && caretVisible)
     lengthDisplay += "|";
   data->renderer->drawText(lengthDisplay.c_str(), lengthBox.x + 8, lengthBox.y + 8, lengthText);
 #endif
@@ -176,6 +170,8 @@ void RenderSelectBlockDialog(SelectBlockDialogData* data, int windowWidth, int w
   data->renderer->endFrame(data->renderer->getDrawContext());
 #endif
 }
+
+
 
 void UpdateSelectBlockHover(SelectBlockDialogData* data, int x, int y, int windowWidth, int windowHeight)
 {
