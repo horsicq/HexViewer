@@ -110,7 +110,6 @@ extern ByteStatistics     g_ByteStats;
 
 Rect GetBookmarkRect(int bookmarkIndex, const Rect& panelBounds);
 void Bookmarks_UpdateValues();
-bool ShowInputDialog(HWND hwndParent, const char* title, const char* prompt, char* outText, int maxLen);
 void PatternSearch_SetFocus();
 void PatternSearch_Run();
 void PatternSearch_FindNext();
