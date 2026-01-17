@@ -358,16 +358,24 @@ void RenderManager::clear(const Color &color)
 #endif
 }
 
-void RenderManager::setColor(const Color &color)
+void RenderManager::setColor(const Color& color)
 {
 #ifdef _WIN32
   SetTextColor(memDC, RGB(color.r, color.g, color.b));
   SetBkMode(memDC, TRANSPARENT);
+
 #elif __APPLE__
+
 #else
-  XSetForeground(display, gc, (color.r << 16) | (color.g << 8) | color.b);
+  uint8_t r = (color.r * color.a) / 255;
+  uint8_t g = (color.g * color.a) / 255;
+  uint8_t b = (color.b * color.a) / 255;
+
+  unsigned long pixel = (r << 16) | (g << 8) | b;
+  XSetForeground(display, gc, pixel);
 #endif
 }
+
 
 void RenderManager::drawRect(const Rect &rect, const Color &color, bool filled)
 {
@@ -499,6 +507,7 @@ void RenderManager::drawRoundedRect(const Rect &rect, float radius, const Color 
   }
 #elif __APPLE__
 #else
+  setColor(color);
   drawRect(rect, color, filled);
 #endif
 }

@@ -99,9 +99,9 @@ struct Theme
     t.controlCheck = Color(96, 150, 227);
 
     t.dropdownBackground = Color(44, 44, 44, 255);
-
     t.menuBackground = Color(44, 44, 44, 245);
-    t.menuHover = Color(255, 255, 255, 25);
+
+    t.menuHover = Color(60, 60, 60, 255);
     t.menuBorder = Color(255, 255, 255, 15);
     t.disabledText = Color(255, 255, 255, 80);
 

@@ -5,6 +5,10 @@
 #elif defined(__APPLE__)
 #include <TargetConditionals.h>
 #elif defined(__linux__)
+#include <X11/Xlib.h>
+#include <X11/Xutil.h>
+#include <X11/keysym.h>
+#include <unistd.h>
 #else
 #error "Unsupported platform"
 #endif
@@ -2343,11 +2347,6 @@ int main(int argc, char **argv)
 
 #elif defined(__linux__)
 
-#include <X11/Xlib.h>
-#include <X11/Xutil.h>
-#include <X11/keysym.h>
-#include <unistd.h>
-
 Display *g_display = nullptr;
 Window g_window = 0;
 GC g_GC;
@@ -3043,7 +3042,16 @@ void LinuxRedraw()
 
 	g_MenuBar.render(&g_Renderer, windowWidth);
 
+	if (g_ContextMenu.isVisible())
+	{
+		g_Renderer.drawContextMenu(
+			g_ContextMenu.getState(),
+			g_Options.darkMode ? Theme::Dark() : Theme::Light()
+		);
+	}
+
 	g_Renderer.endFrame(g_GC);
+
 }
 
 int main(int argc, char **argv)
@@ -3140,31 +3148,67 @@ int main(int argc, char **argv)
 				break;
 
 			case ButtonPress:
-				HandleLinuxMouseButton(&event.xbutton, true);
-				LinuxRedraw();
+				if (event.xbutton.button == Button3)
+				{
+					g_ContextMenu.show(event.xbutton.x, event.xbutton.y);
+					LinuxRedraw();
+				}
+				else
+				{
+					HandleLinuxMouseButton(&event.xbutton, true);
+					LinuxRedraw();
+				}
 				break;
 
 			case ButtonRelease:
-				HandleLinuxMouseButton(&event.xbutton, false);
-				LinuxRedraw();
+				if (event.xbutton.button == Button1 && g_ContextMenu.isVisible())
+				{
+					int action = g_ContextMenu.handleClick(
+						event.xbutton.x,
+						event.xbutton.y,
+						&g_Renderer
+					);
+
+					if (action > 0)
+						g_ContextMenu.executeAction(action);
+
+					g_ContextMenu.hide();
+					LinuxRedraw();
+				}
+				else
+				{
+					HandleLinuxMouseButton(&event.xbutton, false);
+					LinuxRedraw();
+				}
 				break;
 
 			case MotionNotify:
-				HandleLinuxMouseMotion(&event.xmotion);
-				LinuxRedraw();
+				if (g_ContextMenu.isVisible())
+				{
+					g_ContextMenu.handleMouseMove(
+						event.xmotion.x,
+						event.xmotion.y,
+						&g_Renderer
+					);
+					LinuxRedraw();
+				}
+				else
+				{
+					HandleLinuxMouseMotion(&event.xmotion);
+					LinuxRedraw();
+				}
 				break;
 
 			case ClientMessage:
 				if ((Atom)event.xclient.data.l[0] == g_WmDeleteWindow)
-				{
 					running = false;
-				}
 				break;
 			}
 		}
 
 		usleep(1000);
 	}
+
 
 	SaveOptionsToFile(g_Options);
 	XFreeGC(g_display, g_GC);
