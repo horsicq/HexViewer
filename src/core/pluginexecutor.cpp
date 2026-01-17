@@ -641,7 +641,7 @@ bool ExecutePluginBookmarks(
       void* pOffset = PyDict_GetItemString(pItem, "offset");
       void* pLabel = PyDict_GetItemString(pItem, "label");
       void* pDesc = PyDict_GetItemString(pItem, "description");
-
+   
       if (pOffset && pLabel) {
         PluginBookmark bookmark;
         memSet(&bookmark, 0, sizeof(PluginBookmark));
@@ -671,6 +671,28 @@ bool ExecutePluginBookmarks(
           char* desc = PyUnicode_AsUTF8(pDesc);
           if (desc)
             StrCopy(bookmark.description, desc);
+        }
+
+        void* pColor = PyDict_GetItemString(pItem, "color");
+        if (pColor && PyDict_GetItemString) {
+          void* pR = PyDict_GetItemString(pColor, "r");
+          void* pG = PyDict_GetItemString(pColor, "g");
+          void* pB = PyDict_GetItemString(pColor, "b");
+
+          typedef long long (*PyLongAsLongLongFunc)(void*);
+#ifdef _WIN32
+          PyLongAsLongLongFunc PyLong_AsLongLong =
+            (PyLongAsLongLongFunc)GetProcAddress(pythonDLL, "PyLong_AsLongLong");
+#else
+          PyLongAsLongLongFunc PyLong_AsLongLong =
+            (PyLongAsLongLongFunc)dlsym(pythonLib, "PyLong_AsLongLong");
+#endif
+
+          if (pR && pG && pB && PyLong_AsLongLong) {
+            bookmark.color.r = (uint8_t)PyLong_AsLongLong(pR);
+            bookmark.color.g = (uint8_t)PyLong_AsLongLong(pG);
+            bookmark.color.b = (uint8_t)PyLong_AsLongLong(pB);
+          }
         }
 
         StrCopy(bookmark.pluginSource, moduleName);

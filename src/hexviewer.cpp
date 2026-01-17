@@ -140,6 +140,7 @@ void *g_Hwnd = nullptr;
 RenderManager g_Renderer;
 ScrollbarState g_MainScrollbar;
 SelectionState g_Selection;
+AppContextMenu g_ContextMenu;
 HexData g_HexData;
 AppOptions g_Options;
 MenuBar g_MenuBar;
@@ -170,7 +171,7 @@ int g_ResizeStartX = 0;
 int g_ResizeStartY = 0;
 int g_ResizeStartWidth = 0;
 int g_ResizeStartHeight = 0;
-AppContextMenu g_ContextMenu;
+
 
 #if defined(_WIN32)
 char *GetFileNameFromCmdLine()

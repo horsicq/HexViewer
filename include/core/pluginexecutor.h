@@ -7,11 +7,23 @@
 struct LineArray;
 struct PluginInfo;
 
+struct PluginColor {
+  uint8_t r;
+  uint8_t g;
+  uint8_t b;
+
+  PluginColor() : r(0), g(0), b(0) {}
+  PluginColor(uint8_t rr, uint8_t gg, uint8_t bb)
+    : r(rr), g(gg), b(bb) {
+  }
+};
+
 struct PluginBookmark {
   uint64_t offset;
   char label[128];
   char description[256];
   char pluginSource[128];
+  PluginColor color;
 };
 
 struct PluginBookmarkArray {

@@ -519,6 +519,7 @@ void HexData::executeBookmarkPlugins()
         fileData.data,
         fileData.size,
         &pluginAnnotations);
+  
     }
   }
 }

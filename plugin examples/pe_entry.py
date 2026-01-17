@@ -6,7 +6,7 @@ def get_info():
     return {
         "name": "PE Entry Point Bookmark",
         "version": "1.0",
-        "author": "John",
+        "author": "HexViewer",
         "description": "Bookmarks the PE executable entry point"
     }
 
@@ -88,9 +88,9 @@ def generate_bookmarks(data: bytes, size: int):
 
     # --- Add bookmark ---
     bookmarks.append({
-        "offset": entry_file_offset,
         "label": "Entry Point",
-        "description": f"Executable entry point (RVA 0x{entry_rva:X})"
+        "offset": entry_file_offset,
+        "description": f"entry point (RVA 0x{entry_rva:X})"
     })
 
     return bookmarks
