@@ -426,6 +426,89 @@ Rect GetDIEButtonRect(const Rect& panelBounds)
   return Rect(contentX, currentY, contentWidth, rowHeight + 10);
 }
 
+Rect GetPluginAnnotationRect(int annotationIndex, const Rect& panelBounds)
+{
+  int contentX = panelBounds.x + 15;
+  int currentY = panelBounds.y + PANEL_TITLE_HEIGHT + 15;
+  int contentWidth = panelBounds.width - 30;
+
+  int rowHeight = 16;
+  int headerHeight = 18;
+  int itemSpacing = 4;
+  int sectionSpacing = 10;
+
+  long long fileSize = (long long)g_HexData.getFileSize();
+
+  currentY += headerHeight + sectionSpacing;
+  currentY += (rowHeight + itemSpacing) * 2;
+  currentY += 8;
+
+  currentY += headerHeight + sectionSpacing;
+  if (cursorBytePos >= 0 && cursorBytePos < fileSize)
+  {
+    currentY += (rowHeight + itemSpacing) * 5;
+    currentY += 8;
+  }
+  else
+  {
+    currentY += rowHeight + itemSpacing;
+    currentY += 8;
+  }
+
+  currentY += headerHeight + sectionSpacing;
+
+  if (!g_Bookmarks.bookmarks.empty())
+  {
+    size_t displayCount = g_Bookmarks.bookmarks.size() < 5 ? g_Bookmarks.bookmarks.size() : 5;
+    currentY += (rowHeight + itemSpacing) * displayCount;
+  }
+  else
+  {
+    currentY += (rowHeight + itemSpacing) * 2;
+  }
+
+  currentY += 8;
+
+  currentY += headerHeight + sectionSpacing;
+  if (!g_ByteStats.computed)
+  {
+    currentY += rowHeight + itemSpacing;
+  }
+  else
+  {
+    currentY += rowHeight + itemSpacing;
+  }
+  currentY += 8;
+
+  currentY += headerHeight + sectionSpacing;
+  currentY += (rowHeight + itemSpacing) * 3;
+
+  char diePath[260];
+  bool dieFound = FindDIEPath(diePath, sizeof(diePath));
+  if (dieFound)
+  {
+    currentY += 4;
+    currentY += itemSpacing;
+    currentY += rowHeight + 10 + itemSpacing;
+  }
+
+  currentY += 8;
+
+  currentY += headerHeight + sectionSpacing;
+
+  PluginBookmarkArray* pluginAnnotations = g_HexData.getPluginAnnotations();
+
+  for (int i = 0; i < annotationIndex && i < (int)pluginAnnotations->count; i++)
+  {
+    currentY += rowHeight + itemSpacing;
+    if (pluginAnnotations->bookmarks[i].description[0] != '\0')
+    {
+      currentY += rowHeight + itemSpacing;
+    }
+  }
+
+  return Rect(contentX, currentY, contentWidth, rowHeight + itemSpacing);
+}
 
 Rect GetBookmarkRect(int bookmarkIndex, const Rect& panelBounds)
 {
@@ -842,8 +925,53 @@ bool HandleLeftPanelContentClick(int x, int y, int windowWidth, int windowHeight
       DIE_OpenInApplication();
       return true;
     }
+
+    currentY += rowHeight + 10 + itemSpacing;
+  }
+
+  currentY += 8;
+
+  currentY += headerHeight + sectionSpacing;
+
+  PluginBookmarkArray* pluginAnnotations = g_HexData.getPluginAnnotations();
+
+  if (pluginAnnotations && pluginAnnotations->count > 0)
+  {
+    size_t maxDisplay = pluginAnnotations->count < 10 ? pluginAnnotations->count : 10;
+
+    for (size_t i = 0; i < maxDisplay; i++)
+    {
+      const PluginBookmark& annotation = pluginAnnotations->bookmarks[i];
+
+      Rect annotationRect(contentX, currentY, contentWidth, rowHeight + itemSpacing);
+
+      if (annotationRect.contains(x, y))
+      {
+        cursorBytePos = annotation.offset;
+        cursorNibblePos = 0;
+
+        long long line = cursorBytePos / 16;
+        if (line < g_ScrollY || line >= g_ScrollY + g_LinesPerPage)
+        {
+          g_ScrollY = (int)line;
+
+#ifdef _WIN32
+          SetScrollPos(g_Hwnd, SB_VERT, g_ScrollY, TRUE);
+#endif
+        }
+
+        InvalidateWindow();
+        return true;
+      }
+
+      currentY += rowHeight + itemSpacing;
+
+      if (annotation.description[0] != '\0')
+      {
+        currentY += rowHeight + itemSpacing;
+      }
+    }
   }
 
   return false;
 }
-

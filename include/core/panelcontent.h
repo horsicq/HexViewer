@@ -107,6 +107,7 @@ extern ChecksumState      g_Checksum;
 extern CompareState       g_Compare;
 extern BookmarksState     g_Bookmarks;
 extern ByteStatistics     g_ByteStats;
+extern int g_PluginAnnotationHoveredIndex;
 
 Rect GetBookmarkRect(int bookmarkIndex, const Rect& panelBounds);
 void Bookmarks_UpdateValues();
