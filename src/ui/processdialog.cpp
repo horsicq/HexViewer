@@ -35,8 +35,196 @@
 
 #include "processdialog.h"
 
-
 static ProcessDialogData* g_processDialogData = nullptr;
+
+
+void RenderProcessDialog(ProcessDialogData* data, int windowWidth, int windowHeight)
+{
+  if (!data || !data->renderer)
+    return;
+
+  Theme theme = data->darkMode ? Theme::Dark() : Theme::Light();
+  data->renderer->clear(theme.windowBackground);
+
+  const int margin = 20;
+  const int headerY = margin;
+  const int rowHeight = 32;
+
+  Color headerColor = theme.headerColor;
+  data->renderer->drawText("PID", margin, headerY, headerColor);
+  data->renderer->drawText("Process Name", margin + 80, headerY, headerColor);
+  data->renderer->drawText("Architecture", margin + 320, headerY, headerColor);
+
+  data->renderer->drawLine(margin, headerY + 20, windowWidth - margin, headerY + 20, theme.separator);
+
+  int listStartY = headerY + 28;
+  int listEndY = windowHeight - 70;
+  int maxVisibleRows = (listEndY - listStartY) / rowHeight;
+
+  int maxScroll = data->processes.count - maxVisibleRows;
+  if (maxScroll < 0) maxScroll = 0;
+  if (data->scrollOffset > maxScroll)
+    data->scrollOffset = maxScroll;
+  if (data->scrollOffset < 0)
+    data->scrollOffset = 0;
+
+  int rowY = listStartY;
+  int visibleCount = 0;
+
+  for (int i = data->scrollOffset; i < data->processes.count && visibleCount < maxVisibleRows; i++, visibleCount++)
+  {
+    ProcessEntry* e = &data->processes.entries[i];
+
+    Rect rowRect(margin, rowY, windowWidth - margin * 2, rowHeight - 2);
+
+    if (i == data->selectedIndex)
+    {
+      Color selectedBg = theme.controlCheck;
+      selectedBg.a = 60;
+      data->renderer->drawRoundedRect(rowRect, 6.0f, selectedBg, true);
+
+      Color selectedBorder = theme.controlCheck;
+      selectedBorder.a = 200;
+      data->renderer->drawRoundedRect(rowRect, 6.0f, selectedBorder, false);
+    }
+    else if (i == data->hoveredIndex)
+    {
+      Color hoverBg = theme.menuHover;
+      hoverBg.a = 80;
+      data->renderer->drawRoundedRect(rowRect, 6.0f, hoverBg, true);
+    }
+
+    char pidBuf[32];
+    IntToStr(e->pid, pidBuf, sizeof(pidBuf));
+    Color textColor = (i == data->selectedIndex) ? theme.controlCheck : theme.textColor;
+    data->renderer->drawText(pidBuf, margin, rowY + 8, textColor);
+
+    data->renderer->drawText(e->name, margin + 80, rowY + 8, textColor);
+
+    Rect archBadge(margin + 320, rowY + 6, 50, 20);
+    bool isDark = (theme.windowBackground.r < 128);
+    Color badgeBg = e->is64bit
+      ? (isDark ? Color(50, 120, 200) : Color(70, 140, 220))
+      : (isDark ? Color(180, 100, 50) : Color(220, 140, 80));
+    badgeBg.a = (i == data->selectedIndex) ? 220 : 140;
+    data->renderer->drawRoundedRect(archBadge, 4.0f, badgeBg, true);
+
+    Color badgeText = Color(255, 255, 255);
+    const char* archText = e->is64bit ? "x64" : "x86";
+    data->renderer->drawText(archText, margin + 328, rowY + 9, badgeText);
+
+    rowY += rowHeight;
+  }
+
+  if (data->processes.count > maxVisibleRows)
+  {
+    int scrollbarX = windowWidth - 15;
+    int scrollbarY = listStartY;
+    int scrollbarHeight = listEndY - listStartY;
+
+    Rect trackRect(scrollbarX, scrollbarY, 8, scrollbarHeight);
+    Color trackColor = theme.scrollbarBg;
+    data->renderer->drawRoundedRect(trackRect, 4.0f, trackColor, true);
+
+    float thumbRatio = (float)maxVisibleRows / (float)data->processes.count;
+    int thumbHeight = (int)(scrollbarHeight * thumbRatio);
+    if (thumbHeight < 30) thumbHeight = 30;
+
+    float scrollRatio = (float)data->scrollOffset / (float)maxScroll;
+    int thumbY = scrollbarY + (int)((scrollbarHeight - thumbHeight) * scrollRatio);
+
+    Rect thumbRect(scrollbarX, thumbY, 8, thumbHeight);
+    Color thumbColor = theme.scrollbarThumb;
+    thumbColor.a = 200;
+    data->renderer->drawRoundedRect(thumbRect, 4.0f, thumbColor, true);
+  }
+
+  data->renderer->drawLine(margin, listEndY + 8, windowWidth - margin, listEndY + 8, theme.separator);
+
+  const int buttonWidth = 100;
+  const int buttonHeight = 36;
+  const int buttonY = windowHeight - margin - buttonHeight;
+
+  {
+    Rect r(windowWidth - margin - buttonWidth * 2 - 10, buttonY, buttonWidth, buttonHeight);
+    WidgetState ws(r);
+    ws.hovered = (data->hoveredWidget == 1);
+    ws.pressed = (data->pressedWidget == 1);
+    data->renderer->drawModernButton(ws, theme, "Cancel");
+  }
+
+  {
+    Rect r(windowWidth - margin - buttonWidth, buttonY, buttonWidth, buttonHeight);
+    WidgetState ws(r);
+    ws.enabled = (data->selectedIndex >= 0);
+    ws.hovered = (data->hoveredWidget == 2);
+    ws.pressed = (data->pressedWidget == 2);
+    data->renderer->drawModernButton(ws, theme, "Open");
+  }
+}
+
+void UpdateProcessDialogHover(ProcessDialogData* data, int x, int y, int windowWidth, int windowHeight)
+{
+  const int margin = 20;
+  const int headerY = margin;
+  const int rowHeight = 32;
+  const int listStartY = headerY + 28;
+  const int listEndY = windowHeight - 70;
+
+  data->hoveredIndex = -1;
+  data->hoveredWidget = -1;
+
+  const int buttonWidth = 100;
+  const int buttonHeight = 36;
+  const int buttonY = windowHeight - margin - buttonHeight;
+
+  Rect cancelRect(windowWidth - margin - buttonWidth * 2 - 10, buttonY, buttonWidth, buttonHeight);
+  if (x >= cancelRect.x && x <= cancelRect.x + cancelRect.width &&
+    y >= cancelRect.y && y <= cancelRect.y + cancelRect.height)
+  {
+    data->hoveredWidget = 1;
+    return;
+  }
+
+  Rect openRect(windowWidth - margin - buttonWidth, buttonY, buttonWidth, buttonHeight);
+  if (x >= openRect.x && x <= openRect.x + openRect.width &&
+    y >= openRect.y && y <= openRect.y + openRect.height)
+  {
+    data->hoveredWidget = 2;
+    return;
+  }
+
+  if (y < listStartY || y > listEndY)
+    return;
+
+  int relY = y - listStartY;
+  int rowIndex = relY / rowHeight;
+  int absoluteIndex = data->scrollOffset + rowIndex;
+
+  if (absoluteIndex >= 0 && absoluteIndex < data->processes.count)
+  {
+    data->hoveredIndex = absoluteIndex;
+  }
+}
+
+void HandleProcessDialogClick(ProcessDialogData* data)
+{
+  if (data->hoveredWidget == 1)
+  {
+    data->dialogResult = false;
+    data->running = false;
+  }
+  else if (data->hoveredWidget == 2 && data->selectedIndex >= 0)
+  {
+    data->dialogResult = true;
+    data->running = false;
+  }
+  else if (data->hoveredIndex >= 0)
+  {
+    data->selectedIndex = data->hoveredIndex;
+  }
+}
+
 
 #ifdef _WIN32
 
@@ -60,7 +248,6 @@ bool IsProcessRecentlyAccessed(DWORD pid, FILETIME* outTime)
 
 bool ProcessHasVisibleWindow(DWORD pid)
 {
- 
   EnumData data = { pid, false };
 
   EnumWindows([](HWND hwnd, LPARAM lParam) -> BOOL
@@ -112,13 +299,7 @@ void SortProcessPriorities(ProcessPriority* priorities, int count)
       }
       else if (priorities[j].priority == key.priority && priorities[j].priority >= 2)
       {
-        ULARGE_INTEGER ta, tb;
-        ta.LowPart = priorities[j].lastAccessTime.dwLowDateTime;
-        ta.HighPart = priorities[j].lastAccessTime.dwHighDateTime;
-        tb.LowPart = key.lastAccessTime.dwLowDateTime;
-        tb.HighPart = key.lastAccessTime.dwHighDateTime;
-
-        if (ta.QuadPart < tb.QuadPart)
+        if (priorities[j].timestamp < key.timestamp)
         {
           shouldSwap = true;
         }
@@ -231,11 +412,11 @@ bool EnumerateProcesses(ProcessList* list)
     FILETIME processTime;
     if (IsProcessRecentlyAccessed(pe.th32ProcessID, &processTime))
     {
-      priorities[tempCount].lastAccessTime = processTime;
-
       ULARGE_INTEGER processTimeInt;
       processTimeInt.LowPart = processTime.dwLowDateTime;
       processTimeInt.HighPart = processTime.dwHighDateTime;
+
+      priorities[tempCount].timestamp = processTimeInt.QuadPart;
 
       const ULONGLONG oneHour = 36000000000ULL;
 
@@ -273,447 +454,6 @@ bool EnumerateProcesses(ProcessList* list)
   return true;
 }
 
-#elif defined(__linux__)
-
-bool IsProcessRecentlyAccessed(int pid, time_t* outTime)
-{
-  char statPath[256];
-  snprintf(statPath, sizeof(statPath), "/proc/%d/stat", pid);
-
-  FILE* f = fopen(statPath, "r");
-  if (!f)
-    return false;
-
-  unsigned long long starttime;
-  char comm[256];
-  char state;
-  int ppid;
-
-  if (fscanf(f, "%*d %s %c %d %*d %*d %*d %*d %*u %*u %*u %*u %*u %*u %*u %*d %*d %*d %*d %*d %*d %llu",
-    comm, &state, &ppid, &starttime) < 4)
-  {
-    fclose(f);
-    return false;
-  }
-
-  fclose(f);
-
-  time_t procStartTime = starttime / sysconf(_SC_CLK_TCK);
-
-  if (outTime)
-    *outTime = procStartTime;
-
-  return true;
-}
-
-bool ProcessHasVisibleWindow(int pid)
-{
-  Display* display = XOpenDisplay(NULL);
-  if (!display)
-    return false;
-
-  Window root = DefaultRootWindow(display);
-  Atom clientListAtom = XInternAtom(display, "_NET_CLIENT_LIST", False);
-  Atom pidAtom = XInternAtom(display, "_NET_WM_PID", False);
-
-  Atom actualType;
-  int format;
-  unsigned long numItems, bytesAfter;
-  unsigned char* data = NULL;
-
-  if (XGetWindowProperty(display, root, clientListAtom, 0, ~0L, False,
-    XA_WINDOW, &actualType, &format, &numItems,
-    &bytesAfter, &data) != Success)
-  {
-    XCloseDisplay(display);
-    return false;
-  }
-
-  Window* windowList = (Window*)data;
-  bool hasWindow = false;
-
-  for (unsigned long i = 0; i < numItems; i++)
-  {
-    unsigned char* pidData = NULL;
-    unsigned long pidItems;
-
-    if (XGetWindowProperty(display, windowList[i], pidAtom, 0, 1, False,
-      XA_CARDINAL, &actualType, &format, &pidItems,
-      &bytesAfter, &pidData) == Success)
-    {
-      if (pidItems > 0)
-      {
-        int windowPid = *(int*)pidData;
-        if (windowPid == pid)
-        {
-          XWindowAttributes attrs;
-          if (XGetWindowAttributes(display, windowList[i], &attrs))
-          {
-            if (attrs.map_state == IsViewable)
-            {
-              hasWindow = true;
-              XFree(pidData);
-              break;
-            }
-          }
-        }
-      }
-      XFree(pidData);
-    }
-  }
-
-  XFree(data);
-  XCloseDisplay(display);
-
-  return hasWindow;
-}
-
-int CompareProcessPriority(const void* a, const void* b)
-{
-  const ProcessPriority* pa = (const ProcessPriority*)a;
-  const ProcessPriority* pb = (const ProcessPriority*)b;
-
-  if (pa->priority != pb->priority)
-    return pb->priority - pa->priority;
-
-  if (pa->priority >= 2)
-  {
-    if (pa->startTime > pb->startTime)
-      return -1;
-    else if (pa->startTime < pb->startTime)
-      return 1;
-  }
-
-  return 0;
-}
-
-bool EnumerateProcesses(ProcessList* list)
-{
-  if (!list || !list->entries)
-    return false;
-
-  DIR* procDir = opendir("/proc");
-  if (!procDir)
-    return false;
-
-  ProcessEntry* tempEntries = (ProcessEntry*)PlatformAlloc(sizeof(ProcessEntry) * 512);
-  ProcessPriority* priorities = (ProcessPriority*)PlatformAlloc(sizeof(ProcessPriority) * 512);
-  int tempCount = 0;
-
-  time_t currentTime = time(NULL);
-  struct dirent* entry;
-
-  while ((entry = readdir(procDir)) != NULL && tempCount < 512)
-  {
-    int pid = atoi(entry->d_name);
-    if (pid <= 0)
-      continue;
-
-    char cmdlinePath[256];
-    snprintf(cmdlinePath, sizeof(cmdlinePath), "/proc/%d/cmdline", pid);
-
-    FILE* cmdFile = fopen(cmdlinePath, "r");
-    if (!cmdFile)
-      continue;
-
-    char cmdline[260];
-    size_t len = fread(cmdline, 1, sizeof(cmdline) - 1, cmdFile);
-    fclose(cmdFile);
-    cmdline[len] = '\0';
-
-    if (len == 0)
-      continue;
-
-    ProcessEntry* e = &tempEntries[tempCount];
-    e->pid = pid;
-
-    const char* procName = cmdline;
-    const char* lastSlash = NULL;
-    for (size_t i = 0; i < len && cmdline[i]; i++)
-    {
-      if (cmdline[i] == '/')
-        lastSlash = &cmdline[i];
-    }
-    if (lastSlash)
-      procName = lastSlash + 1;
-
-    int i = 0;
-    while (i < 259 && procName[i] != 0)
-    {
-      e->name[i] = procName[i];
-      i++;
-    }
-    e->name[i] = 0;
-
-    char exePath[256];
-    char exeLink[512];
-    snprintf(exePath, sizeof(exePath), "/proc/%d/exe", pid);
-    ssize_t linkLen = readlink(exePath, exeLink, sizeof(exeLink) - 1);
-
-    e->is64bit = false;
-    if (linkLen > 0)
-    {
-      exeLink[linkLen] = '\0';
-
-      FILE* exeFile = fopen(exeLink, "rb");
-      if (exeFile)
-      {
-        unsigned char elfHeader[5];
-        if (fread(elfHeader, 1, 5, exeFile) == 5)
-        {
-          if (elfHeader[0] == 0x7F && elfHeader[1] == 'E' &&
-            elfHeader[2] == 'L' && elfHeader[3] == 'F')
-          {
-            e->is64bit = (elfHeader[4] == 2);
-          }
-        }
-        fclose(exeFile);
-      }
-    }
-
-    priorities[tempCount].index = tempCount;
-    priorities[tempCount].priority = 1;
-
-    time_t processTime;
-    if (IsProcessRecentlyAccessed(pid, &processTime))
-    {
-      priorities[tempCount].startTime = processTime;
-
-      if ((currentTime - processTime) < 3600)
-      {
-        priorities[tempCount].priority = 3;
-      }
-    }
-
-    if (ProcessHasVisibleWindow(pid))
-    {
-      if (priorities[tempCount].priority < 2)
-        priorities[tempCount].priority = 2;
-    }
-
-    tempCount++;
-  }
-
-  closedir(procDir);
-
-  qsort(priorities, tempCount, sizeof(ProcessPriority), CompareProcessPriority);
-
-  list->count = 0;
-  for (int i = 0; i < tempCount && i < (int)list->capacity; i++)
-  {
-    int sourceIndex = priorities[i].index;
-    list->entries[list->count] = tempEntries[sourceIndex];
-    list->count++;
-  }
-
-  PlatformFree(tempEntries, sizeof(ProcessEntry) * 512);
-  PlatformFree(priorities, sizeof(ProcessPriority) * 512);
-
-  return true;
-}
-
-#elif defined(__APPLE__)
-
-bool IsProcessRecentlyAccessed(int pid, time_t* outTime)
-{
-  struct proc_bsdinfo procInfo;
-  int ret = proc_pidinfo(pid, PROC_PIDTBSDINFO, 0, &procInfo, sizeof(procInfo));
-
-  if (ret <= 0)
-    return false;
-
-  if (outTime)
-    *outTime = procInfo.pbi_start_tvsec;
-
-  return true;
-}
-
-bool ProcessHasVisibleWindow(int pid)
-{
-  CFArrayRef windowList = CGWindowListCopyWindowInfo(
-    kCGWindowListOptionOnScreenOnly | kCGWindowListExcludeDesktopElements,
-    kCGNullWindowID);
-
-  if (!windowList)
-    return false;
-
-  bool hasWindow = false;
-  CFIndex count = CFArrayGetCount(windowList);
-
-  for (CFIndex i = 0; i < count; i++)
-  {
-    CFDictionaryRef windowInfo = (CFDictionaryRef)CFArrayGetValueAtIndex(windowList, i);
-
-    CFNumberRef pidNum = (CFNumberRef)CFDictionaryGetValue(windowInfo, kCGWindowOwnerPID);
-    if (!pidNum)
-      continue;
-
-    int windowPid;
-    CFNumberGetValue(pidNum, kCFNumberIntType, &windowPid);
-
-    if (windowPid == pid)
-    {
-      CFStringRef windowName = (CFStringRef)CFDictionaryGetValue(windowInfo, kCGWindowName);
-      if (windowName && CFStringGetLength(windowName) > 0)
-      {
-        hasWindow = true;
-        break;
-      }
-    }
-  }
-
-  CFRelease(windowList);
-  return hasWindow;
-}
-
-int CompareProcessPriority(const void* a, const void* b)
-{
-  const ProcessPriority* pa = (const ProcessPriority*)a;
-  const ProcessPriority* pb = (const ProcessPriority*)b;
-
-  if (pa->priority != pb->priority)
-    return pb->priority - pa->priority;
-
-  if (pa->priority >= 2)
-  {
-    if (pa->startTime > pb->startTime)
-      return -1;
-    else if (pa->startTime < pb->startTime)
-      return 1;
-  }
-
-  return 0;
-}
-
-bool EnumerateProcesses(ProcessList* list)
-{
-  if (!list || !list->entries)
-    return false;
-
-  int mib[4] = { CTL_KERN, KERN_PROC, KERN_PROC_ALL, 0 };
-  size_t size;
-
-  if (sysctl(mib, 4, NULL, &size, NULL, 0) < 0)
-    return false;
-
-  struct kinfo_proc* procList = (struct kinfo_proc*)malloc(size);
-  if (!procList)
-    return false;
-
-  if (sysctl(mib, 4, procList, &size, NULL, 0) < 0)
-  {
-    free(procList);
-    return false;
-  }
-
-  int procCount = (int)(size / sizeof(struct kinfo_proc));
-
-  ProcessEntry* tempEntries = (ProcessEntry*)PlatformAlloc(sizeof(ProcessEntry) * 512);
-  ProcessPriority* priorities = (ProcessPriority*)PlatformAlloc(sizeof(ProcessPriority) * 512);
-  int tempCount = 0;
-
-  time_t currentTime = time(NULL);
-
-  for (int i = 0; i < procCount && tempCount < 512; i++)
-  {
-    int pid = procList[i].kp_proc.p_pid;
-    if (pid <= 0)
-      continue;
-
-    ProcessEntry* e = &tempEntries[tempCount];
-    e->pid = pid;
-
-    char pathbuf[PROC_PIDPATHINFO_MAXSIZE];
-    if (proc_pidpath(pid, pathbuf, sizeof(pathbuf)) <= 0)
-    {
-      int j = 0;
-      while (j < 259 && procList[i].kp_proc.p_comm[j] != 0)
-      {
-        e->name[j] = procList[i].kp_proc.p_comm[j];
-        j++;
-      }
-      e->name[j] = 0;
-    }
-    else
-    {
-      const char* name = pathbuf;
-      for (int j = 0; pathbuf[j]; j++)
-      {
-        if (pathbuf[j] == '/')
-          name = &pathbuf[j + 1];
-      }
-
-      int j = 0;
-      while (j < 259 && name[j] != 0)
-      {
-        e->name[j] = name[j];
-        j++;
-      }
-      e->name[j] = 0;
-    }
-
-    if (e->name[0] == 0)
-      continue;
-
-    cpu_type_t cpuType;
-    size_t cpuTypeSize = sizeof(cpuType);
-    int mib2[4] = { CTL_KERN, KERN_PROC, KERN_PROC_PID, pid };
-
-    e->is64bit = false;
-    if (sysctl(mib2, 4, NULL, &size, NULL, 0) == 0)
-    {
-      struct kinfo_proc kp;
-      size = sizeof(kp);
-      if (sysctl(mib2, 4, &kp, &size, NULL, 0) == 0)
-      {
-        e->is64bit = (kp.kp_proc.p_flag & P_LP64) != 0;
-      }
-    }
-
-    priorities[tempCount].index = tempCount;
-    priorities[tempCount].priority = 1;
-
-    time_t processTime;
-    if (IsProcessRecentlyAccessed(pid, &processTime))
-    {
-      priorities[tempCount].startTime = processTime;
-
-      if ((currentTime - processTime) < 3600)
-      {
-        priorities[tempCount].priority = 3;
-      }
-    }
-
-    if (ProcessHasVisibleWindow(pid))
-    {
-      if (priorities[tempCount].priority < 2)
-        priorities[tempCount].priority = 2;
-    }
-
-    tempCount++;
-  }
-
-  free(procList);
-
-  qsort(priorities, tempCount, sizeof(ProcessPriority), CompareProcessPriority);
-
-  list->count = 0;
-  for (int i = 0; i < tempCount && i < (int)list->capacity; i++)
-  {
-    int sourceIndex = priorities[i].index;
-    list->entries[list->count] = tempEntries[sourceIndex];
-    list->count++;
-  }
-
-  PlatformFree(tempEntries, sizeof(ProcessEntry) * 512);
-  PlatformFree(priorities, sizeof(ProcessPriority) * 512);
-
-  return true;
-}
-
-#endif
-
-#ifdef _WIN32
 bool ReadProcessMemoryData(int pid, HexData* hexData)
 {
   if (!hexData)
@@ -778,366 +518,6 @@ bool ReadProcessMemoryData(int pid, HexData* hexData)
   bb_free(&tempBuffer);
   return false;
 }
-
-#elif defined(__linux__)
-
-bool ReadProcessMemoryData(int pid, HexData* hexData)
-{
-  if (!hexData)
-    return false;
-
-  hexData->clear();
-
-  char mapsPath[256];
-  snprintf(mapsPath, sizeof(mapsPath), "/proc/%d/maps", pid);
-
-  FILE* mapsFile = fopen(mapsPath, "r");
-  if (!mapsFile)
-  {
-    return false;
-  }
-
-  ByteBuffer tempBuffer;
-  bb_init(&tempBuffer);
-
-  char line[512];
-  while (fgets(line, sizeof(line), mapsFile))
-  {
-    unsigned long long startAddr, endAddr;
-    char perms[5];
-
-    if (sscanf(line, "%llx-%llx %4s", &startAddr, &endAddr, perms) != 3)
-      continue;
-
-    if (perms[0] != 'r')
-      continue;
-
-    size_t regionSize = (size_t)(endAddr - startAddr);
-
-    if (regionSize > 100 * 1024 * 1024)
-      continue;
-
-    size_t oldSize = tempBuffer.size;
-    size_t newSize = oldSize + regionSize;
-
-    if (!bb_resize(&tempBuffer, newSize))
-    {
-      continue;
-    }
-
-    struct iovec local[1];
-    struct iovec remote[1];
-
-    local[0].iov_base = tempBuffer.data + oldSize;
-    local[0].iov_len = regionSize;
-    remote[0].iov_base = (void*)startAddr;
-    remote[0].iov_len = regionSize;
-
-    ssize_t nread = process_vm_readv(pid, local, 1, remote, 1, 0);
-
-    if (nread > 0)
-    {
-      bb_resize(&tempBuffer, oldSize + (size_t)nread);
-    }
-    else
-    {
-      bb_resize(&tempBuffer, oldSize);
-    }
-  }
-
-  fclose(mapsFile);
-
-  if (tempBuffer.size > 0)
-  {
-    bb_resize(&hexData->fileData, tempBuffer.size);
-    for (size_t i = 0; i < tempBuffer.size; i++)
-    {
-      hexData->fileData.data[i] = tempBuffer.data[i];
-    }
-    hexData->convertDataToHex(16);
-    bb_free(&tempBuffer);
-    return true;
-  }
-
-  bb_free(&tempBuffer);
-  return false;
-}
-
-#elif defined(__APPLE__)
-
-bool ReadProcessMemoryData(int pid, HexData* hexData)
-{
-  if (!hexData)
-    return false;
-
-  hexData->clear();
-
-  mach_port_t task;
-  kern_return_t kr = task_for_pid(mach_task_self(), pid, &task);
-
-  if (kr != KERN_SUCCESS)
-  {
-    return false;
-  }
-
-  ByteBuffer tempBuffer;
-  bb_init(&tempBuffer);
-
-  mach_vm_address_t address = 0;
-  mach_vm_size_t size = 0;
-  vm_region_basic_info_data_64_t info;
-  mach_msg_type_number_t count = VM_REGION_BASIC_INFO_COUNT_64;
-  mach_port_t object_name;
-
-  while (true)
-  {
-    kr = mach_vm_region(task, &address, &size, VM_REGION_BASIC_INFO_64,
-      (vm_region_info_t)&info, &count, &object_name);
-
-    if (kr != KERN_SUCCESS)
-      break;
-
-    if (info.protection & VM_PROT_READ)
-    {
-      if (size > 100 * 1024 * 1024)
-      {
-        address += size;
-        continue;
-      }
-
-      size_t oldSize = tempBuffer.size;
-      size_t newSize = oldSize + (size_t)size;
-
-      if (bb_resize(&tempBuffer, newSize))
-      {
-        mach_vm_size_t bytesRead = 0;
-        kr = mach_vm_read_overwrite(task, address, size,
-          (mach_vm_address_t)(tempBuffer.data + oldSize),
-          &bytesRead);
-
-        if (kr == KERN_SUCCESS && bytesRead > 0)
-        {
-          bb_resize(&tempBuffer, oldSize + (size_t)bytesRead);
-        }
-        else
-        {
-          bb_resize(&tempBuffer, oldSize);
-        }
-      }
-    }
-
-    address += size;
-  }
-
-  mach_port_deallocate(mach_task_self(), task);
-
-  if (tempBuffer.size > 0)
-  {
-    bb_resize(&hexData->fileData, tempBuffer.size);
-    for (size_t i = 0; i < tempBuffer.size; i++)
-    {
-      hexData->fileData.data[i] = tempBuffer.data[i];
-    }
-    hexData->convertDataToHex(16);
-    bb_free(&tempBuffer);
-    return true;
-  }
-
-  bb_free(&tempBuffer);
-  return false;
-}
-
-#endif
-
-void RenderProcessDialog(ProcessDialogData* data, int windowWidth, int windowHeight)
-{
-  if (!data || !data->renderer)
-    return;
-
-  Theme theme = data->darkMode ? Theme::Dark() : Theme::Light();
-  data->renderer->clear(theme.windowBackground);
-
-  const int margin = 20;
-  const int headerY = margin;
-  const int rowHeight = 32;
-
-  Color headerColor = theme.headerColor;
-  data->renderer->drawText("PID", margin, headerY, headerColor);
-  data->renderer->drawText("Process Name", margin + 80, headerY, headerColor);
-  data->renderer->drawText("Architecture", margin + 320, headerY, headerColor);
-
-  data->renderer->drawLine(margin, headerY + 20, windowWidth - margin, headerY + 20, theme.separator);
-
-  int listStartY = headerY + 28;
-  int listEndY = windowHeight - 70;
-  int maxVisibleRows = (listEndY - listStartY) / rowHeight;
-
-  int maxScroll = data->processes.count - maxVisibleRows;
-  if (maxScroll < 0) maxScroll = 0;
-  if (data->scrollOffset > maxScroll)
-    data->scrollOffset = maxScroll;
-  if (data->scrollOffset < 0)
-    data->scrollOffset = 0;
-
-  int rowY = listStartY;
-  int visibleCount = 0;
-
-  for (int i = data->scrollOffset; i < data->processes.count && visibleCount < maxVisibleRows; i++, visibleCount++)
-  {
-    ProcessEntry* e = &data->processes.entries[i];
-
-    Rect rowRect(margin, rowY, windowWidth - margin * 2, rowHeight - 2);
-
-    if (i == data->selectedIndex)
-    {
-      Color selectedBg = theme.controlCheck;
-      selectedBg.a = 60;
-      data->renderer->drawRoundedRect(rowRect, 6.0f, selectedBg, true);
-
-      Color selectedBorder = theme.controlCheck;
-      selectedBorder.a = 200;
-      data->renderer->drawRoundedRect(rowRect, 6.0f, selectedBorder, false);
-    }
-    else if (i == data->hoveredIndex)
-    {
-      Color hoverBg = theme.menuHover;
-      hoverBg.a = 80;
-      data->renderer->drawRoundedRect(rowRect, 6.0f, hoverBg, true);
-    }
-
-    char pidBuf[32];
-    IntToStr(e->pid, pidBuf, sizeof(pidBuf));
-    Color textColor = (i == data->selectedIndex) ? theme.controlCheck : theme.textColor;
-    data->renderer->drawText(pidBuf, margin, rowY + 8, textColor);
-
-    data->renderer->drawText(e->name, margin + 80, rowY + 8, textColor);
-
-    Rect archBadge(margin + 320, rowY + 6, 50, 20);
-    bool isDark = (theme.windowBackground.r < 128);
-    Color badgeBg = e->is64bit
-      ? (isDark ? Color(50, 120, 200) : Color(70, 140, 220))
-      : (isDark ? Color(180, 100, 50) : Color(220, 140, 80));
-    badgeBg.a = (i == data->selectedIndex) ? 220 : 140;
-    data->renderer->drawRoundedRect(archBadge, 4.0f, badgeBg, true);
-
-    Color badgeText = Color(255, 255, 255);
-    const char* archText = e->is64bit ? "x64" : "x86";
-    data->renderer->drawText(archText, margin + 328, rowY + 9, badgeText);
-
-    rowY += rowHeight;
-  }
-
-  if (data->processes.count > maxVisibleRows)
-  {
-    int scrollbarX = windowWidth - 15;
-    int scrollbarY = listStartY;
-    int scrollbarHeight = listEndY - listStartY;
-
-    Rect trackRect(scrollbarX, scrollbarY, 8, scrollbarHeight);
-    Color trackColor = theme.scrollbarBg;
-    data->renderer->drawRoundedRect(trackRect, 4.0f, trackColor, true);
-
-    float thumbRatio = (float)maxVisibleRows / (float)data->processes.count;
-    int thumbHeight = (int)(scrollbarHeight * thumbRatio);
-    if (thumbHeight < 30) thumbHeight = 30;
-
-    float scrollRatio = (float)data->scrollOffset / (float)maxScroll;
-    int thumbY = scrollbarY + (int)((scrollbarHeight - thumbHeight) * scrollRatio);
-
-    Rect thumbRect(scrollbarX, thumbY, 8, thumbHeight);
-    Color thumbColor = theme.scrollbarThumb;
-    thumbColor.a = 200;
-    data->renderer->drawRoundedRect(thumbRect, 4.0f, thumbColor, true);
-  }
-
-  data->renderer->drawLine(margin, listEndY + 8, windowWidth - margin, listEndY + 8, theme.separator);
- 
-
-  const int buttonWidth = 100;
-  const int buttonHeight = 36;
-  const int buttonY = windowHeight - margin - buttonHeight;
-
-  {
-    Rect r(windowWidth - margin - buttonWidth * 2 - 10, buttonY, buttonWidth, buttonHeight);
-    WidgetState ws(r);
-    ws.hovered = (data->hoveredWidget == 1);
-    ws.pressed = (data->pressedWidget == 1);
-    data->renderer->drawModernButton(ws, theme, "Cancel");
-  }
-
-  {
-    Rect r(windowWidth - margin - buttonWidth, buttonY, buttonWidth, buttonHeight);
-    WidgetState ws(r);
-    ws.enabled = (data->selectedIndex >= 0);
-    ws.hovered = (data->hoveredWidget == 2);
-    ws.pressed = (data->pressedWidget == 2);
-    data->renderer->drawModernButton(ws, theme, "Open");
-  }
-}
-
-void UpdateProcessDialogHover(ProcessDialogData* data, int x, int y, int windowWidth, int windowHeight)
-{
-  const int margin = 20;
-  const int headerY = margin;
-  const int rowHeight = 32;
-  const int listStartY = headerY + 28;
-  const int listEndY = windowHeight - 70;
-
-  data->hoveredIndex = -1;
-  data->hoveredWidget = -1;
-
-  const int buttonWidth = 100;
-  const int buttonHeight = 36;
-  const int buttonY = windowHeight - margin - buttonHeight;
-
-  Rect cancelRect(windowWidth - margin - buttonWidth * 2 - 10, buttonY, buttonWidth, buttonHeight);
-  if (x >= cancelRect.x && x <= cancelRect.x + cancelRect.width &&
-    y >= cancelRect.y && y <= cancelRect.y + cancelRect.height)
-  {
-    data->hoveredWidget = 1;
-    return;
-  }
-
-  Rect openRect(windowWidth - margin - buttonWidth, buttonY, buttonWidth, buttonHeight);
-  if (x >= openRect.x && x <= openRect.x + openRect.width &&
-    y >= openRect.y && y <= openRect.y + openRect.height)
-  {
-    data->hoveredWidget = 2;
-    return;
-  }
-
-  if (y < listStartY || y > listEndY)
-    return;
-
-  int relY = y - listStartY;
-  int rowIndex = relY / rowHeight;
-  int absoluteIndex = data->scrollOffset + rowIndex;
-
-  if (absoluteIndex >= 0 && absoluteIndex < data->processes.count)
-  {
-    data->hoveredIndex = absoluteIndex;
-  }
-}
-
-void HandleProcessDialogClick(ProcessDialogData* data)
-{
-  if (data->hoveredWidget == 1)
-  {
-    data->dialogResult = false;
-    data->running = false;
-  }
-  else if (data->hoveredWidget == 2 && data->selectedIndex >= 0)
-  {
-    data->dialogResult = true;
-    data->running = false;
-  }
-  else if (data->hoveredIndex >= 0)
-  {
-    data->selectedIndex = data->hoveredIndex;
-  }
-}
-
-#ifdef _WIN32
 
 LRESULT CALLBACK ProcessDialogProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
@@ -1419,13 +799,353 @@ bool ShowProcessDialog(HWND parent, AppOptions& options)
   return data.dialogResult;
 }
 
-#elif defined(__linux__)
+#endif
+
+
+#ifdef __linux__
+
+bool IsProcessRecentlyAccessed(int pid, time_t* outTime)
+{
+  char statPath[256];
+  snprintf(statPath, sizeof(statPath), "/proc/%d/stat", pid);
+
+  FILE* f = fopen(statPath, "r");
+  if (!f)
+    return false;
+
+  unsigned long long starttime;
+  char comm[256];
+  char state;
+  int ppid;
+
+  if (fscanf(f, "%*d %s %c %d %*d %*d %*d %*d %*u %*u %*u %*u %*u %*u %*u %*d %*d %*d %*d %*d %*d %llu",
+    comm, &state, &ppid, &starttime) < 4)
+  {
+    fclose(f);
+    return false;
+  }
+
+  fclose(f);
+
+  time_t procStartTime = starttime / sysconf(_SC_CLK_TCK);
+
+  if (outTime)
+    *outTime = procStartTime;
+
+  return true;
+}
+
+bool ProcessHasVisibleWindow(int pid)
+{
+  Display* display = XOpenDisplay(NULL);
+  if (!display)
+    return false;
+
+  Window root = DefaultRootWindow(display);
+  Atom clientListAtom = XInternAtom(display, "_NET_CLIENT_LIST", False);
+  Atom pidAtom = XInternAtom(display, "_NET_WM_PID", False);
+
+  Atom actualType;
+  int format;
+  unsigned long numItems, bytesAfter;
+  unsigned char* data = NULL;
+
+  if (XGetWindowProperty(display, root, clientListAtom, 0, ~0L, False,
+    XA_WINDOW, &actualType, &format, &numItems,
+    &bytesAfter, &data) != Success)
+  {
+    XCloseDisplay(display);
+    return false;
+  }
+
+  Window* windowList = (Window*)data;
+  bool hasWindow = false;
+
+  for (unsigned long i = 0; i < numItems; i++)
+  {
+    unsigned char* pidData = NULL;
+    unsigned long pidItems;
+
+    if (XGetWindowProperty(display, windowList[i], pidAtom, 0, 1, False,
+      XA_CARDINAL, &actualType, &format, &pidItems,
+      &bytesAfter, &pidData) == Success)
+    {
+      if (pidItems > 0)
+      {
+        int windowPid = *(int*)pidData;
+        if (windowPid == pid)
+        {
+          XWindowAttributes attrs;
+          if (XGetWindowAttributes(display, windowList[i], &attrs))
+          {
+            if (attrs.map_state == IsViewable)
+            {
+              hasWindow = true;
+              XFree(pidData);
+              break;
+            }
+          }
+        }
+      }
+      XFree(pidData);
+    }
+  }
+
+  XFree(data);
+  XCloseDisplay(display);
+
+  return hasWindow;
+}
+
+int CompareProcessPriority(const void* a, const void* b)
+{
+  const ProcessPriority* pa = (const ProcessPriority*)a;
+  const ProcessPriority* pb = (const ProcessPriority*)b;
+
+  if (pa->priority != pb->priority)
+    return pb->priority - pa->priority;
+
+  if (pa->priority >= 2)
+  {
+    if (pa->timestamp > pb->timestamp)
+      return -1;
+    else if (pa->timestamp < pb->timestamp)
+      return 1;
+  }
+
+  return 0;
+}
+
+bool EnumerateProcesses(ProcessList* list)
+{
+
+  if (!list || !list->entries)
+  {
+    return false;
+  }
+
+  DIR* procDir = opendir("/proc");
+  if (!procDir)
+  {
+    return false;
+  }
+
+  ProcessEntry* tempEntries = (ProcessEntry*)PlatformAlloc(sizeof(ProcessEntry) * 512);
+  ProcessPriority* priorities = (ProcessPriority*)PlatformAlloc(sizeof(ProcessPriority) * 512);
+
+  if (!tempEntries || !priorities)
+  {
+
+    if (tempEntries) PlatformFree(tempEntries, sizeof(ProcessEntry) * 512);
+    if (priorities) PlatformFree(priorities, sizeof(ProcessPriority) * 512);
+    closedir(procDir);
+    return false;
+  }
+
+
+  int tempCount = 0;
+  time_t currentTime = time(NULL);
+  struct dirent* entry;
+
+  while ((entry = readdir(procDir)) != NULL && tempCount < 512)
+  {
+    int pid = atoi(entry->d_name);
+    if (pid <= 0)
+      continue;
+
+
+    char cmdlinePath[256];
+    snprintf(cmdlinePath, sizeof(cmdlinePath), "/proc/%d/cmdline", pid);
+
+    FILE* cmdFile = fopen(cmdlinePath, "r");
+    if (!cmdFile)
+    {
+      continue;
+    }
+
+    char cmdline[260];
+    size_t len = fread(cmdline, 1, sizeof(cmdline) - 1, cmdFile);
+    fclose(cmdFile);
+    cmdline[len] = '\0';
+
+    if (len == 0)
+    {
+      continue;
+    }
+
+    ProcessEntry* e = &tempEntries[tempCount];
+    e->pid = pid;
+
+    const char* procName = cmdline;
+    const char* lastSlash = NULL;
+    for (size_t i = 0; i < len && cmdline[i]; i++)
+    {
+      if (cmdline[i] == '/')
+        lastSlash = &cmdline[i];
+    }
+    if (lastSlash)
+      procName = lastSlash + 1;
+
+    int i = 0;
+    while (i < 259 && procName[i] != 0)
+    {
+      e->name[i] = procName[i];
+      i++;
+    }
+    e->name[i] = 0;
+
+    char exePath[256];
+    char exeLink[512];
+    snprintf(exePath, sizeof(exePath), "/proc/%d/exe", pid);
+    ssize_t linkLen = readlink(exePath, exeLink, sizeof(exeLink) - 1);
+
+    e->is64bit = false;
+    if (linkLen > 0)
+    {
+      exeLink[linkLen] = '\0';
+
+      FILE* exeFile = fopen(exeLink, "rb");
+      if (exeFile)
+      {
+        unsigned char elfHeader[5];
+        if (fread(elfHeader, 1, 5, exeFile) == 5)
+        {
+          if (elfHeader[0] == 0x7F && elfHeader[1] == 'E' &&
+            elfHeader[2] == 'L' && elfHeader[3] == 'F')
+          {
+            e->is64bit = (elfHeader[4] == 2);
+          }
+        }
+        fclose(exeFile);
+      }
+    }
+
+    priorities[tempCount].index = tempCount;
+    priorities[tempCount].priority = 1;
+
+    time_t processTime;
+    if (IsProcessRecentlyAccessed(pid, &processTime))
+    {
+      priorities[tempCount].timestamp = (uint64_t)processTime;
+
+      if ((currentTime - processTime) < 3600)
+        priorities[tempCount].priority = 3;
+    }
+
+    tempCount++;
+  }
+
+  closedir(procDir);
+
+
+  qsort(priorities, tempCount, sizeof(ProcessPriority), CompareProcessPriority);
+
+  list->count = 0;
+  for (int i = 0; i < tempCount && i < (int)list->capacity; i++)
+  {
+    int sourceIndex = priorities[i].index;
+    list->entries[list->count] = tempEntries[sourceIndex];
+    list->count++;
+  }
+
+
+  PlatformFree(tempEntries, sizeof(ProcessEntry) * 512);
+  PlatformFree(priorities, sizeof(ProcessPriority) * 512);
+
+
+  return true;
+}
+
+bool ReadProcessMemoryData(int pid, HexData* hexData)
+{
+  if (!hexData)
+    return false;
+
+  hexData->clear();
+
+  char mapsPath[256];
+  snprintf(mapsPath, sizeof(mapsPath), "/proc/%d/maps", pid);
+
+  FILE* mapsFile = fopen(mapsPath, "r");
+  if (!mapsFile)
+  {
+    return false;
+  }
+
+  ByteBuffer tempBuffer;
+  bb_init(&tempBuffer);
+
+  char line[512];
+  while (fgets(line, sizeof(line), mapsFile))
+  {
+    unsigned long long startAddr, endAddr;
+    char perms[5];
+
+    if (sscanf(line, "%llx-%llx %4s", &startAddr, &endAddr, perms) != 3)
+      continue;
+
+    if (perms[0] != 'r')
+      continue;
+
+    size_t regionSize = (size_t)(endAddr - startAddr);
+
+    if (regionSize > 100 * 1024 * 1024)
+      continue;
+
+    size_t oldSize = tempBuffer.size;
+    size_t newSize = oldSize + regionSize;
+
+    if (!bb_resize(&tempBuffer, newSize))
+    {
+      continue;
+    }
+
+    struct iovec local[1];
+    struct iovec remote[1];
+
+    local[0].iov_base = tempBuffer.data + oldSize;
+    local[0].iov_len = regionSize;
+    remote[0].iov_base = (void*)startAddr;
+    remote[0].iov_len = regionSize;
+
+    ssize_t nread = process_vm_readv(pid, local, 1, remote, 1, 0);
+
+    if (nread > 0)
+    {
+      bb_resize(&tempBuffer, oldSize + (size_t)nread);
+    }
+    else
+    {
+      bb_resize(&tempBuffer, oldSize);
+    }
+  }
+
+  fclose(mapsFile);
+
+  if (tempBuffer.size > 0)
+  {
+    bb_resize(&hexData->fileData, tempBuffer.size);
+    for (size_t i = 0; i < tempBuffer.size; i++)
+    {
+      hexData->fileData.data[i] = tempBuffer.data[i];
+    }
+    hexData->convertDataToHex(16);
+    bb_free(&tempBuffer);
+    return true;
+  }
+
+  bb_free(&tempBuffer);
+  return false;
+}
+
 bool ShowProcessDialog(NativeWindow parent, AppOptions& options)
 {
   extern Display* g_display;
 
   if (!g_display)
+  {
     return false;
+  }
 
   ProcessDialogData data = {};
   data.darkMode = options.darkMode;
@@ -1466,11 +1186,17 @@ bool ShowProcessDialog(NativeWindow parent, AppOptions& options)
   int width = 500;
   int height = 600;
 
-  Window parentWindow = (Window)(uintptr_t)parent;
+  Window parentWindow = (Window)parent;
   int screen = DefaultScreen(g_display);
 
   XWindowAttributes parentAttrs;
-  XGetWindowAttributes(g_display, parentWindow, &parentAttrs);
+  if (!XGetWindowAttributes(g_display, parentWindow, &parentAttrs))
+  {
+    parentAttrs.x = 100;
+    parentAttrs.y = 100;
+    parentAttrs.width = 800;
+    parentAttrs.height = 600;
+  }
 
   int x = parentAttrs.x + (parentAttrs.width - width) / 2;
   int y = parentAttrs.y + (parentAttrs.height - height) / 2;
@@ -1492,20 +1218,54 @@ bool ShowProcessDialog(NativeWindow parent, AppOptions& options)
     CWBackPixel | CWEventMask | CWOverrideRedirect,
     &attrs);
 
+  if (!dialog)
+  {
+    PlatformFree(data.processes.entries, sizeof(ProcessEntry) * 512);
+    g_processDialogData = nullptr;
+    return false;
+  }
+
   XStoreName(g_display, dialog, "Select Process");
+
+  XSizeHints* sizeHints = XAllocSizeHints();
+  if (sizeHints)
+  {
+    sizeHints->flags = PMinSize | PMaxSize;
+    sizeHints->min_width = width;
+    sizeHints->min_height = height;
+    sizeHints->max_width = width;
+    sizeHints->max_height = height;
+    XSetWMNormalHints(g_display, dialog, sizeHints);
+    XFree(sizeHints);
+  }
 
   XSetTransientForHint(g_display, dialog, parentWindow);
 
   Atom wmDelete = XInternAtom(g_display, "WM_DELETE_WINDOW", False);
   XSetWMProtocols(g_display, dialog, &wmDelete, 1);
 
-  data.window = (void*)(uintptr_t)dialog;
+  data.window = (NativeWindow)dialog;
+
+  XMapWindow(g_display, dialog);
+  XRaiseWindow(g_display, dialog);
+  XSync(g_display, False);
+
+  XEvent mapEvent;
+  while (true)
+  {
+    XNextEvent(g_display, &mapEvent);
+    if (mapEvent.type == MapNotify && mapEvent.xmap.window == dialog)
+    {
+      break;
+    }
+  }
 
   data.renderer = new RenderManager();
-  if (!data.renderer || !data.renderer->initialize((NativeWindow)(uintptr_t)dialog))
+  if (!data.renderer || !data.renderer->initialize((NativeWindow)dialog))
   {
     if (data.renderer)
       delete data.renderer;
+
     XDestroyWindow(g_display, dialog);
     PlatformFree(data.processes.entries, sizeof(ProcessEntry) * 512);
     g_processDialogData = nullptr;
@@ -1514,18 +1274,103 @@ bool ShowProcessDialog(NativeWindow parent, AppOptions& options)
 
   data.renderer->resize(width, height);
 
-  XMapWindow(g_display, dialog);
+  XSetInputFocus(g_display, dialog, RevertToParent, CurrentTime);
+
+  data.renderer->beginFrame();
+  RenderProcessDialog(&data, width, height);
+  GC gc = XCreateGC(g_display, dialog, 0, nullptr);
+  data.renderer->endFrame(gc);
+  XFreeGC(g_display, gc);
+
   XFlush(g_display);
 
   XEvent event;
+  bool needsRedraw = false;
+
   while (data.running)
   {
-    XNextEvent(g_display, &event);
-
-    switch (event.type)
+    if (XCheckWindowEvent(g_display, dialog,
+      ExposureMask | KeyPressMask | ButtonPressMask |
+      ButtonReleaseMask | PointerMotionMask | StructureNotifyMask,
+      &event) ||
+      XCheckTypedWindowEvent(g_display, dialog, ClientMessage, &event))
     {
-    case Expose:
-      if (event.xexpose.count == 0)
+      needsRedraw = false;
+
+      switch (event.type)
+      {
+      case Expose:
+        if (event.xexpose.count == 0)
+        {
+          needsRedraw = true;
+        }
+        break;
+
+      case MotionNotify:
+        UpdateProcessDialogHover(&data, event.xmotion.x, event.xmotion.y, width, height);
+        needsRedraw = true;
+        break;
+
+      case ButtonPress:
+        if (event.xbutton.button == Button1)
+        {
+          data.pressedWidget = data.hoveredWidget;
+          needsRedraw = true;
+        }
+        else if (event.xbutton.button == Button4)
+        {
+          int maxVisibleRows = (height - 118) / 32;
+          int maxScroll = data.processes.count - maxVisibleRows;
+          if (maxScroll < 0) maxScroll = 0;
+
+          data.scrollOffset -= 3;
+          if (data.scrollOffset < 0) data.scrollOffset = 0;
+          needsRedraw = true;
+        }
+        else if (event.xbutton.button == Button5)
+        {
+          int maxVisibleRows = (height - 118) / 32;
+          int maxScroll = data.processes.count - maxVisibleRows;
+          if (maxScroll < 0) maxScroll = 0;
+
+          data.scrollOffset += 3;
+          if (data.scrollOffset > maxScroll) data.scrollOffset = maxScroll;
+          needsRedraw = true;
+        }
+        break;
+
+      case ButtonRelease:
+        if (event.xbutton.button == Button1)
+        {
+          if (data.pressedWidget == data.hoveredWidget || data.hoveredIndex >= 0)
+            HandleProcessDialogClick(&data);
+
+          data.pressedWidget = -1;
+          needsRedraw = true;
+        }
+        break;
+
+      case ClientMessage:
+        if ((Atom)event.xclient.data.l[0] == wmDelete)
+        {
+          data.dialogResult = false;
+          data.running = false;
+        }
+        break;
+
+      case KeyPress:
+      {
+        KeySym key = XLookupKeysym(&event.xkey, 0);
+        if (key == XK_Escape)
+        {
+          data.dialogResult = false;
+          data.running = false;
+        }
+      }
+      break;
+      }
+
+      if (needsRedraw)
       {
         data.renderer->beginFrame();
         RenderProcessDialog(&data, width, height);
@@ -1533,65 +1378,17 @@ bool ShowProcessDialog(NativeWindow parent, AppOptions& options)
         data.renderer->endFrame(gc);
         XFreeGC(g_display, gc);
       }
-      break;
-
-    case MotionNotify:
-      UpdateProcessDialogHover(&data, event.xmotion.x, event.xmotion.y, width, height);
-      XClearArea(g_display, dialog, 0, 0, 0, 0, True);
-      break;
-
-    case ButtonPress:
-      if (event.xbutton.button == Button1)
-      {
-        data.pressedWidget = data.hoveredWidget;
-        XClearArea(g_display, dialog, 0, 0, 0, 0, True);
-      }
-      else if (event.xbutton.button == Button4)
-      {
-        int maxVisibleRows = (height - 118) / 32;
-        int maxScroll = data.processes.count - maxVisibleRows;
-        if (maxScroll < 0) maxScroll = 0;
-
-        data.scrollOffset -= 3;
-        if (data.scrollOffset < 0) data.scrollOffset = 0;
-        XClearArea(g_display, dialog, 0, 0, 0, 0, True);
-      }
-      else if (event.xbutton.button == Button5)
-      {
-        int maxVisibleRows = (height - 118) / 32;
-        int maxScroll = data.processes.count - maxVisibleRows;
-        if (maxScroll < 0) maxScroll = 0;
-
-        data.scrollOffset += 3;
-        if (data.scrollOffset > maxScroll) data.scrollOffset = maxScroll;
-        XClearArea(g_display, dialog, 0, 0, 0, 0, True);
-      }
-      break;
-
-    case ButtonRelease:
-      if (event.xbutton.button == Button1)
-      {
-        if (data.pressedWidget == data.hoveredWidget || data.hoveredIndex >= 0)
-        {
-          HandleProcessDialogClick(&data);
-        }
-        data.pressedWidget = -1;
-        XClearArea(g_display, dialog, 0, 0, 0, 0, True);
-      }
-      break;
-
-    case ClientMessage:
-      if ((Atom)event.xclient.data.l[0] == wmDelete)
-      {
-        data.dialogResult = false;
-        data.running = false;
-      }
-      break;
+    }
+    else
+    {
+      usleep(10000);
     }
   }
 
   int selectedPid = -1;
-  if (data.dialogResult && data.selectedIndex >= 0 && data.selectedIndex < data.processes.count)
+  if (data.dialogResult &&
+    data.selectedIndex >= 0 &&
+    data.selectedIndex < data.processes.count)
   {
     selectedPid = data.processes.entries[data.selectedIndex].pid;
   }
@@ -1603,6 +1400,8 @@ bool ShowProcessDialog(NativeWindow parent, AppOptions& options)
   }
 
   XDestroyWindow(g_display, dialog);
+  XFlush(g_display);
+
   PlatformFree(data.processes.entries, sizeof(ProcessEntry) * 512);
   g_processDialogData = nullptr;
 
@@ -1629,14 +1428,297 @@ bool ShowProcessDialog(NativeWindow parent, AppOptions& options)
     }
     else
     {
-      printf("Failed to read process memory. Make sure you have sufficient privileges.\n");
+      printf("[ShowProcessDialog] ERROR: Failed to read process memory\n"); fflush(stdout);
     }
   }
 
   return data.dialogResult;
 }
 
-#elif defined(__APPLE__)
+#endif
+
+
+#ifdef __APPLE__
+
+bool IsProcessRecentlyAccessed(int pid, time_t* outTime)
+{
+  struct proc_bsdinfo procInfo;
+  int ret = proc_pidinfo(pid, PROC_PIDTBSDINFO, 0, &procInfo, sizeof(procInfo));
+
+  if (ret <= 0)
+    return false;
+
+  if (outTime)
+    *outTime = procInfo.pbi_start_tvsec;
+
+  return true;
+}
+
+bool ProcessHasVisibleWindow(int pid)
+{
+  CFArrayRef windowList = CGWindowListCopyWindowInfo(
+    kCGWindowListOptionOnScreenOnly | kCGWindowListExcludeDesktopElements,
+    kCGNullWindowID);
+
+  if (!windowList)
+    return false;
+
+  bool hasWindow = false;
+  CFIndex count = CFArrayGetCount(windowList);
+
+  for (CFIndex i = 0; i < count; i++)
+  {
+    CFDictionaryRef windowInfo = (CFDictionaryRef)CFArrayGetValueAtIndex(windowList, i);
+
+    CFNumberRef pidNum = (CFNumberRef)CFDictionaryGetValue(windowInfo, kCGWindowOwnerPID);
+    if (!pidNum)
+      continue;
+
+    int windowPid;
+    CFNumberGetValue(pidNum, kCFNumberIntType, &windowPid);
+
+    if (windowPid == pid)
+    {
+      CFStringRef windowName = (CFStringRef)CFDictionaryGetValue(windowInfo, kCGWindowName);
+      if (windowName && CFStringGetLength(windowName) > 0)
+      {
+        hasWindow = true;
+        break;
+      }
+    }
+  }
+
+  CFRelease(windowList);
+  return hasWindow;
+}
+
+int CompareProcessPriority(const void* a, const void* b)
+{
+  const ProcessPriority* pa = (const ProcessPriority*)a;
+  const ProcessPriority* pb = (const ProcessPriority*)b;
+
+  if (pa->priority != pb->priority)
+    return pb->priority - pa->priority;
+
+  if (pa->priority >= 2)
+  {
+    if (pa->timestamp > pb->timestamp)
+      return -1;
+    else if (pa->timestamp < pb->timestamp)
+      return 1;
+  }
+
+  return 0;
+}
+
+bool EnumerateProcesses(ProcessList* list)
+{
+  if (!list || !list->entries)
+    return false;
+
+  int mib[4] = { CTL_KERN, KERN_PROC, KERN_PROC_ALL, 0 };
+  size_t size;
+
+  if (sysctl(mib, 4, NULL, &size, NULL, 0) < 0)
+    return false;
+
+  struct kinfo_proc* procList = (struct kinfo_proc*)malloc(size);
+  if (!procList)
+    return false;
+
+  if (sysctl(mib, 4, procList, &size, NULL, 0) < 0)
+  {
+    free(procList);
+    return false;
+  }
+
+  int procCount = (int)(size / sizeof(struct kinfo_proc));
+
+  ProcessEntry* tempEntries = (ProcessEntry*)PlatformAlloc(sizeof(ProcessEntry) * 512);
+  ProcessPriority* priorities = (ProcessPriority*)PlatformAlloc(sizeof(ProcessPriority) * 512);
+  int tempCount = 0;
+
+  time_t currentTime = time(NULL);
+
+  for (int i = 0; i < procCount && tempCount < 512; i++)
+  {
+    int pid = procList[i].kp_proc.p_pid;
+    if (pid <= 0)
+      continue;
+
+    ProcessEntry* e = &tempEntries[tempCount];
+    e->pid = pid;
+
+    char pathbuf[PROC_PIDPATHINFO_MAXSIZE];
+    if (proc_pidpath(pid, pathbuf, sizeof(pathbuf)) <= 0)
+    {
+      int j = 0;
+      while (j < 259 && procList[i].kp_proc.p_comm[j] != 0)
+      {
+        e->name[j] = procList[i].kp_proc.p_comm[j];
+        j++;
+      }
+      e->name[j] = 0;
+    }
+    else
+    {
+      const char* name = pathbuf;
+      for (int j = 0; pathbuf[j]; j++)
+      {
+        if (pathbuf[j] == '/')
+          name = &pathbuf[j + 1];
+      }
+
+      int j = 0;
+      while (j < 259 && name[j] != 0)
+      {
+        e->name[j] = name[j];
+        j++;
+      }
+      e->name[j] = 0;
+    }
+
+    if (e->name[0] == 0)
+      continue;
+
+    cpu_type_t cpuType;
+    size_t cpuTypeSize = sizeof(cpuType);
+    int mib2[4] = { CTL_KERN, KERN_PROC, KERN_PROC_PID, pid };
+
+    e->is64bit = false;
+    if (sysctl(mib2, 4, NULL, &size, NULL, 0) == 0)
+    {
+      struct kinfo_proc kp;
+      size = sizeof(kp);
+      if (sysctl(mib2, 4, &kp, &size, NULL, 0) == 0)
+      {
+        e->is64bit = (kp.kp_proc.p_flag & P_LP64) != 0;
+      }
+    }
+
+    priorities[tempCount].index = tempCount;
+    priorities[tempCount].priority = 1;
+
+    time_t processTime;
+    if (IsProcessRecentlyAccessed(pid, &processTime))
+    {
+      priorities[tempCount].timestamp = (uint64_t)processTime;
+
+      if ((currentTime - processTime) < 3600)
+      {
+        priorities[tempCount].priority = 3;
+      }
+    }
+
+    if (ProcessHasVisibleWindow(pid))
+    {
+      if (priorities[tempCount].priority < 2)
+        priorities[tempCount].priority = 2;
+    }
+
+    tempCount++;
+  }
+
+  free(procList);
+
+  qsort(priorities, tempCount, sizeof(ProcessPriority), CompareProcessPriority);
+
+  list->count = 0;
+  for (int i = 0; i < tempCount && i < (int)list->capacity; i++)
+  {
+    int sourceIndex = priorities[i].index;
+    list->entries[list->count] = tempEntries[sourceIndex];
+    list->count++;
+  }
+
+  PlatformFree(tempEntries, sizeof(ProcessEntry) * 512);
+  PlatformFree(priorities, sizeof(ProcessPriority) * 512);
+
+  return true;
+}
+
+bool ReadProcessMemoryData(int pid, HexData* hexData)
+{
+  if (!hexData)
+    return false;
+
+  hexData->clear();
+
+  mach_port_t task;
+  kern_return_t kr = task_for_pid(mach_task_self(), pid, &task);
+
+  if (kr != KERN_SUCCESS)
+  {
+    return false;
+  }
+
+  ByteBuffer tempBuffer;
+  bb_init(&tempBuffer);
+
+  mach_vm_address_t address = 0;
+  mach_vm_size_t size = 0;
+  vm_region_basic_info_data_64_t info;
+  mach_msg_type_number_t count = VM_REGION_BASIC_INFO_COUNT_64;
+  mach_port_t object_name;
+
+  while (true)
+  {
+    kr = mach_vm_region(task, &address, &size, VM_REGION_BASIC_INFO_64,
+      (vm_region_info_t)&info, &count, &object_name);
+
+    if (kr != KERN_SUCCESS)
+      break;
+
+    if (info.protection & VM_PROT_READ)
+    {
+      if (size > 100 * 1024 * 1024)
+      {
+        address += size;
+        continue;
+      }
+
+      size_t oldSize = tempBuffer.size;
+      size_t newSize = oldSize + (size_t)size;
+
+      if (bb_resize(&tempBuffer, newSize))
+      {
+        mach_vm_size_t bytesRead = 0;
+        kr = mach_vm_read_overwrite(task, address, size,
+          (mach_vm_address_t)(tempBuffer.data + oldSize),
+          &bytesRead);
+
+        if (kr == KERN_SUCCESS && bytesRead > 0)
+        {
+          bb_resize(&tempBuffer, oldSize + (size_t)bytesRead);
+        }
+        else
+        {
+          bb_resize(&tempBuffer, oldSize);
+        }
+      }
+    }
+
+    address += size;
+  }
+
+  mach_port_deallocate(mach_task_self(), task);
+
+  if (tempBuffer.size > 0)
+  {
+    bb_resize(&hexData->fileData, tempBuffer.size);
+    for (size_t i = 0; i < tempBuffer.size; i++)
+    {
+      hexData->fileData.data[i] = tempBuffer.data[i];
+    }
+    hexData->convertDataToHex(16);
+    bb_free(&tempBuffer);
+    return true;
+  }
+
+  bb_free(&tempBuffer);
+  return false;
+}
+
 bool ShowProcessDialog(NativeWindow parent, AppOptions& options)
 {
   @autoreleasepool

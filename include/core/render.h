@@ -527,9 +527,11 @@ typedef Window NativeWindow;
 
 class RenderManager
 {
+
 public:
   int getHexAreaX() const { return _hexAreaX; }
   int getHexAreaY() const { return _hexAreaY; }
+
   RenderManager();
   ~RenderManager();
 
@@ -540,19 +542,19 @@ public:
 
   void beginFrame();
   void endFrame(NativeDrawContext ctx);
-  void clear(const Color &color);
-  void drawRect(const Rect &rect, const Color &color, bool filled = true);
-  void drawLine(int x1, int y1, int x2, int y2, const Color &color);
-  void drawText(const char *text, int x, int y, const Color &color);
-  void drawRoundedRect(const Rect &rect, float radius, const Color &color, bool filled);
-  void drawModernButton(const WidgetState &state, const Theme &theme, const char *label);
-  void drawModernCheckbox(const WidgetState &state, const Theme &theme, bool checked);
-  void drawModernRadioButton(const WidgetState &state, const Theme &theme, bool selected);
+  void clear(const Color& color);
+  void drawRect(const Rect& rect, const Color& color, bool filled = true);
+  void drawLine(int x1, int y1, int x2, int y2, const Color& color);
+  void drawText(const char* text, int x, int y, const Color& color);
+  void drawRoundedRect(const Rect& rect, float radius, const Color& color, bool filled);
+  void drawModernButton(const WidgetState& state, const Theme& theme, const char* label);
+  void drawModernCheckbox(const WidgetState& state, const Theme& theme, bool checked);
+  void drawModernRadioButton(const WidgetState& state, const Theme& theme, bool selected);
   Point GetGridBytePoint(long long byteIndex);
   PointF GetBytePointF(long long byteIndex);
   PointF GetBytePointF(Point gridPoint);
   BytePositionInfo GetHexBytePositionInfo(Point screenPoint);
-  void drawProgressBar(const Rect &rect, float progress, const Theme &theme);
+  void drawProgressBar(const Rect& rect, float progress, const Theme& theme);
   void UpdateCaret();
   void DrawCaret();
   long long ScreenToByteIndex(int mouseX, int mouseY);
@@ -567,7 +569,6 @@ public:
   void drawBookmarksContent(int contentX, int& contentY, int panelWidth, const Theme& theme);
   void drawDataInspectorContent(int contentX, int& contentY, int panelWidth, const DataInspectorValues& vals, const Theme& theme);
   void drawFileInfoContent(int contentX, int& contentY, int panelWidth, const FileInfoValues& info, const Theme& theme);
-
 
   CaretInfo GetCaretPosition();
 
@@ -593,20 +594,28 @@ public:
   void drawLeftPanel(const LeftPanelState& state, const Theme& theme, int windowHeight, const Rect& panelBounds);
   void drawBottomPanel(const BottomPanelState& state, const Theme& theme, const ChecksumResults& checksums, int windowWidth, int windowHeight, const Rect& panelBounds);
 
-  bool isLeftPanelResizeHandle(int mouseX, int mouseY, const LeftPanelState &state);
-  bool isBottomPanelResizeHandle(int mouseX, int mouseY, const BottomPanelState &state, int leftPanelWidth);
+  bool isLeftPanelResizeHandle(int mouseX, int mouseY, const LeftPanelState& state);
+  bool isBottomPanelResizeHandle(int mouseX, int mouseY, const BottomPanelState& state, int leftPanelWidth);
 
   int getContextMenuHoveredItem(int mouseX, int mouseY, const ContextMenuState& state);
   void drawContextMenu(const ContextMenuState& state, const Theme& theme);
   bool isPointInContextMenu(int mouseX, int mouseY, const ContextMenuState& state);
 
-  int getSectionHeaderY(const LeftPanelState &state, int sectionIndex, int menuBarHeight);
-  int getItemY(const LeftPanelState &state, int sectionIndex, int itemIndex, int menuBarHeight);
+  int getSectionHeaderY(const LeftPanelState& state, int sectionIndex, int menuBarHeight);
+  int getItemY(const LeftPanelState& state, int sectionIndex, int itemIndex, int menuBarHeight);
+
+  bool isPointInDisasmResizeHandle(int mouseX, int mouseY, int menuBarHeight);
+  void startDisasmResize(int mouseX);
+  void updateDisasmResize(int mouseX);
+  void endDisasmResize();
+  int getDisasmColumnWidth() const { return _disasmColumnWidth; }
+  void setDisasmColumnWidth(int width) { _disasmColumnWidth = width; }
+  bool isResizingDisasmColumn() const { return _resizingDisasmColumn; }
 
 #ifdef _WIN32
-  void drawBitmap(void *hBitmap, int width, int height, int x, int y);
+  void drawBitmap(void* hBitmap, int width, int height, int x, int y);
 #elif __APPLE__
-  void drawImage(void *nsImage, int width, int height, int x, int y);
+  void drawImage(void* nsImage, int width, int height, int x, int y);
 #else
   void drawX11Pixmap(Pixmap pixmap, int width, int height, int x, int y);
 #endif
@@ -638,22 +647,27 @@ private:
   int _charWidth;
   int _charHeight;
 
+  int _disasmColumnWidth;
+  bool _resizingDisasmColumn;
+  int _resizeStartX;
+  int _resizeStartWidth;
+
 #ifdef _WIN32
   HDC hdc;
   HDC memDC;
   HBITMAP memBitmap;
   HBITMAP oldBitmap;
   HFONT font;
-  void *pixels;
+  void* pixels;
   BITMAPINFO bitmapInfo;
 #elif __APPLE__
   CGContextRef context;
-  void *backBuffer;
+  void* backBuffer;
 #else
-  Display *display;
+  Display* display;
   GC gc;
   Pixmap backBuffer;
-  XFontStruct *fontInfo;
+  XFontStruct* fontInfo;
 #endif
-  void setColor(const Color &color);
+  void setColor(const Color& color);
 };

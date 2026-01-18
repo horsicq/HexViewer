@@ -10,6 +10,7 @@ typedef HWND NativeWindow;
 typedef void* NativeWindow;
 #elif defined(__linux__)
 #include <X11/Xlib.h>
+#include <string>
 typedef Window NativeWindow;
 #endif
 

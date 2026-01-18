@@ -29,6 +29,7 @@ const int PANEL_TITLE_HEIGHT = 28;
 
 RenderManager::RenderManager()
     : window(NATIVE_WINDOW_NULL),
+  _disasmColumnWidth(300),
       windowWidth(0), windowHeight(0)
 #ifdef _WIN32
       ,
@@ -2678,6 +2679,41 @@ void RenderManager::drawByteStatsContent(
   contentY += histHeight + 5;
 }
 
+bool RenderManager::isPointInDisasmResizeHandle(int mouseX, int mouseY, int menuBarHeight)
+{
+  int separatorX = windowWidth - 16 - _disasmColumnWidth;
+  int handleWidth = 6;
+
+  return mouseX >= separatorX - handleWidth / 2 &&
+    mouseX <= separatorX + handleWidth / 2 &&
+    mouseY >= menuBarHeight;
+}
+
+void RenderManager::startDisasmResize(int mouseX)
+{
+  _resizingDisasmColumn = true;
+  _resizeStartX = mouseX;
+  _resizeStartWidth = _disasmColumnWidth;
+}
+
+void RenderManager::updateDisasmResize(int mouseX)
+{
+  if (!_resizingDisasmColumn)
+    return;
+
+  int delta = _resizeStartX - mouseX;
+  int newWidth = _resizeStartWidth + delta;
+
+  const int MIN_WIDTH = 150;
+  const int MAX_WIDTH = 600;
+  _disasmColumnWidth = Clamp(newWidth, MIN_WIDTH, MAX_WIDTH);
+}
+
+void RenderManager::endDisasmResize()
+{
+  _resizingDisasmColumn = false;
+}
+
 void RenderManager::renderHexViewer(
   const Vector<char*>& hexLines,
   const char* headerLine,
@@ -2759,8 +2795,6 @@ void RenderManager::renderHexViewer(
     workingHeight - menuBarHeight);
   drawRect(contentArea, currentTheme.windowBackground, true);
 
-  int disasmColumnWidth = 300;
-
   if (headerLine && headerLine[0])
   {
     drawText(headerLine,
@@ -2768,7 +2802,7 @@ void RenderManager::renderHexViewer(
       menuBarHeight + (int)layout.margin,
       currentTheme.headerColor);
 
-    int disasmX = windowWidth - (int)layout.scrollbarWidth - disasmColumnWidth + 10;
+    int disasmX = windowWidth - (int)layout.scrollbarWidth - _disasmColumnWidth + 10;
     drawText("Disassembly",
       disasmX,
       menuBarHeight + (int)layout.margin,
@@ -2781,12 +2815,22 @@ void RenderManager::renderHexViewer(
       currentTheme.separator);
   }
 
-  int separatorX = windowWidth - (int)layout.scrollbarWidth - disasmColumnWidth;
+  int separatorX = windowWidth - (int)layout.scrollbarWidth - _disasmColumnWidth;
   drawLine(separatorX,
     menuBarHeight + (int)(layout.margin + layout.headerHeight),
     separatorX,
     workingHeight - (int)layout.margin,
     currentTheme.separator);
+
+  Rect resizeHandle(
+    separatorX - 3,
+    menuBarHeight + (int)(layout.margin + layout.headerHeight),
+    6,
+    workingHeight - menuBarHeight - (int)(layout.margin + layout.headerHeight));
+
+  Color handleColor = currentTheme.controlCheck;
+  handleColor.a = _resizingDisasmColumn ? 150 : 30;
+  drawRect(resizeHandle, handleColor, true);
 
   int contentY = _hexAreaY;
   int contentHeight = workingHeight - contentY - (int)layout.margin;

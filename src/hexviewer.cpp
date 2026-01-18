@@ -339,11 +339,11 @@ void OnNew()
 
 void OnFileProcessOpen()
 {
+	if (!g_Hwnd)
+		return;
+
 #if defined(_WIN32)
-	if (g_Hwnd)
-	{
-		ShowProcessDialog(g_Hwnd, g_Options);
-	}
+	ShowProcessDialog(g_Hwnd, g_Options);
 #else
 	ShowProcessDialog((NativeWindow)(uintptr_t)g_Hwnd, g_Options);
 #endif
@@ -982,6 +982,12 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 			return 0;
 		}
 
+		if (g_Renderer.isResizingDisasmColumn())
+		{
+			g_Renderer.updateDisasmResize(x);
+			InvalidateRect(hwnd, NULL, FALSE);
+			return 0;
+		}
 		static bool g_DebugScrollbarMsgShown = false;
 
 		g_Bookmarks.hoveredIndex = -1;
@@ -1121,9 +1127,9 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 				else
 				{
 					int leftOffset = (g_LeftPanel.visible &&
-									  g_LeftPanel.dockPosition == PanelDockPosition::Left)
-										 ? g_LeftPanel.width
-										 : 0;
+						g_LeftPanel.dockPosition == PanelDockPosition::Left)
+						? g_LeftPanel.width
+						: 0;
 					g_BottomPanel.floatingWidth = windowWidth - leftOffset;
 					g_BottomPanel.floatingHeight = g_BottomPanel.height;
 				}
@@ -1141,13 +1147,13 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 				{
 					g_BottomPanel.height = 250;
 					int leftOffset = (g_LeftPanel.visible &&
-									  g_LeftPanel.dockPosition == PanelDockPosition::Left)
-										 ? g_LeftPanel.width
-										 : 0;
+						g_LeftPanel.dockPosition == PanelDockPosition::Left)
+						? g_LeftPanel.width
+						: 0;
 					int rightOffset = (g_LeftPanel.visible &&
-									   g_LeftPanel.dockPosition == PanelDockPosition::Right)
-										  ? g_LeftPanel.width
-										  : 0;
+						g_LeftPanel.dockPosition == PanelDockPosition::Right)
+						? g_LeftPanel.width
+						: 0;
 					g_BottomPanel.width = windowWidth - leftOffset - rightOffset;
 				}
 			}
@@ -1197,13 +1203,11 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 			return 0;
 		}
 
-
-
 		if (g_Selection.dragging)
 		{
 			int leftPanelWidth = g_LeftPanel.visible ? g_LeftPanel.width : 0;
 			if (g_Renderer.IsPointInHexArea(x, y, leftPanelWidth, g_MenuBar.getHeight(),
-											windowWidth, windowHeight))
+				windowWidth, windowHeight))
 			{
 				BytePositionInfo hoverInfo = g_Renderer.GetHexBytePositionInfo(Point(x, y));
 
@@ -1229,11 +1233,13 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 			}
 			return 0;
 		}
+
+		bool overDisasmHandle = g_Renderer.isPointInDisasmResizeHandle(x, y, g_MenuBar.getHeight());
 		bool overLeftHandle = g_Renderer.isLeftPanelResizeHandle(x, y, g_LeftPanel);
 		bool overBottomHandle = g_Renderer.isBottomPanelResizeHandle(x, y, g_BottomPanel,
-																	 g_LeftPanel.visible ? g_LeftPanel.width : 0);
+			g_LeftPanel.visible ? g_LeftPanel.width : 0);
 
-		if (overLeftHandle)
+		if (overDisasmHandle || overLeftHandle)
 		{
 			SetCursor(LoadCursor(NULL, IDC_SIZEWE));
 		}
@@ -1324,6 +1330,14 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 			return 0;
 		}
 
+		if (g_Renderer.isResizingDisasmColumn())
+		{
+			g_Renderer.endDisasmResize();
+			ReleaseCapture();
+			InvalidateRect(hwnd, NULL, FALSE);
+			return 0;
+		}
+
 		return 0;
 	}
 
@@ -1393,6 +1407,14 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 
 			g_MainScrollbar.position = newPos;
 
+			InvalidateRect(hwnd, NULL, FALSE);
+			return 0;
+		}
+
+		if (g_Renderer.isPointInDisasmResizeHandle(x, y, g_MenuBar.getHeight()))
+		{
+			g_Renderer.startDisasmResize(x);
+			SetCapture(hwnd);
 			InvalidateRect(hwnd, NULL, FALSE);
 			return 0;
 		}
@@ -2279,6 +2301,10 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 		g_BottomPanel.dragging = false;
 		g_ResizingLeftPanel = false;
 		g_ResizingBottomPanel = false;
+		if (g_Renderer.isResizingDisasmColumn())
+		{
+			g_Renderer.endDisasmResize();
+		}
 		InvalidateRect(hwnd, NULL, FALSE);
 		return 0;
 	}
@@ -2372,7 +2398,7 @@ int main(int argc, char **argv)
 
 #elif defined(__linux__)
 
-Display *g_display = nullptr;
+Display* g_display = nullptr;
 Window g_window = 0;
 GC g_GC;
 Atom g_WmDeleteWindow;
@@ -2381,7 +2407,7 @@ void UpdateLinuxScrollbar()
 {
 }
 
-void HandleLinuxKeyPress(XKeyEvent *event)
+void HandleLinuxKeyPress(XKeyEvent* event)
 {
 	KeySym keysym = XLookupKeysym(event, 0);
 	bool ctrl = (event->state & ControlMask) != 0;
@@ -2655,7 +2681,7 @@ void HandleLinuxResize(int width, int height)
 	g_MenuBar.closeAllMenus();
 }
 
-void HandleLinuxMouseButton(XButtonEvent *event, bool pressed)
+void HandleLinuxMouseButton(XButtonEvent* event, bool pressed)
 {
 	int x = event->x;
 	int y = event->y;
@@ -2673,7 +2699,14 @@ void HandleLinuxMouseButton(XButtonEvent *event, bool pressed)
 			int root_x, root_y, win_x, win_y;
 			unsigned int mask;
 			XQueryPointer(g_display, g_window, &root, &root,
-						  &root_x, &root_y, &win_x, &win_y, &mask);
+				&root_x, &root_y, &win_x, &win_y, &mask);
+
+			if (g_Renderer.isPointInDisasmResizeHandle(x, y, g_MenuBar.getHeight()))
+			{
+				g_Renderer.startDisasmResize(x);
+				LinuxRedraw();
+				return;
+			}
 
 			if (g_MenuBar.handleMouseDown(x, y))
 			{
@@ -2691,13 +2724,13 @@ void HandleLinuxMouseButton(XButtonEvent *event, bool pressed)
 				int tabStartY = bottomBounds.y + 28 + 5;
 
 				bool isVertical = (g_BottomPanel.dockPosition == PanelDockPosition::Left ||
-								   g_BottomPanel.dockPosition == PanelDockPosition::Right);
+					g_BottomPanel.dockPosition == PanelDockPosition::Right);
 
 				BottomPanelState::Tab tabs[] = {
 					BottomPanelState::Tab::EntropyAnalysis,
 					BottomPanelState::Tab::PatternSearch,
 					BottomPanelState::Tab::Checksum,
-					BottomPanelState::Tab::Compare};
+					BottomPanelState::Tab::Compare };
 
 				if (isVertical)
 				{
@@ -2720,11 +2753,11 @@ void HandleLinuxMouseButton(XButtonEvent *event, bool pressed)
 				{
 					if (y >= tabStartY && y <= tabStartY + tabHeight - 5)
 					{
-						const char *tabLabels[] = {
+						const char* tabLabels[] = {
 							"Entropy Analysis",
 							"Hex Pattern Search",
 							"Checksum",
-							"Compare"};
+							"Compare" };
 
 						int tabX = bottomBounds.x + 10;
 
@@ -2772,6 +2805,25 @@ void HandleLinuxMouseButton(XButtonEvent *event, bool pressed)
 					return;
 				}
 			}
+
+			if (g_Renderer.isLeftPanelResizeHandle(x, y, g_LeftPanel))
+			{
+				g_ResizingLeftPanel = true;
+				g_LeftPanel.resizing = true;
+				g_ResizeStartX = x;
+				g_ResizeStartWidth = g_LeftPanel.width;
+				return;
+			}
+
+			if (g_Renderer.isBottomPanelResizeHandle(x, y, g_BottomPanel,
+				g_LeftPanel.visible ? g_LeftPanel.width : 0))
+			{
+				g_ResizingBottomPanel = true;
+				g_BottomPanel.resizing = true;
+				g_ResizeStartY = y;
+				g_ResizeStartHeight = g_BottomPanel.height;
+				return;
+			}
 		}
 		else if (event->button == Button4)
 		{
@@ -2792,6 +2844,13 @@ void HandleLinuxMouseButton(XButtonEvent *event, bool pressed)
 	{
 		if (event->button == Button1)
 		{
+			if (g_Renderer.isResizingDisasmColumn())
+			{
+				g_Renderer.endDisasmResize();
+				LinuxRedraw();
+				return;
+			}
+
 			if (g_LeftPanel.dragging || g_BottomPanel.dragging)
 			{
 				g_LeftPanel.dragging = false;
@@ -2819,7 +2878,7 @@ void HandleLinuxMouseButton(XButtonEvent *event, bool pressed)
 	}
 }
 
-void HandleLinuxMouseMotion(XMotionEvent *event)
+void HandleLinuxMouseMotion(XMotionEvent* event)
 {
 	int x = event->x;
 	int y = event->y;
@@ -2828,6 +2887,13 @@ void HandleLinuxMouseMotion(XMotionEvent *event)
 	XGetWindowAttributes(g_display, g_window, &attrs);
 	int windowWidth = attrs.width;
 	int windowHeight = attrs.height;
+
+	if (g_Renderer.isResizingDisasmColumn())
+	{
+		g_Renderer.updateDisasmResize(x);
+		LinuxRedraw();
+		return;
+	}
 
 	if (g_LeftPanel.dragging)
 	{
@@ -2872,6 +2938,7 @@ void HandleLinuxMouseMotion(XMotionEvent *event)
 			}
 		}
 
+		LinuxRedraw();
 		return;
 	}
 
@@ -2899,9 +2966,9 @@ void HandleLinuxMouseMotion(XMotionEvent *event)
 			else
 			{
 				int leftOffset = (g_LeftPanel.visible &&
-								  g_LeftPanel.dockPosition == PanelDockPosition::Left)
-									 ? g_LeftPanel.width
-									 : 0;
+					g_LeftPanel.dockPosition == PanelDockPosition::Left)
+					? g_LeftPanel.width
+					: 0;
 				g_BottomPanel.floatingWidth = windowWidth - leftOffset;
 				g_BottomPanel.floatingHeight = g_BottomPanel.height;
 			}
@@ -2919,17 +2986,18 @@ void HandleLinuxMouseMotion(XMotionEvent *event)
 			{
 				g_BottomPanel.height = 250;
 				int leftOffset = (g_LeftPanel.visible &&
-								  g_LeftPanel.dockPosition == PanelDockPosition::Left)
-									 ? g_LeftPanel.width
-									 : 0;
+					g_LeftPanel.dockPosition == PanelDockPosition::Left)
+					? g_LeftPanel.width
+					: 0;
 				int rightOffset = (g_LeftPanel.visible &&
-								   g_LeftPanel.dockPosition == PanelDockPosition::Right)
-									  ? g_LeftPanel.width
-									  : 0;
+					g_LeftPanel.dockPosition == PanelDockPosition::Right)
+					? g_LeftPanel.width
+					: 0;
 				g_BottomPanel.width = windowWidth - leftOffset - rightOffset;
 			}
 		}
 
+		LinuxRedraw();
 		return;
 	}
 
@@ -2948,6 +3016,7 @@ void HandleLinuxMouseMotion(XMotionEvent *event)
 					g_LeftPanel.floatingWidth = newWidth;
 				}
 			}
+			LinuxRedraw();
 		}
 		return;
 	}
@@ -2967,12 +3036,14 @@ void HandleLinuxMouseMotion(XMotionEvent *event)
 					g_BottomPanel.floatingHeight = newHeight;
 				}
 			}
+			LinuxRedraw();
 		}
 		return;
 	}
 
 	if (g_MenuBar.handleMouseMove(x, y))
 	{
+		LinuxRedraw();
 	}
 }
 
@@ -2988,8 +3059,8 @@ void LinuxRedraw()
 
 	g_Renderer.clear(
 		g_Options.darkMode
-			? Theme::Dark().windowBackground
-			: Theme::Light().windowBackground);
+		? Theme::Dark().windowBackground
+		: Theme::Light().windowBackground);
 
 	Rect leftBounds = GetLeftPanelBounds(
 		g_LeftPanel, windowWidth, windowHeight, menuBarHeight);
@@ -2998,8 +3069,8 @@ void LinuxRedraw()
 		g_BottomPanel, windowWidth, windowHeight,
 		menuBarHeight, g_LeftPanel);
 
-	Vector<char *> hexLines;
-	const LineArray &lines = g_HexData.getHexLines();
+	Vector<char*> hexLines;
+	const LineArray& lines = g_HexData.getHexLines();
 
 	if (lines.count > 0)
 	{
@@ -3010,8 +3081,8 @@ void LinuxRedraw()
 
 		for (int i = startLine; i < endLine; i++)
 		{
-			const SimpleString *line = &lines.lines[i];
-			char *buf = (char *)malloc(line->length + 1);
+			const SimpleString* line = &lines.lines[i];
+			char* buf = (char*)malloc(line->length + 1);
 
 			for (size_t j = 0; j < line->length; j++)
 				buf[j] = line->data[j];
@@ -3021,8 +3092,8 @@ void LinuxRedraw()
 		}
 	}
 
-	const SimpleString &header = g_HexData.getHeaderLine();
-	const char *headerStr = header.data ? header.data : "No File Loaded";
+	const SimpleString& header = g_HexData.getHeaderLine();
+	const char* headerStr = header.data ? header.data : "No File Loaded";
 
 	g_Renderer.renderHexViewer(
 		hexLines,
@@ -3079,7 +3150,7 @@ void LinuxRedraw()
 
 }
 
-int main(int argc, char **argv)
+int main(int argc, char** argv)
 {
 	DetectNative();
 	LoadOptionsFromFile(g_Options);
@@ -3102,7 +3173,7 @@ int main(int argc, char **argv)
 	XSetWindowAttributes attrs;
 	attrs.background_pixel = WhitePixel(g_display, screen);
 	attrs.event_mask = ExposureMask | KeyPressMask | ButtonPressMask |
-					   ButtonReleaseMask | PointerMotionMask | StructureNotifyMask;
+		ButtonReleaseMask | PointerMotionMask | StructureNotifyMask;
 
 	g_window = XCreateWindow(
 		g_display, root,
@@ -3121,8 +3192,8 @@ int main(int argc, char **argv)
 	g_GC = XCreateGC(g_display, g_window, 0, nullptr);
 
 	XMapWindow(g_display, g_window);
-
-	g_Renderer.initialize((NativeWindow)(uintptr_t)g_window);
+	g_Hwnd = (void*)(uintptr_t)g_window;
+	g_Renderer.initialize((NativeWindow)g_window);
 
 	g_LeftPanel.visible = true;
 	g_LeftPanel.width = 280;
@@ -3131,12 +3202,12 @@ int main(int argc, char **argv)
 	g_Renderer.resize(800, 600);
 	g_MenuBar.setPosition(0, 0);
 
-	g_MenuBar.addMenu(MenuHelper::createFileMenu(OnNew, OnFileOpen, OnFileSave, OnFileExit, RecentCallbacks));
+	g_MenuBar.addMenu(MenuHelper::createFileMenu(OnNew, OnFileOpen, OnFileSave, OnFileExit, OnFileProcessOpen, RecentCallbacks));
 	g_MenuBar.addMenu(MenuHelper::createSearchMenu(OnFindReplace, OnGoTo));
 	g_MenuBar.addMenu(MenuHelper::createToolsMenu(OnOptionsDialog, OnPluginsDialog));
 	g_MenuBar.addMenu(MenuHelper::createHelpMenu(OnAbout, OnDocumentation));
 
-	char *filename = GetFileNameFromCmdLine();
+	char* filename = GetFileNameFromCmdLine();
 	if (filename)
 	{
 		if (g_HexData.loadFile(filename))

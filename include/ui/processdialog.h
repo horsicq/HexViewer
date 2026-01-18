@@ -3,11 +3,19 @@
 #include "global.h"
 #include "options.h"
 
+#ifdef _WIN32
+struct EnumData
+{
+  DWORD pid;
+  bool hasWindow;
+};
+#endif
+
 struct ProcessPriority
 {
   int index;
   int priority;
-  FILETIME lastAccessTime;
+  uint64_t timestamp;
 };
 
 struct ProcessEntry
@@ -22,12 +30,6 @@ struct ProcessList
   ProcessEntry* entries;
   int count;
   int capacity;
-};
-
-struct EnumData
-{
-  DWORD pid;
-  bool hasWindow;
 };
 
 struct ProcessDialogData
