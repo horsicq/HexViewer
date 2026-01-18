@@ -9,6 +9,13 @@
 
 #define MAX_PLUGINS 10
 
+struct MemoryRegion
+{
+  uint64_t virtualAddress;
+  size_t bufferOffset;
+  size_t size;
+};
+
 class HexData
 {
 public:
@@ -19,12 +26,12 @@ public:
     bool valid;
   };
   Vector<DisasmCache> disasmRanges;
-
+  Vector<MemoryRegion> memoryMap;
   HexData();
   ~HexData();
 
   ByteBuffer fileData;
-
+  bool virtualAddressToOffset(uint64_t virtualAddress, size_t* outOffset) const;
   bool loadFile(const char* filepath);
   bool saveFile(const char* filepath);
   void clear();
@@ -49,7 +56,25 @@ public:
   void setModified(bool mod) { modified = mod; }
 
   void regenerateHexLines(int bytesPerLine);
+  bool isProcessMemory;
 
+  void setMemoryMap(const Vector<MemoryRegion>& map) {
+    memoryMap = map;
+    isProcessMemory = true;
+  }
+
+  const Vector<MemoryRegion>& getMemoryMap() const {
+    return memoryMap;
+  }
+
+  bool isProcessMemoryDump() const {
+    return isProcessMemory;
+  }
+
+  void clearMemoryMap() {
+    memoryMap.clear();
+    isProcessMemory = false;
+  }
   void addPlugin(const char* pluginPath);
   void clearAllPlugins();
   bool hasPlugins() const;

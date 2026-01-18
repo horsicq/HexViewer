@@ -154,13 +154,14 @@ static int clamp_int(int v, int lo, int hi)
 HexData::HexData()
   : currentBytesPerLine(16),
   modified(false),
+  isProcessMemory(false),
   capstoneInitialized(false),
   currentArch(0),
   currentMode(0),
   csHandle(0),
   usePlugin(false),
-  pluginCount(0),
-  usePlugins(false)
+  pluginCount(0),      
+  usePlugins(false)    
 {
   bb_init(&fileData);
   la_init(&hexLines);
@@ -322,19 +323,23 @@ void HexData::disassembleInstruction(size_t /*offset*/,
     instructionLength = 1;
 }
 
-bool HexData::loadFile(const char *filepath)
+bool HexData::loadFile(const char* filepath)
 {
-    if (!read_file_all(filepath, &fileData))
-    {
-        la_clear(&hexLines);
-        la_push_back_cstr(&hexLines, "Error: Failed to open or read file");
-        return false;
-    }
+  if (!read_file_all(filepath, &fileData))
+  {
+    la_clear(&hexLines);
+    la_push_back_cstr(&hexLines, "Error: Failed to open or read file");
+    return false;
+  }
 
-    clearDisassemblyCache();
-    convertDataToHex(16);
-    modified = false;
-    return true;
+  clearDisassemblyCache();
+  clearPluginAnnotations();
+  clearMemoryMap();
+  isProcessMemory = false;
+
+  convertDataToHex(16);
+  modified = false;
+  return true;
 }
 
 bool HexData::saveFile(const char *filepath)
@@ -366,12 +371,15 @@ uint8_t HexData::getByte(size_t offset) const
 
 void HexData::clear()
 {
-    bb_resize(&fileData, 0);
-    la_clear(&hexLines);
-    la_clear(&disassemblyLines);
-    ss_clear(&headerLine);
-    clearDisassemblyCache();
-    modified = false;
+  bb_resize(&fileData, 0);
+  la_clear(&hexLines);
+  la_clear(&disassemblyLines);
+  ss_clear(&headerLine);
+  clearDisassemblyCache();
+  clearMemoryMap();
+  clearPluginAnnotations();
+  isProcessMemory = false;
+  modified = false;
 }
 
 void HexData::regenerateHexLines(int bytesPerLine)
@@ -562,19 +570,49 @@ void HexData::executeBookmarkPlugins()
     const char* pluginPath,
     const uint8_t * data,
     size_t dataSize,
-    PluginBookmarkArray * outBookmarks);
+    PluginBookmarkArray * outBookmarks,
+    const Vector<MemoryRegion>*memoryMap);
 
   for (int i = 0; i < pluginCount; i++)
   {
-    if (CanPluginGenerateBookmarks(pluginPaths[i]))
+    if (!CanPluginGenerateBookmarks(pluginPaths[i]))
+      continue;
+
+    const Vector<MemoryRegion>* mapPtr = nullptr;
+
+    if (isProcessMemory && !memoryMap.empty())
     {
-      ExecutePluginBookmarks(
-        pluginPaths[i],
-        fileData.data,
-        fileData.size,
-        &pluginAnnotations);
+      mapPtr = &memoryMap;
+    }
+
+    ExecutePluginBookmarks(
+      pluginPaths[i],
+      fileData.data,
+      fileData.size,
+      &pluginAnnotations,
+      mapPtr);
+  }
+}
+
+bool HexData::virtualAddressToOffset(uint64_t virtualAddress, size_t* outOffset) const
+{
+  if (!isProcessMemory || !outOffset)
+    return false;
+
+  for (size_t i = 0; i < memoryMap.size(); i++)
+  {
+    const MemoryRegion& region = memoryMap[i];
+
+    if (virtualAddress >= region.virtualAddress &&
+      virtualAddress < region.virtualAddress + region.size)
+    {
+      uint64_t offsetInRegion = virtualAddress - region.virtualAddress;
+      *outOffset = region.bufferOffset + offsetInRegion;
+      return true;
     }
   }
+
+  return false;
 }
 
 void HexData::clearPluginAnnotations()

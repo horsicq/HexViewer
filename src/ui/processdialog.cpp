@@ -35,6 +35,13 @@
 
 #include "processdialog.h"
 
+
+extern HexData g_HexData;
+extern char g_CurrentFilePath[MAX_PATH_LEN];
+extern int g_TotalLines;
+extern int g_ScrollY;
+extern void ApplyEnabledPlugins();
+
 static ProcessDialogData* g_processDialogData = nullptr;
 
 
@@ -459,64 +466,116 @@ bool ReadProcessMemoryData(int pid, HexData* hexData)
   if (!hexData)
     return false;
 
-  HANDLE hProcess = OpenProcess(PROCESS_VM_READ | PROCESS_QUERY_INFORMATION, FALSE, (DWORD)pid);
+  HANDLE hProcess = OpenProcess(PROCESS_VM_READ | PROCESS_QUERY_INFORMATION | PROCESS_VM_OPERATION,
+    FALSE, (DWORD)pid);
   if (!hProcess)
   {
+    hProcess = OpenProcess(PROCESS_VM_READ | PROCESS_QUERY_INFORMATION, FALSE, (DWORD)pid);
+    if (!hProcess)
+      return false;
+  }
+
+  hexData->clear();
+
+  HMODULE hModules[1];
+  DWORD cbNeeded;
+
+  if (!EnumProcessModules(hProcess, hModules, sizeof(hModules), &cbNeeded))
+  {
+    CloseHandle(hProcess);
     return false;
   }
 
-  MEMORY_BASIC_INFORMATION mbi;
-  uint8_t* address = 0;
+  MODULEINFO modInfo;
+  if (!GetModuleInformation(hProcess, hModules[0], &modInfo, sizeof(modInfo)))
+  {
+    CloseHandle(hProcess);
+    return false;
+  }
 
-  hexData->clear();
+  void* moduleBase = modInfo.lpBaseOfDll;
+  SIZE_T moduleSize = modInfo.SizeOfImage;
 
   ByteBuffer tempBuffer;
   bb_init(&tempBuffer);
 
-  while (VirtualQueryEx(hProcess, address, &mbi, sizeof(mbi)) == sizeof(mbi))
-  {
-    if (mbi.State == MEM_COMMIT &&
-      (mbi.Protect & (PAGE_READONLY | PAGE_READWRITE | PAGE_WRITECOPY | PAGE_EXECUTE_READ | PAGE_EXECUTE_READWRITE | PAGE_EXECUTE_WRITECOPY)))
-    {
-      size_t oldSize = tempBuffer.size;
-      size_t newSize = oldSize + mbi.RegionSize;
+  Vector<MemoryRegion> memoryMap;
 
-      if (bb_resize(&tempBuffer, newSize))
+  MEMORY_BASIC_INFORMATION mbi;
+  uint8_t* scanAddr = (uint8_t*)moduleBase;
+  uint8_t* moduleEnd = scanAddr + moduleSize;
+
+  while (scanAddr < moduleEnd)
+  {
+    if (VirtualQueryEx(hProcess, scanAddr, &mbi, sizeof(mbi)) != sizeof(mbi))
+      break;
+
+    if (mbi.State == MEM_COMMIT &&
+      (mbi.Protect & (PAGE_READONLY | PAGE_READWRITE | PAGE_WRITECOPY |
+        PAGE_EXECUTE | PAGE_EXECUTE_READ |
+        PAGE_EXECUTE_READWRITE | PAGE_EXECUTE_WRITECOPY)))
+    {
+      if (!(mbi.Protect & PAGE_GUARD) && !(mbi.Protect & PAGE_NOACCESS))
       {
-        SIZE_T bytesRead = 0;
-        if (ReadProcessMemory(hProcess, mbi.BaseAddress, tempBuffer.data + oldSize, mbi.RegionSize, &bytesRead))
+        size_t oldSize = tempBuffer.size;
+        size_t regionSize = mbi.RegionSize;
+
+        if ((uint8_t*)mbi.BaseAddress + regionSize > moduleEnd)
         {
-          bb_resize(&tempBuffer, oldSize + bytesRead);
+          regionSize = moduleEnd - (uint8_t*)mbi.BaseAddress;
         }
-        else
+
+        if (bb_resize(&tempBuffer, oldSize + regionSize))
         {
-          bb_resize(&tempBuffer, oldSize);
+          SIZE_T bytesRead = 0;
+
+          if (ReadProcessMemory(hProcess,
+            mbi.BaseAddress,
+            tempBuffer.data + oldSize,
+            regionSize,
+            &bytesRead))
+          {
+            MemoryRegion region;
+            region.virtualAddress = (uint64_t)mbi.BaseAddress;
+            region.bufferOffset = oldSize;
+            region.size = bytesRead;
+            memoryMap.push_back(region);
+
+            bb_resize(&tempBuffer, oldSize + bytesRead);
+
+          }
+          else
+          {
+
+            bb_resize(&tempBuffer, oldSize);
+          }
         }
       }
     }
 
-    address = (uint8_t*)mbi.BaseAddress + mbi.RegionSize;
-
-    if ((size_t)address >= 0x7FFFFFFF)
-      break;
+    scanAddr = (uint8_t*)mbi.BaseAddress + mbi.RegionSize;
   }
 
   CloseHandle(hProcess);
 
-  if (tempBuffer.size > 0)
+  if (tempBuffer.size == 0 || memoryMap.empty())
   {
-    bb_resize(&hexData->fileData, tempBuffer.size);
-    for (size_t i = 0; i < tempBuffer.size; i++)
-    {
-      hexData->fileData.data[i] = tempBuffer.data[i];
-    }
-    hexData->convertDataToHex(16);
     bb_free(&tempBuffer);
-    return true;
+    return false;
   }
 
+  bb_resize(&hexData->fileData, tempBuffer.size);
+  for (size_t i = 0; i < tempBuffer.size; i++)
+  {
+    hexData->fileData.data[i] = tempBuffer.data[i];
+  }
+
+  hexData->setMemoryMap(memoryMap);
+  hexData->isProcessMemory = true;
+
+  hexData->convertDataToHex(16);
   bb_free(&tempBuffer);
-  return false;
+  return true;
 }
 
 LRESULT CALLBACK ProcessDialogProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
@@ -771,11 +830,7 @@ bool ShowProcessDialog(HWND parent, AppOptions& options)
 
   if (selectedPid > 0)
   {
-    extern HexData g_HexData;
-    extern char g_CurrentFilePath[MAX_PATH_LEN];
-    extern int g_TotalLines;
-    extern int g_ScrollY;
-
+    
     if (ReadProcessMemoryData(selectedPid, &g_HexData))
     {
       StrCopy(g_CurrentFilePath, "[Process Memory - PID ");
@@ -786,8 +841,10 @@ bool ShowProcessDialog(HWND parent, AppOptions& options)
 
       g_TotalLines = (int)g_HexData.getHexLines().count;
       g_ScrollY = 0;
+      ApplyEnabledPlugins();
 
       InvalidateRect(parent, NULL, FALSE);
+
     }
     else
     {
@@ -1407,12 +1464,7 @@ bool ShowProcessDialog(NativeWindow parent, AppOptions& options)
 
   if (selectedPid > 0)
   {
-    extern HexData g_HexData;
-    extern char g_CurrentFilePath[MAX_PATH_LEN];
-    extern int g_TotalLines;
-    extern int g_ScrollY;
-    extern void LinuxRedraw();
-
+   
     if (ReadProcessMemoryData(selectedPid, &g_HexData))
     {
       StrCopy(g_CurrentFilePath, "[Process Memory - PID ");
@@ -1423,6 +1475,7 @@ bool ShowProcessDialog(NativeWindow parent, AppOptions& options)
 
       g_TotalLines = (int)g_HexData.getHexLines().count;
       g_ScrollY = 0;
+      ApplyEnabledPlugins();
 
       LinuxRedraw();
     }
@@ -1849,10 +1902,6 @@ bool ShowProcessDialog(NativeWindow parent, AppOptions& options)
 
     if (selectedPid > 0)
     {
-      extern HexData g_HexData;
-      extern char g_CurrentFilePath[MAX_PATH_LEN];
-      extern int g_TotalLines;
-      extern int g_ScrollY;
 
       if (ReadProcessMemoryData(selectedPid, &g_HexData))
       {
@@ -1864,6 +1913,7 @@ bool ShowProcessDialog(NativeWindow parent, AppOptions& options)
 
         g_TotalLines = (int)g_HexData.getHexLines().count;
         g_ScrollY = 0;
+        ApplyEnabledPlugins();
 
         [[parentWindow contentView]setNeedsDisplay:YES];
       }

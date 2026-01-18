@@ -6,6 +6,7 @@
 #endif
 
 #include "pluginexecutor.h"
+#include <hexdata.h>
 
 static bool pythonInitialized = false;
 
@@ -599,7 +600,8 @@ bool ExecutePluginBookmarks(
   const char* pluginPath,
   const uint8_t* data,
   size_t dataSize,
-  PluginBookmarkArray* outBookmarks)
+  PluginBookmarkArray* outBookmarks,
+  const Vector<MemoryRegion>* memoryMap)
 {
   if (!pythonInitialized) {
     if (!InitializePythonRuntime())
@@ -618,11 +620,30 @@ bool ExecutePluginBookmarks(
 
   void* pFunc = PyObject_GetAttrString(pModule, "generate_bookmarks");
   if (!pFunc) {
+    if (PyErr_Clear)
+      PyErr_Clear();
     Py_DecRef(pModule);
     return false;
   }
 
-  void* pArgs = PyTuple_New(2);
+  typedef void* (*PyListNewFunc)(long long);
+  typedef int (*PyListSetFunc)(void*, long long, void*);
+  typedef void* (*PyDictNewFunc)();
+  typedef int (*PyDictSetFunc)(void*, const char*, void*);
+
+#ifdef _WIN32
+  PyListNewFunc PyList_New = (PyListNewFunc)GetProcAddress(pythonDLL, "PyList_New");
+  PyListSetFunc PyList_SetItem = (PyListSetFunc)GetProcAddress(pythonDLL, "PyList_SetItem");
+  PyDictNewFunc PyDict_New = (PyDictNewFunc)GetProcAddress(pythonDLL, "PyDict_New");
+  PyDictSetFunc PyDict_SetItemString = (PyDictSetFunc)GetProcAddress(pythonDLL, "PyDict_SetItemString");
+#else
+  PyListNewFunc PyList_New = (PyListNewFunc)dlsym(pythonLib, "PyList_New");
+  PyListSetFunc PyList_SetItem = (PyListSetFunc)dlsym(pythonLib, "PyList_SetItem");
+  PyDictNewFunc PyDict_New = (PyDictNewFunc)dlsym(pythonLib, "PyDict_New");
+  PyDictSetFunc PyDict_SetItemString = (PyDictSetFunc)dlsym(pythonLib, "PyDict_SetItemString");
+#endif
+
+  void* pArgs = PyTuple_New(3);
 
   void* pData = PyBytes_FromStringAndSize((const char*)data, (long long)dataSize);
   PyTuple_SetItem(pArgs, 0, pData);
@@ -630,35 +651,99 @@ bool ExecutePluginBookmarks(
   void* pSize = PyLong_FromLongLong((long long)dataSize);
   PyTuple_SetItem(pArgs, 1, pSize);
 
+  void* pMemoryMap = nullptr;
+
+  if (memoryMap && memoryMap->size() > 0 && PyList_New && PyList_SetItem && PyDict_New && PyDict_SetItemString)
+  {
+    pMemoryMap = PyList_New((long long)memoryMap->size());
+
+    for (size_t i = 0; i < memoryMap->size(); i++)
+    {
+      const MemoryRegion& region = (*memoryMap)[i];
+
+      void* pDict = PyDict_New();
+
+      void* pVA = PyLong_FromLongLong((long long)region.virtualAddress);
+      void* pOffset = PyLong_FromLongLong((long long)region.bufferOffset);
+      void* pRegionSize = PyLong_FromLongLong((long long)region.size);
+
+      PyDict_SetItemString(pDict, "virtual_address", pVA);
+      PyDict_SetItemString(pDict, "buffer_offset", pOffset);
+      PyDict_SetItemString(pDict, "size", pRegionSize);
+
+      PyList_SetItem(pMemoryMap, (long long)i, pDict);
+
+      Py_DecRef(pVA);
+      Py_DecRef(pOffset);
+      Py_DecRef(pRegionSize);
+    }
+  }
+  else if (PyList_New)
+  {
+    pMemoryMap = PyList_New(0);
+  }
+  else
+  {
+    typedef void* (*PyNoneFunc)();
+#ifdef _WIN32
+    PyNoneFunc Py_None_Func = (PyNoneFunc)GetProcAddress(pythonDLL, "_Py_NoneStruct");
+#else
+    PyNoneFunc Py_None_Func = (PyNoneFunc)dlsym(pythonLib, "_Py_NoneStruct");
+#endif
+    if (Py_None_Func)
+    {
+      pMemoryMap = Py_None_Func();
+      typedef void (*PyIncRefFunc)(void*);
+#ifdef _WIN32
+      PyIncRefFunc Py_IncRef = (PyIncRefFunc)GetProcAddress(pythonDLL, "Py_IncRef");
+#else
+      PyIncRefFunc Py_IncRef = (PyIncRefFunc)dlsym(pythonLib, "Py_IncRef");
+#endif
+      if (Py_IncRef)
+        Py_IncRef(pMemoryMap);
+    }
+  }
+
+  PyTuple_SetItem(pArgs, 2, pMemoryMap);
   void* pResult = PyObject_CallObject(pFunc, pArgs);
+
+  if (!pResult)
+  {
+    if (PyErr_Clear)
+      PyErr_Clear();
+
+    Py_DecRef(pArgs);
+    Py_DecRef(pFunc);
+    Py_DecRef(pModule);
+    return false;
+  }
+
+  bool success = false;
 
   if (pResult && PyList_Size) {
     long long listSize = PyList_Size(pResult);
-
     for (long long i = 0; i < listSize; i++) {
       void* pItem = PyList_GetItem(pResult, i);
 
       void* pOffset = PyDict_GetItemString(pItem, "offset");
       void* pLabel = PyDict_GetItemString(pItem, "label");
       void* pDesc = PyDict_GetItemString(pItem, "description");
-   
+
       if (pOffset && pLabel) {
         PluginBookmark bookmark;
         memSet(&bookmark, 0, sizeof(PluginBookmark));
 
-        if (PyLong_FromLongLong) {
-          typedef long long (*PyLongAsLongLongFunc)(void*);
+        typedef long long (*PyLongAsLongLongFunc)(void*);
 #ifdef _WIN32
-          PyLongAsLongLongFunc PyLong_AsLongLong =
-            (PyLongAsLongLongFunc)GetProcAddress(pythonDLL, "PyLong_AsLongLong");
+        PyLongAsLongLongFunc PyLong_AsLongLong =
+          (PyLongAsLongLongFunc)GetProcAddress(pythonDLL, "PyLong_AsLongLong");
 #else
-          PyLongAsLongLongFunc PyLong_AsLongLong =
-            (PyLongAsLongLongFunc)dlsym(pythonLib, "PyLong_AsLongLong");
+        PyLongAsLongLongFunc PyLong_AsLongLong =
+          (PyLongAsLongLongFunc)dlsym(pythonLib, "PyLong_AsLongLong");
 #endif
 
-          if (PyLong_AsLongLong) {
-            bookmark.offset = (uint64_t)PyLong_AsLongLong(pOffset);
-          }
+        if (PyLong_AsLongLong) {
+          bookmark.offset = (uint64_t)PyLong_AsLongLong(pOffset);
         }
 
         if (PyUnicode_AsUTF8) {
@@ -679,15 +764,6 @@ bool ExecutePluginBookmarks(
           void* pG = PyDict_GetItemString(pColor, "g");
           void* pB = PyDict_GetItemString(pColor, "b");
 
-          typedef long long (*PyLongAsLongLongFunc)(void*);
-#ifdef _WIN32
-          PyLongAsLongLongFunc PyLong_AsLongLong =
-            (PyLongAsLongLongFunc)GetProcAddress(pythonDLL, "PyLong_AsLongLong");
-#else
-          PyLongAsLongLongFunc PyLong_AsLongLong =
-            (PyLongAsLongLongFunc)dlsym(pythonLib, "PyLong_AsLongLong");
-#endif
-
           if (pR && pG && pB && PyLong_AsLongLong) {
             bookmark.color.r = (uint8_t)PyLong_AsLongLong(pR);
             bookmark.color.g = (uint8_t)PyLong_AsLongLong(pG);
@@ -696,8 +772,8 @@ bool ExecutePluginBookmarks(
         }
 
         StrCopy(bookmark.pluginSource, moduleName);
-
         pba_push_back(outBookmarks, &bookmark);
+        success = true;
       }
     }
 
@@ -707,8 +783,7 @@ bool ExecutePluginBookmarks(
   Py_DecRef(pArgs);
   Py_DecRef(pFunc);
   Py_DecRef(pModule);
-
-  return outBookmarks->count > 0;
+  return success;
 }
 
 bool ExecutePythonDisassembly(
