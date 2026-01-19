@@ -2,6 +2,7 @@
 #define RESOURCE_H
 
 #define IDB_LOGO 1
+#define IDI_MAIN_ICON 2
 
 #ifdef APSTUDIO_INVOKED
 #ifndef APSTUDIO_READONLY_SYMBOLS

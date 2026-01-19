@@ -419,7 +419,6 @@ void SaveOptionsToFile(const AppOptions& options)
 #endif
 }
 
-
 void LoadOptionsFromFile(AppOptions& options)
 {
   char configPath[512];
@@ -564,8 +563,6 @@ void LoadOptionsFromFile(AppOptions& options)
     }
   }
 }
-
-
 
 bool IsPointInRect(int x, int y, const Rect &rect)
 {

@@ -23,6 +23,7 @@
 #include "about.h"
 #include "pluginmanager.h"
 #include "processdialog.h"
+#include "resource.h"
 
 typedef unsigned long long size_t_custom;
 
@@ -2364,6 +2365,25 @@ extern "C" void entry()
 		0, 0,
 		wc.hInstance,
 		0);
+
+	HICON hBig = (HICON)LoadImage(
+		wc.hInstance,
+		MAKEINTRESOURCE(IDI_MAIN_ICON),
+		IMAGE_ICON,
+		32, 32,
+		LR_DEFAULTCOLOR
+	);
+	SendMessage(hwnd, WM_SETICON, ICON_BIG, (LPARAM)hBig);
+
+	HICON hSmall = (HICON)LoadImage(
+		wc.hInstance,
+		MAKEINTRESOURCE(IDI_MAIN_ICON),
+		IMAGE_ICON,
+		16, 16,
+		LR_DEFAULTCOLOR
+	);
+	SendMessage(hwnd, WM_SETICON, ICON_SMALL, (LPARAM)hSmall);
+
 
 	if (!hwnd)
 	{

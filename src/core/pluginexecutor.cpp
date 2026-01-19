@@ -63,79 +63,79 @@ void GetPluginDirectory(char *outPath, int maxLen);
 #ifdef _WIN32
 HMODULE LoadPythonFromRegistry()
 {
-    const wchar_t *roots[] = {
-        L"SOFTWARE\\Python\\PythonCore",
-        L"SOFTWARE\\WOW6432Node\\Python\\PythonCore",
-        nullptr};
+  const wchar_t* roots[] = {
+      L"SOFTWARE\\Python\\PythonCore",
+      L"SOFTWARE\\WOW6432Node\\Python\\PythonCore",
+      nullptr };
 
-    HKEY hRoot = nullptr;
-    HKEY hVersion = nullptr;
-    HKEY hInstallPath = nullptr;
+  HKEY hRoot = nullptr;
+  HKEY hVersion = nullptr;
+  HKEY hInstallPath = nullptr;
 
-    wchar_t subKey[256];
-    wchar_t installPath[512];
-    DWORD installPathSize;
-    FILETIME ft;
+  wchar_t subKey[256];
+  wchar_t installPath[512];
+  DWORD installPathSize;
+  FILETIME ft;
 
-    for (int r = 0; roots[r]; r++)
+  for (int r = 0; roots[r]; r++)
+  {
+    if (RegOpenKeyExW(HKEY_LOCAL_MACHINE, roots[r], 0, KEY_READ, &hRoot) != ERROR_SUCCESS &&
+      RegOpenKeyExW(HKEY_CURRENT_USER, roots[r], 0, KEY_READ, &hRoot) != ERROR_SUCCESS)
     {
-        if (RegOpenKeyExW(HKEY_LOCAL_MACHINE, roots[r], 0, KEY_READ, &hRoot) != ERROR_SUCCESS &&
-            RegOpenKeyExW(HKEY_CURRENT_USER, roots[r], 0, KEY_READ, &hRoot) != ERROR_SUCCESS)
-        {
-            continue;
-        }
-
-        DWORD index = 0;
-        while (true)
-        {
-            DWORD subKeyLen = sizeof(subKey) / sizeof(wchar_t);
-            LONG res = RegEnumKeyExW(hRoot, index++, subKey, &subKeyLen, nullptr, nullptr, nullptr, &ft);
-            if (res != ERROR_SUCCESS)
-                break;
-
-            if (RegOpenKeyExW(hRoot, subKey, 0, KEY_READ, &hVersion) != ERROR_SUCCESS)
-                continue;
-
-            if (RegOpenKeyExW(hVersion, L"InstallPath", 0, KEY_READ, &hInstallPath) != ERROR_SUCCESS)
-            {
-                RegCloseKey(hVersion);
-                continue;
-            }
-
-            installPathSize = sizeof(installPath);
-            if (RegQueryValueExW(hInstallPath, nullptr, nullptr, nullptr,
-                                 (LPBYTE)installPath, &installPathSize) == ERROR_SUCCESS)
-            {
-                wchar_t ver[16];
-                int vi = 0;
-                for (int si = 0; subKey[si] != 0; si++)
-                {
-                    if (subKey[si] != L'.')
-                        ver[vi++] = subKey[si];
-                }
-                ver[vi] = 0;
-
-                wchar_t dllPath[600];
-                wsprintfW(dllPath, L"%spython%s.dll", installPath, ver);
-
-                HMODULE h = LoadLibraryW(dllPath);
-                if (h)
-                {
-                    RegCloseKey(hInstallPath);
-                    RegCloseKey(hVersion);
-                    RegCloseKey(hRoot);
-                    return h;
-                }
-            }
-
-            RegCloseKey(hInstallPath);
-            RegCloseKey(hVersion);
-        }
-
-        RegCloseKey(hRoot);
+      continue;
     }
 
-    return nullptr;
+    DWORD index = 0;
+    while (true)
+    {
+      DWORD subKeyLen = sizeof(subKey) / sizeof(wchar_t);
+      LONG res = RegEnumKeyExW(hRoot, index++, subKey, &subKeyLen, nullptr, nullptr, nullptr, &ft);
+      if (res != ERROR_SUCCESS)
+        break;
+
+      if (RegOpenKeyExW(hRoot, subKey, 0, KEY_READ, &hVersion) != ERROR_SUCCESS)
+        continue;
+
+      if (RegOpenKeyExW(hVersion, L"InstallPath", 0, KEY_READ, &hInstallPath) != ERROR_SUCCESS)
+      {
+        RegCloseKey(hVersion);
+        continue;
+      }
+
+      installPathSize = sizeof(installPath);
+      if (RegQueryValueExW(hInstallPath, nullptr, nullptr, nullptr,
+        (LPBYTE)installPath, &installPathSize) == ERROR_SUCCESS)
+      {
+        wchar_t ver[16];
+        int vi = 0;
+        for (int si = 0; subKey[si] != 0; si++)
+        {
+          if (subKey[si] != L'.')
+            ver[vi++] = subKey[si];
+        }
+        ver[vi] = 0;
+
+        wchar_t dllPath[600];
+        wsprintfW(dllPath, L"%spython%s.dll", installPath, ver);
+
+        HMODULE h = LoadLibraryW(dllPath);
+        if (h)
+        {
+          RegCloseKey(hInstallPath);
+          RegCloseKey(hVersion);
+          RegCloseKey(hRoot);
+          return h;
+        }
+      }
+
+      RegCloseKey(hInstallPath);
+      RegCloseKey(hVersion);
+    }
+
+    RegCloseKey(hRoot);
+  }
+
+  return nullptr;
 }
 
 #endif

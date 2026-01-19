@@ -474,6 +474,35 @@ inline wchar_t *WcsCopy(wchar_t *dest, const wchar_t *src)
     return original;
 }
 
+inline const wchar_t* wcsStr(const wchar_t* haystack, const wchar_t* needle)
+{
+  if (!haystack || !needle)
+    return nullptr;
+
+  const wchar_t* h = haystack;
+  const wchar_t* n = needle;
+
+  while (*h)
+  {
+    const wchar_t* h2 = h;
+    const wchar_t* n2 = n;
+
+    while (*h2 && *n2 && (*h2 == *n2))
+    {
+      h2++;
+      n2++;
+    }
+
+    if (*n2 == 0)
+      return h;
+
+    h++;
+  }
+
+  return nullptr;
+}
+
+
 inline void MemCopy(void *dest, const void *src, size_t n)
 {
     if (!dest || !src || n == 0)

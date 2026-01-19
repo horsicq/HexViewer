@@ -40,15 +40,20 @@ set(SOURCES
     src/ui/pluginmanager.cpp
     src/core/pluginexecutor.cpp
     src/ui/selectblockdialog.cpp
+	src/ui/processdialog.cpp
 )
 
 if (WIN32)
     list(APPEND SOURCES resources/ui/hexviewer.rc)
 
-    set_property(
-        SOURCE resources/ui/hexviewer.rc
-        PROPERTY COMPILE_OPTIONS "/I${CMAKE_CURRENT_SOURCE_DIR}/resources/images"
-    )
+   set_property(
+    SOURCE resources/ui/hexviewer.rc
+    PROPERTY COMPILE_OPTIONS
+        "/I${CMAKE_CURRENT_SOURCE_DIR}/include/system"
+        "/I${CMAKE_CURRENT_SOURCE_DIR}/resources/images"
+        "/I${CMAKE_CURRENT_SOURCE_DIR}/resources/icons"
+)
+
 endif()
 
 if (UNIX AND NOT APPLE)

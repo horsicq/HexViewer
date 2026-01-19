@@ -1,5 +1,7 @@
 #ifdef _WIN32
 #include <windows.h>
+#include <appmodel.h>
+
 #elif __APPLE__
 #include <dirent.h>
 #include <unistd.h>
@@ -17,73 +19,60 @@
 static PluginManagerData *g_pluginDialogData = nullptr;
 extern AppOptions g_Options;
 
-void GetPluginDirectory(char *outPath, int maxLen)
+void GetPluginDirectory(char* outPath, int maxLen)
 {
 #ifdef _WIN32
-    if (GetIsMsixFlag())
-    {
-        wchar_t localAppData[MAX_PATH];
-        DWORD len = GetEnvironmentVariableW(L"LOCALAPPDATA", localAppData, MAX_PATH);
-        if (len > 0 && len < MAX_PATH)
-        {
-            WideCharToMultiByte(CP_UTF8, 0, localAppData, -1, outPath, maxLen - 50, nullptr, nullptr);
-            int slen = (int)StrLen(outPath);
-            StrCopy(outPath + slen, "\\HexViewer\\plugins");
-        }
-    }
-    else
-    {
-        wchar_t exePath[MAX_PATH];
-        GetModuleFileNameW(nullptr, exePath, MAX_PATH);
+  UINT32 length = 0;
+  LONG result = GetPackageFullName(GetCurrentProcess(), &length, nullptr);
+  bool isMsix = (result == ERROR_SUCCESS || result == ERROR_INSUFFICIENT_BUFFER);
 
-        int lastSlash = -1;
-        for (int i = 0; exePath[i]; i++)
-        {
-            if (exePath[i] == L'\\' || exePath[i] == L'/')
-                lastSlash = i;
-        }
-        exePath[lastSlash] = 0;
+  if (isMsix)
+  {
+    wchar_t packageFamilyName[MAX_PATH];
+    UINT32 packageFamilyNameLength = MAX_PATH;
+    if (GetPackageFamilyName(GetCurrentProcess(), &packageFamilyNameLength, packageFamilyName) == ERROR_SUCCESS)
+    {
+      wchar_t sandboxPath[MAX_PATH];
+      wchar_t username[MAX_PATH];
+      DWORD usernameLen = MAX_PATH;
+      GetUserNameW(username, &usernameLen);
 
-        WideCharToMultiByte(CP_UTF8, 0, exePath, -1, outPath, maxLen - 20, nullptr, nullptr);
-        int len = (int)StrLen(outPath);
-        StrCopy(outPath + len, "\\plugins");
+      wsprintfW(sandboxPath, L"C:\\Users\\%s\\AppData\\Local\\Packages\\%s\\LocalCache\\Local\\HexViewer\\plugins",
+        username, packageFamilyName);
+
+      WideCharToMultiByte(CP_UTF8, 0, sandboxPath, -1, outPath, maxLen, nullptr, nullptr);
+      return;
     }
-#else
-    if (GetIsNativeFlag())
+  }
+
+  if (GetIsNativeFlag())
+  {
+    wchar_t localAppData[MAX_PATH];
+    DWORD len = GetEnvironmentVariableW(L"LOCALAPPDATA", localAppData, MAX_PATH);
+    if (len > 0 && len < MAX_PATH)
     {
-        const char *home = getenv("HOME");
-        if (home)
-        {
-            StrCopy(outPath, home);
-            int len = (int)StrLen(outPath);
-            StrCopy(outPath + len, "/.config/HexViewer/plugins");
-        }
+      WideCharToMultiByte(CP_UTF8, 0, localAppData, -1, outPath, maxLen - 50, nullptr, nullptr);
+      int slen = (int)StrLen(outPath);
+      StrCopy(outPath + slen, "\\HexViewer\\plugins");
+      return;
     }
-    else
-    {
-        char exePath[4096];
-#ifdef __APPLE__
-        uint32_t size = sizeof(exePath);
-        if (_NSGetExecutablePath(exePath, &size) == 0)
-        {
+  }
+
+  wchar_t exePath[MAX_PATH];
+  GetModuleFileNameW(nullptr, exePath, MAX_PATH);
+
+  int lastSlash = -1;
+  for (int i = 0; exePath[i]; i++)
+  {
+    if (exePath[i] == L'\\' || exePath[i] == L'/')
+      lastSlash = i;
+  }
+  exePath[lastSlash] = 0;
+
+  WideCharToMultiByte(CP_UTF8, 0, exePath, -1, outPath, maxLen - 20, nullptr, nullptr);
+  int len = (int)StrLen(outPath);
+  StrCopy(outPath + len, "\\plugins");
 #else
-        ssize_t count = readlink("/proc/self/exe", exePath, sizeof(exePath) - 1);
-        if (count != -1)
-        {
-            exePath[count] = 0;
-#endif
-            int lastSlash = -1;
-            for (int i = 0; exePath[i]; i++)
-            {
-                if (exePath[i] == '/')
-                    lastSlash = i;
-            }
-            exePath[lastSlash] = 0;
-            StrCopy(outPath, exePath);
-            int len = (int)StrLen(outPath);
-            StrCopy(outPath + len, "/plugins");
-        }
-    }
 #endif
 }
 
@@ -530,248 +519,273 @@ void PluginManager::LoadPluginStates(PluginManagerData *data)
     }
 }
 
-void RenderPluginManager(PluginManagerData *data, int windowWidth, int windowHeight)
+void RenderPluginManager(PluginManagerData* data, int windowWidth, int windowHeight)
 {
-    if (!data || !data->renderer)
-        return;
+  if (!data || !data->renderer)
+    return;
 
-    Theme theme = Theme::Dark();
-    data->renderer->clear(theme.windowBackground);
+  Theme theme = Theme::Dark();
+  data->renderer->clear(theme.windowBackground);
 
-    int margin = 20;
-    int y = margin;
+  int margin = 20;
+  int y = margin;
 
-    data->renderer->drawText("Plugin Manager", margin, y, theme.headerColor);
-    y += 35;
+  data->renderer->drawText("Plugin Manager", margin, y, theme.headerColor);
+  y += 35;
 
-    int listHeight = windowHeight - 150;
-    Rect listRect(margin, y, windowWidth - margin * 2, listHeight);
+  int listHeight = windowHeight - 150;
+  Rect listRect(margin, y, windowWidth - margin * 2, listHeight);
 
-    Color listBg(30, 30, 35);
-    data->renderer->drawRoundedRect(listRect, 4.0f, listBg, true);
-    data->renderer->drawRoundedRect(listRect, 4.0f, theme.controlBorder, false);
+  Color listBg(30, 30, 35);
+  data->renderer->drawRoundedRect(listRect, 4.0f, listBg, true);
+  data->renderer->drawRoundedRect(listRect, 4.0f, theme.controlBorder, false);
 
-    int itemY = y + 10;
-    int itemHeight = 60;
-    int maxVisibleItems = (listHeight - 20) / itemHeight;
+  int itemY = y + 10;
+  int itemHeight = 60;
+  int maxVisibleItems = (listHeight - 20) / itemHeight;
 
-    int startIndex = data->scrollOffset;
-    int endIndex = Clamp(startIndex + maxVisibleItems, 0, (int)data->plugins.size());
+  int startIndex = data->scrollOffset;
+  int endIndex = Clamp(startIndex + maxVisibleItems, 0, (int)data->plugins.size());
 
-    for (int i = startIndex; i < endIndex; i++)
-    {
-        PluginInfo *plugin = data->plugins[i];
+  for (int i = startIndex; i < endIndex; i++)
+  {
+    PluginInfo* plugin = data->plugins[i];
 
-        Rect itemRect(margin + 10, itemY, windowWidth - margin * 2 - 20, itemHeight - 5);
+    Rect itemRect(margin + 10, itemY, windowWidth - margin * 2 - 20, itemHeight - 5);
 
-        bool isHovered = (i == data->hoveredPlugin);
-        bool isSelected = (i == data->selectedPlugin);
+    bool isHovered = (i == data->hoveredPlugin);
+    bool isSelected = (i == data->selectedPlugin);
 
-        Color itemBg = listBg;
-        if (isSelected)
-        {
-            itemBg = Color(50, 50, 60);
-        }
-        else if (isHovered)
-        {
-            itemBg = Color(40, 40, 50);
-        }
+    Color itemBg = listBg;
+    if (isSelected)
+      itemBg = Color(50, 50, 60);
+    else if (isHovered)
+      itemBg = Color(40, 40, 50);
 
-        data->renderer->drawRoundedRect(itemRect, 3.0f, itemBg, true);
+    data->renderer->drawRoundedRect(itemRect, 3.0f, itemBg, true);
 
-        Rect checkboxRect(itemRect.x + 10, itemRect.y + 20, 18, 18);
-        WidgetState checkboxState(checkboxRect);
-        checkboxState.hovered = isHovered;
-        checkboxState.checked = plugin->enabled;
+    Rect checkboxRect(itemRect.x + 10, itemRect.y + 20, 18, 18);
+    WidgetState checkboxState(checkboxRect);
+    checkboxState.hovered = isHovered;
+    checkboxState.checked = plugin->enabled;
 
-        data->renderer->drawModernCheckbox(checkboxState, theme, plugin->enabled);
+    data->renderer->drawModernCheckbox(checkboxState, theme, plugin->enabled);
 
-        int textX = itemRect.x + 40;
-        int textY = itemRect.y + 5;
+    int textX = itemRect.x + 40;
+    int textY = itemRect.y + 5;
 
-        data->renderer->drawText(plugin->name, textX, textY, theme.textColor);
-        textY += 18;
+    data->renderer->drawText(plugin->name, textX, textY, theme.textColor);
+    textY += 18;
 
-        char versionAuthor[128];
-        StrCopy(versionAuthor, "v");
-        StrCat(versionAuthor, plugin->version);
-        StrCat(versionAuthor, " by ");
-        StrCat(versionAuthor, plugin->author);
+    char versionAuthor[128];
+    StrCopy(versionAuthor, "v");
+    StrCat(versionAuthor, plugin->version);
+    StrCat(versionAuthor, " by ");
+    StrCat(versionAuthor, plugin->author);
 
-        Color subColor(150, 150, 150);
-        data->renderer->drawText(versionAuthor, textX, textY, subColor);
-        textY += 16;
+    Color subColor(150, 150, 150);
+    data->renderer->drawText(versionAuthor, textX, textY, subColor);
+    textY += 16;
 
-        Color descColor(120, 120, 120);
-        data->renderer->drawText(plugin->description, textX, textY, descColor);
+    Color descColor(120, 120, 120);
+    data->renderer->drawText(plugin->description, textX, textY, descColor);
 
-        int badgeX = itemRect.x + itemRect.width - 80;
-        int badgeY = itemRect.y + 10;
-        Rect badgeRect(badgeX, badgeY, 70, 20);
+    int badgeX = itemRect.x + itemRect.width - 80;
+    int badgeY = itemRect.y + 10;
+    Rect badgeRect(badgeX, badgeY, 70, 20);
 
-        Color badgeColor = strEquals(plugin->language, "python")
-                               ? Color(60, 90, 150)
-                               : Color(240, 180, 40);
+    Color badgeColor = strEquals(plugin->language, "python")
+      ? Color(60, 90, 150)
+      : Color(240, 180, 40);
 
-        data->renderer->drawRoundedRect(badgeRect, 3.0f, badgeColor, true);
-        data->renderer->drawText(plugin->language, badgeX + 8, badgeY + 3, Color(255, 255, 255));
+    data->renderer->drawRoundedRect(badgeRect, 3.0f, badgeColor, true);
+    data->renderer->drawText(plugin->language, badgeX + 8, badgeY + 3, Color(255, 255, 255));
 
-        itemY += itemHeight;
-    }
+    itemY += itemHeight;
+  }
 
-    int buttonWidth = 100;
-    int buttonHeight = 30;
-    int buttonY = windowHeight - margin - buttonHeight - 10;
-    int buttonSpacing = 10;
+  int buttonWidth = 100;
+  int buttonHeight = 30;
+  int buttonSpacing = 10;
+  int buttonY = windowHeight - margin - buttonHeight - 10;
 
-    Rect reloadButtonRect(margin, buttonY, buttonWidth, buttonHeight);
-    WidgetState reloadButtonState(reloadButtonRect);
-    reloadButtonState.hovered = (data->hoveredWidget == 0);
-    reloadButtonState.pressed = (data->pressedWidget == 0);
-    data->renderer->drawModernButton(reloadButtonState, theme, "Reload");
+  Rect reloadButtonRect(margin, buttonY, buttonWidth, buttonHeight);
+  WidgetState reloadButtonState(reloadButtonRect);
+  reloadButtonState.hovered = (data->hoveredWidget == 0);
+  reloadButtonState.pressed = (data->pressedWidget == 0);
+  data->renderer->drawModernButton(reloadButtonState, theme, "Reload");
 
-    Rect settingsButtonRect(margin + buttonWidth + buttonSpacing, buttonY, buttonWidth, buttonHeight);
-    WidgetState settingsButtonState(settingsButtonRect);
-    settingsButtonState.enabled = (data->selectedPlugin >= 0);
-    settingsButtonState.hovered = (data->hoveredWidget == 1);
-    settingsButtonState.pressed = (data->pressedWidget == 1);
-    data->renderer->drawModernButton(settingsButtonState, theme, "Settings");
+  Rect openFolderRect(margin + (buttonWidth + buttonSpacing), buttonY,
+    buttonWidth + 40, buttonHeight);
 
-    Rect okButtonRect(windowWidth - margin - buttonWidth * 2 - buttonSpacing, buttonY, buttonWidth, buttonHeight);
-    WidgetState okButtonState(okButtonRect);
-    okButtonState.hovered = (data->hoveredWidget == 2);
-    okButtonState.pressed = (data->pressedWidget == 2);
-    data->renderer->drawModernButton(okButtonState, theme, "OK");
+  WidgetState openFolderState(openFolderRect);
+  openFolderState.hovered = (data->hoveredWidget == 1);
+  openFolderState.pressed = (data->pressedWidget == 1);
+  data->renderer->drawModernButton(openFolderState, theme, "Plugin Folder");
 
-    Rect cancelButtonRect(windowWidth - margin - buttonWidth, buttonY, buttonWidth, buttonHeight);
-    WidgetState cancelButtonState(cancelButtonRect);
-    cancelButtonState.hovered = (data->hoveredWidget == 3);
-    cancelButtonState.pressed = (data->pressedWidget == 3);
-    data->renderer->drawModernButton(cancelButtonState, theme, "Cancel");
+  Rect okButtonRect(windowWidth - margin - buttonWidth * 2 - buttonSpacing,
+    buttonY, buttonWidth, buttonHeight);
+  WidgetState okButtonState(okButtonRect);
+  okButtonState.hovered = (data->hoveredWidget == 2);
+  okButtonState.pressed = (data->pressedWidget == 2);
+  data->renderer->drawModernButton(okButtonState, theme, "OK");
+
+  Rect cancelButtonRect(windowWidth - margin - buttonWidth,
+    buttonY, buttonWidth, buttonHeight);
+  WidgetState cancelButtonState(cancelButtonRect);
+  cancelButtonState.hovered = (data->hoveredWidget == 3);
+  cancelButtonState.pressed = (data->pressedWidget == 3);
+  data->renderer->drawModernButton(cancelButtonState, theme, "Cancel");
 }
 
-void UpdatePluginHoverState(PluginManagerData *data, int x, int y, int windowWidth, int windowHeight)
+
+void UpdatePluginHoverState(PluginManagerData* data, int x, int y, int windowWidth, int windowHeight)
 {
-    data->hoveredWidget = -1;
-    data->hoveredPlugin = -1;
+  data->hoveredWidget = -1;
+  data->hoveredPlugin = -1;
+
+  int margin = 20;
+  int listY = margin + 35;
+  int listHeight = windowHeight - 150;
+
+  int itemY = listY + 10;
+  int itemHeight = 60;
+  int maxVisibleItems = (listHeight - 20) / itemHeight;
+
+  int startIndex = data->scrollOffset;
+  int endIndex = Clamp(startIndex + maxVisibleItems, 0, (int)data->plugins.size());
+
+  for (int i = startIndex; i < endIndex; i++)
+  {
+    Rect itemRect(margin + 10, itemY, windowWidth - margin * 2 - 20, itemHeight - 5);
+    if (IsPointInRect(x, y, itemRect))
+    {
+      data->hoveredPlugin = i;
+      return;
+    }
+    itemY += itemHeight;
+  }
+
+  int buttonWidth = 100;
+  int buttonHeight = 30;
+  int buttonSpacing = 10;
+  int buttonY = windowHeight - margin - buttonHeight - 10;
+
+  Rect reloadButtonRect(margin, buttonY, buttonWidth, buttonHeight);
+  if (IsPointInRect(x, y, reloadButtonRect))
+  {
+    data->hoveredWidget = 0;
+    return;
+  }
+
+  Rect openFolderRect(margin + (buttonWidth + buttonSpacing), buttonY,
+    buttonWidth + 40, buttonHeight);
+  if (IsPointInRect(x, y, openFolderRect))
+  {
+    data->hoveredWidget = 1;
+    return;
+  }
+
+  Rect okButtonRect(windowWidth - margin - buttonWidth * 2 - buttonSpacing,
+    buttonY, buttonWidth, buttonHeight);
+  if (IsPointInRect(x, y, okButtonRect))
+  {
+    data->hoveredWidget = 2;
+    return;
+  }
+
+  Rect cancelButtonRect(windowWidth - margin - buttonWidth,
+    buttonY, buttonWidth, buttonHeight);
+  if (IsPointInRect(x, y, cancelButtonRect))
+  {
+    data->hoveredWidget = 3;
+    return;
+  }
+}
+
+void HandlePluginClick(PluginManagerData* data, int x, int y, int windowWidth, int windowHeight)
+{
+  if (data->hoveredPlugin >= 0)
+  {
+    data->selectedPlugin = data->hoveredPlugin;
 
     int margin = 20;
     int listY = margin + 35;
-    int listHeight = windowHeight - 150;
-
-    int itemY = listY + 10;
     int itemHeight = 60;
-    int maxVisibleItems = (listHeight - 20) / itemHeight;
+    int itemY = listY + 10 + (data->hoveredPlugin - data->scrollOffset) * itemHeight;
 
-    int startIndex = data->scrollOffset;
-    int endIndex = Clamp(startIndex + maxVisibleItems, 0, (int)data->plugins.size());
-
-    for (int i = startIndex; i < endIndex; i++)
+    Rect checkboxRect(margin + 20, itemY + 20, 18, 18);
+    if (IsPointInRect(x, y, checkboxRect))
     {
-        Rect itemRect(margin + 10, itemY, windowWidth - margin * 2 - 20, itemHeight - 5);
-        if (IsPointInRect(x, y, itemRect))
-        {
-            data->hoveredPlugin = i;
-            return;
-        }
-        itemY += itemHeight;
-    }
+      data->plugins[data->hoveredPlugin]->enabled =
+        !data->plugins[data->hoveredPlugin]->enabled;
 
-    int buttonWidth = 100;
-    int buttonHeight = 30;
-    int buttonY = windowHeight - margin - buttonHeight - 10;
-    int buttonSpacing = 10;
-
-    Rect reloadButtonRect(margin, buttonY, buttonWidth, buttonHeight);
-    if (IsPointInRect(x, y, reloadButtonRect))
-    {
-        data->hoveredWidget = 0;
-        return;
+      if (data->plugins[data->hoveredPlugin]->enabled &&
+        data->plugins[data->hoveredPlugin]->canDisassemble)
+      {
+        extern HexData g_HexData;
+        g_HexData.setDisassemblyPlugin(data->plugins[data->hoveredPlugin]->path);
+      }
+      else if (!data->plugins[data->hoveredPlugin]->enabled)
+      {
+        extern HexData g_HexData;
+        g_HexData.clearDisassemblyPlugin();
+      }
     }
+    return;
+  }
 
-    Rect settingsButtonRect(margin + buttonWidth + buttonSpacing, buttonY, buttonWidth, buttonHeight);
-    if (IsPointInRect(x, y, settingsButtonRect) && data->selectedPlugin >= 0)
-    {
-        data->hoveredWidget = 1;
-        return;
-    }
+  if (data->hoveredWidget == -1)
+    return;
 
-    Rect okButtonRect(windowWidth - margin - buttonWidth * 2 - buttonSpacing, buttonY, buttonWidth, buttonHeight);
-    if (IsPointInRect(x, y, okButtonRect))
-    {
-        data->hoveredWidget = 2;
-        return;
-    }
+  switch (data->hoveredWidget)
+  {
+  case 0:
+    for (size_t i = 0; i < data->plugins.size(); i++)
+      PlatformFree(data->plugins[i]);
+    data->plugins.clear();
+    PluginManager::LoadPluginsFromDirectory(data);
+    data->selectedPlugin = -1;
+    break;
 
-    Rect cancelButtonRect(windowWidth - margin - buttonWidth, buttonY, buttonWidth, buttonHeight);
-    if (IsPointInRect(x, y, cancelButtonRect))
-    {
-        data->hoveredWidget = 3;
-    }
+  case 1:
+  {
+#ifdef _WIN32
+    char pluginDir[512];
+    GetPluginDirectory(pluginDir, 512);
+
+    wchar_t wpath[512];
+    MultiByteToWideChar(CP_UTF8, 0, pluginDir, -1, wpath, 512);
+    ShellExecuteW(nullptr, L"open", wpath, nullptr, nullptr, SW_SHOWNORMAL);
+#else
+    char pluginDir[512];
+    GetPluginDirectory(pluginDir, 512);
+    char command[600];
+#ifdef __APPLE__
+    StrCopy(command, "open \"");
+#else
+    StrCopy(command, "xdg-open \"");
+#endif
+    StrCat(command, pluginDir);
+    StrCat(command, "\"");
+    system(command);
+#endif
+    break;
+  }
+
+  case 2:
+    PluginManager::SavePluginStates(data);
+    data->dialogResult = true;
+    data->running = false;
+    break;
+
+  case 3:
+    data->dialogResult = false;
+    data->running = false;
+    break;
+  }
 }
 
-void HandlePluginClick(PluginManagerData *data, int x, int y, int windowWidth, int windowHeight)
-{
-    if (data->hoveredPlugin >= 0)
-    {
-        data->selectedPlugin = data->hoveredPlugin;
-
-        int margin = 20;
-        int listY = margin + 35;
-        int itemHeight = 60;
-        int itemY = listY + 10 + (data->hoveredPlugin - data->scrollOffset) * itemHeight;
-
-        Rect checkboxRect(margin + 20, itemY + 20, 18, 18);
-        if (IsPointInRect(x, y, checkboxRect))
-        {
-            data->plugins[data->hoveredPlugin]->enabled =
-                !data->plugins[data->hoveredPlugin]->enabled;
-
-            if (data->plugins[data->hoveredPlugin]->enabled &&
-                data->plugins[data->hoveredPlugin]->canDisassemble)
-            {
-                extern HexData g_HexData;
-                g_HexData.setDisassemblyPlugin(data->plugins[data->hoveredPlugin]->path);
-            }
-            else if (!data->plugins[data->hoveredPlugin]->enabled)
-            {
-                extern HexData g_HexData;
-                g_HexData.clearDisassemblyPlugin();
-            }
-        }
-        return;
-    }
-
-    if (data->hoveredWidget == -1)
-        return;
-
-    switch (data->hoveredWidget)
-    {
-    case 0:
-        for (size_t i = 0; i < data->plugins.size(); i++)
-        {
-            PlatformFree(data->plugins[i]);
-        }
-        data->plugins.clear();
-        PluginManager::LoadPluginsFromDirectory(data);
-        data->selectedPlugin = -1;
-        break;
-
-    case 1:
-        break;
-
-    case 2:
-        PluginManager::SavePluginStates(data);
-        data->dialogResult = true;
-        data->running = false;
-        break;
-
-    case 3:
-        data->dialogResult = false;
-        data->running = false;
-        break;
-    }
-}
 #ifdef _WIN32
 LRESULT CALLBACK PluginWindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
