@@ -1469,7 +1469,7 @@ bool ShowProcessDialog(NativeWindow parent, AppOptions& options)
     {
       StrCopy(g_CurrentFilePath, "[Process Memory - PID ");
       char pidBuf[32];
-      IntToStr(selectedPid, pidBuf, sizeof(pidBuf));
+      ItoaDec((long long)selectedPid, pidBuf, sizeof(pidBuf));
       StrCat(g_CurrentFilePath, pidBuf);
       StrCat(g_CurrentFilePath, "]");
 
@@ -1477,7 +1477,6 @@ bool ShowProcessDialog(NativeWindow parent, AppOptions& options)
       g_ScrollY = 0;
       ApplyEnabledPlugins();
 
-      LinuxRedraw();
     }
     else
     {
@@ -1907,7 +1906,7 @@ bool ShowProcessDialog(NativeWindow parent, AppOptions& options)
       {
         StrCopy(g_CurrentFilePath, "[Process Memory - PID ");
         char pidBuf[32];
-        IntToStr(selectedPid, pidBuf, sizeof(pidBuf));
+        ItoaDec((long long)selectedPid, pidBuf, sizeof(pidBuf));
         StrCat(g_CurrentFilePath, pidBuf);
         StrCat(g_CurrentFilePath, "]");
 

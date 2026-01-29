@@ -346,7 +346,7 @@ void SaveOptionsToFile(const AppOptions& options)
   write(fd, buf, StrLen(buf));
 
   StrCopy(buf, "bytesPerLine=");
-  IntToStr(options.defaultBytesPerLine, buf + 13, 243);
+  ItoaDec((long long)options.defaultBytesPerLine, buf + 13, 243);
   int len = (int)StrLen(buf);
   StrCopy(buf + len, "\n");
   write(fd, buf, StrLen(buf));
