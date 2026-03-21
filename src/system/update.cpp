@@ -534,7 +534,7 @@ std::string GetAssetDownloadUrl(const std::string& releaseApiUrl, bool includeBe
   targetExtension = isNative ? ".dmg" : ".zip";
 #elif __linux__
   targetExtension = isNative ? ".deb" : ".tar.gz";
-#else
+#elif __WIN32__
   targetExtension = ".zip";
 #endif
 
