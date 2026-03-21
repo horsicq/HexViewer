@@ -95,7 +95,7 @@ bool CheckPluginCapabilities(const char *pluginPath, PluginInfo *info)
 
     if (!InitializePythonRuntime())
     {
-        strCopy(info->description, "Python not installed");
+        strCopy(info->description, "Python is not installed");
         return false;
     }
 
