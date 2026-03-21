@@ -735,12 +735,12 @@ void DownloadFromGitHub()
   if (isNative)
   {
     std::string cmd = "xterm -e 'sudo dpkg -i \"" + downloadedFilePath + "\"'";
-    system(cmd.c_str());
+    system(cmd.c_str()) >0;
   }
   else
   {
     std::string cmd = "xdg-open \"$(dirname '" + downloadedFilePath + "')\"";
-    system(cmd.c_str());
+    system(cmd.c_str()) >0;
   }
 #endif
 
