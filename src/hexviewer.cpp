@@ -452,7 +452,7 @@ void OnFileOpen()
 	FILE* fp = popen("zenity --file-selection 2>/dev/null", "r");
 	if (!fp)
 	{
-		printf("Failed to open file dialog.\n");
+		fprintf(stderr, "Failed to open file dialog.\n");
 		return;
 	}
 
@@ -484,7 +484,7 @@ void OnFileOpen()
 	}
 	else
 	{
-		printf("Failed to open file: %s\n", path);
+		fprintf(stderr, "Failed to open file: %s\n", path);
 	}
 #endif
 }
@@ -522,7 +522,7 @@ void OnFileSave()
 		[alert setAlertStyle:NSAlertStyleCritical] ;
 		[alert runModal] ;
 #else
-		printf("Failed to save file.\n");
+		fprintf(stderr, "Failed to save file.\n");
 #endif
 	}
 }
